@@ -811,7 +811,11 @@ export default function SellerDashboard({ onNavigate, activeSubView }: Props) {
     const fetchRequests = async () => {
       try {
         const reqs = await firestoreService.getOfferRequests();
-        setRequests(reqs.filter((r: any) => r.status === 'Open'));
+        if (Array.isArray(reqs)) {
+          setRequests(reqs.filter((r: any) => r.status === 'Open'));
+        } else {
+          setRequests([]);
+        }
       } catch (error) {
         console.error("OfferRequests fetch error:", error);
       }

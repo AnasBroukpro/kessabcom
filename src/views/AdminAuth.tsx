@@ -11,7 +11,9 @@ import {
   UserPlus, 
   LogIn, 
   RefreshCcw,
-  AlertTriangle
+  AlertTriangle,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { auth } from '../lib/firebase';
 import { 
@@ -26,12 +28,13 @@ interface Props {
   onNavigate: (view: ViewType) => void;
 }
 
-type AuthStep = 'login' | 'signup' | 'reset';
+type AuthStep = 'login' | 'reset';
 
 export default function AdminAuth({ onNavigate }: Props) {
   const { profile, refreshProfile } = useAuth();
   const [email, setEmail] = useState('anas.brouk@gmail.com');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -65,17 +68,15 @@ export default function AdminAuth({ onNavigate }: Props) {
         const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
         
         // After login, ensure profile is synced as admin
-        await firestoreService.syncUser(userCredential.user.uid, email.trim(), 'Anas Brouk', 'admin');
+        try {
+          await firestoreService.syncUser(userCredential.user.uid, email.trim(), 'Anas Brouk', 'admin');
+        } catch (apiErr) {
+          console.warn('API Sync failed, but continuing login:', apiErr);
+          // If the backend is down, we still want to log in if the user is authentic
+        }
         
         await refreshProfile();
         onNavigate('admin');
-      } else if (step === 'signup') {
-        const userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
-        
-        await firestoreService.syncUser(userCredential.user.uid, email.trim(), 'Anas Brouk', 'admin');
-        
-        setSuccess('تم إنشاء الحساب بنجاح. يمكنك الآن تسجيل الدخول.');
-        setStep('login');
       }
     } catch (err: any) {
       console.error('Auth Error:', err);
@@ -126,7 +127,7 @@ export default function AdminAuth({ onNavigate }: Props) {
             <div>
               <h1 className="text-xl font-black tracking-tighter uppercase italic">كسابكوم أدمن</h1>
               <p className="text-[10px] text-gray-500 uppercase tracking-widest">
-                {step === 'login' ? 'الدخول الآمن' : step === 'signup' ? 'إنشاء حساب مسؤول' : 'إعادة تعيين كلمة المرور'}
+                {step === 'login' ? 'الدخول الآمن' : 'إعادة تعيين كلمة المرور'}
               </p>
             </div>
           </div>
@@ -169,14 +170,21 @@ export default function AdminAuth({ onNavigate }: Props) {
                   <div className="relative">
                     <Lock className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
                     <input 
-                      className="w-full h-14 pr-12 pl-4 bg-[#121212] border border-[#333] rounded-sm text-white font-bold focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all text-left" 
+                      className="w-full h-14 pr-12 pl-12 bg-[#121212] border border-[#333] rounded-sm text-white font-bold focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all text-left" 
                       dir="ltr" 
-                      type="password"
+                      type={showPassword ? "text" : "password"}
                       required
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="••••••••"
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
+                    >
+                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
                   </div>
                 </div>
               </div>
@@ -198,21 +206,11 @@ export default function AdminAuth({ onNavigate }: Props) {
               >
                 {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
                   <>
-                    {step === 'login' ? 'تسجيل الدخول' : 'إنشاء الحساب'}
+                    تسجيل الدخول
                     <LogIn className="w-4 h-4" />
                   </>
                 )}
               </button>
-
-              <div className="text-center pt-4 border-t border-[#333]">
-                <button 
-                  type="button"
-                  onClick={() => setStep(step === 'login' ? 'signup' : 'login')}
-                  className="text-xs text-primary font-bold hover:underline inline-flex items-center gap-2"
-                >
-                  {step === 'login' ? <><UserPlus className="w-4 h-4" /> إنشاء حساب جديد</> : <><LogIn className="w-4 h-4" /> لدي حساب بالفعل</>}
-                </button>
-              </div>
             </form>
           ) : (
             <form onSubmit={handleResetPassword} className="space-y-6">

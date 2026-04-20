@@ -226,10 +226,29 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
         return;
       }
 
+      // Generate reCAPTCHA Enterprise token for server-side verification
+      let recaptchaToken = '';
+      if (typeof window !== 'undefined' && (window as any).grecaptcha?.enterprise) {
+        try {
+          const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
+          if (siteKey) {
+            console.log('🛡️ Generating reCAPTCHA Enterprise token...');
+            recaptchaToken = await (window as any).grecaptcha.enterprise.execute(siteKey, { action: 'create_listing' });
+          }
+        } catch (err) {
+          console.error("reCAPTCHA execution error:", err);
+        }
+      }
+
+      const finalData = {
+        ...announcementData,
+        recaptchaToken
+      };
+
       if (listingId) {
-        await firestoreService.updateAnnouncement(listingId, announcementData);
+        await firestoreService.updateAnnouncement(listingId, finalData);
       } else {
-        await firestoreService.createAnnouncement(announcementData);
+        await firestoreService.createAnnouncement(finalData);
       }
       setShowSuccess(true);
     } catch (error) {

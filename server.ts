@@ -39,6 +39,53 @@ const db = new Firestore({
 });
 const auth = admin.auth();
 
+// Helper to verify reCAPTCHA Enterprise token
+const verifyRecaptcha = async (token: string, action: string) => {
+  if (!token) return false;
+  const projectID = firebaseConfig.projectId;
+  const apiKey = process.env.GOOGLE_CLOUD_API_KEY;
+  const siteKey = process.env.VITE_RECAPTCHA_SITE_KEY;
+  
+  if (!apiKey || !siteKey) {
+    console.warn('⚠️ reCAPTCHA skip: missing API_KEY or SITE_KEY in env');
+    return true; // Don't block if not configured
+  }
+
+  try {
+    const url = `https://recaptchaenterprise.googleapis.com/v1/projects/${projectID}/assessments?key=${apiKey}`;
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        event: {
+          token: token,
+          siteKey: siteKey,
+          expectedAction: action,
+        },
+      }),
+    });
+    
+    const data: any = await response.json();
+    console.log('🛡️ reCAPTCHA Assessment Result:', JSON.stringify(data, null, 2));
+
+    if (!data.tokenProperties?.valid) {
+      console.warn('❌ reCAPTCHA invalid:', data.tokenProperties?.invalidReason);
+      return false;
+    }
+    
+    // Check score (0.0 to 1.0, where 1.0 is very likely a human)
+    if (data.riskAnalysis?.score < 0.3) {
+      console.warn('❌ reCAPTCHA low score:', data.riskAnalysis?.score);
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('❌ reCAPTCHA error:', error);
+    return true; // Fallback to allow progress if API fails
+  }
+};
+
 // Middleware: Verify Token
 const verifyToken = async (req: any, res: Response, next: NextFunction) => {
   const header = req.headers.authorization;
@@ -96,15 +143,17 @@ async function startServer() {
 
   // --- SETTINGS ENDPOINTS ---
   app.get("/api/settings", async (req, res) => {
+    console.log('📡 API: Fetching settings...');
     try {
       const snap = await db.collection('settings').get();
+      console.log(`✅ API: Settings fetched (${snap.size} docs)`);
       const settings: any = {};
       snap.docs.forEach(doc => {
         settings[doc.id === 'global' ? 'main' : doc.id] = doc.data();
       });
       res.json(settings);
     } catch (e: any) {
-      console.warn("Settings fetch failed (likely quota):", e.message);
+      console.error("❌ API: Settings fetch failed:", e.message);
       // Return default settings structure so frontend doesn't crash
       res.json({
         main: { solidarityDonationEnabled: true, maintenanceMode: false, monetization: { proMonthly: 199, farmMonthly: 499, boost3Days: 49, boost7Days: 99 } }
@@ -162,17 +211,22 @@ async function startServer() {
 
   app.post("/api/auth/register", async (req, res) => {
     const { uid, email, fullName, role } = req.body;
+    const phone = req.body.phone || req.body.phoneNumber;
+    console.log(`📝 API: Registering user ${uid} with role: ${role}, phone: ${phone}`);
     try {
       await db.collection('users').doc(uid).set({
-        email,
-        fullName,
-        role: role || 'buyer',
+        email: email || '',
+        fullName: fullName || '',
+        phoneNumber: phone || '',
+        role: role || '', // Remove default 'buyer' to detect incomplete profiles
         status: 'active',
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       }, { merge: true });
+      console.log(`✅ API: User ${uid} profile created/updated`);
       res.status(201).json({ message: "User profile created" });
     } catch (e: any) {
+      console.error(`❌ API: Registration error for ${uid}:`, e.message);
       res.status(500).json({ error: e.message });
     }
   });
@@ -181,15 +235,9 @@ async function startServer() {
     // Just sync/verify user exists
     const userDoc = await db.collection('users').doc(req.user.uid).get();
     if (!userDoc.exists) {
-      await db.collection('users').doc(req.user.uid).set({
-        email: req.user.email,
-        fullName: req.user.name || 'مستخدم جديد',
-        role: 'buyer',
-        status: 'active',
-        createdAt: admin.firestore.FieldValue.serverTimestamp()
-      });
+      return res.status(404).json({ error: "User profile not found" });
     }
-    res.json({ status: "ok" });
+    res.json({ status: "ok", role: userDoc.data()?.role });
   });
 
   app.get("/api/auth/me", verifyToken, async (req: any, res) => {
@@ -209,10 +257,10 @@ async function startServer() {
 
   app.put("/api/auth/profile", verifyToken, async (req: any, res) => {
     try {
-      await db.collection('users').doc(req.user.uid).update({
+      await db.collection('users').doc(req.user.uid).set({
         ...req.body,
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
-      });
+      }, { merge: true });
       res.json({ message: "Profile updated" });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
@@ -233,15 +281,22 @@ async function startServer() {
   // --- LISTINGS ENDPOINTS ---
 
   app.get("/api/listings", async (req, res) => {
-    const { category, sellerId } = req.query;
-    let query: any = db.collection('announcements');
-    if (category) query = query.where('category', '==', category);
-    if (sellerId) query = query.where('sellerId', '==', sellerId);
-    query = query.where('status', '==', 'active').orderBy('createdAt', 'desc');
-    
-    const snap = await query.limit(50).get();
-    const data = snap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
-    res.json(data);
+    try {
+      const { category, sellerId } = req.query;
+      let query: any = db.collection('announcements');
+      if (category) query = query.where('category', '==', category);
+      if (sellerId) query = query.where('sellerId', '==', sellerId);
+      
+      // Removed orderBy to prevent composite index crash locally if not created
+      query = query.where('status', '==', 'active');
+      
+      const snap = await query.limit(50).get();
+      const data = snap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
+      res.json(data);
+    } catch (e: any) {
+      console.error('API Listings Error:', e.message);
+      res.status(500).json({ error: e.message });
+    }
   });
 
   app.get("/api/listings/:id", async (req, res) => {
@@ -251,7 +306,16 @@ async function startServer() {
   });
 
   app.post("/api/listings", verifyToken, async (req: any, res) => {
+    console.log(`📝 API: Creating new listing for user ${req.user.uid}...`);
     try {
+      // Optional reCAPTCHA verification if token is provided
+      if (req.body.recaptchaToken) {
+        const isValid = await verifyRecaptcha(req.body.recaptchaToken, 'create_listing');
+        if (!isValid) {
+          return res.status(403).json({ error: 'reCAPTCHA verification failed. Please try again.' });
+        }
+      }
+
       const data = {
         ...req.body,
         sellerId: req.user.uid,
@@ -260,9 +324,14 @@ async function startServer() {
         totalClicks: 0,
         createdAt: admin.firestore.FieldValue.serverTimestamp()
       };
+      
+      console.log('Listing Data:', { ...data, images: `${data.images?.length || 0} images` });
+      
       const docRef = await db.collection('announcements').add(data);
+      console.log(`✅ API: Listing created successfully (ID: ${docRef.id})`);
       res.status(201).json({ id: docRef.id });
     } catch (e: any) {
+      console.error(`❌ API: Listing creation failed:`, e.message);
       res.status(500).json({ error: e.message });
     }
   });
@@ -291,11 +360,25 @@ async function startServer() {
   });
 
   app.get("/api/listings/seller/:sellerId", async (req, res) => {
-    const snap = await db.collection('announcements')
-      .where('sellerId', '==', req.params.sellerId)
-      .orderBy('createdAt', 'desc')
-      .get();
-    res.json(snap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() })));
+    try {
+      console.log(`📡 API: Fetching listings for seller ${req.params.sellerId}`);
+      const snap = await db.collection('announcements')
+        .where('sellerId', '==', req.params.sellerId)
+        .get();
+      
+      const listings = snap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
+      // Sort in JS to avoid index requirement
+      listings.sort((a, b) => {
+        const dateA = a.createdAt?.toDate?.() || new Date(0);
+        const dateB = b.createdAt?.toDate?.() || new Date(0);
+        return dateB.getTime() - dateA.getTime();
+      });
+      
+      res.json(listings);
+    } catch (e: any) {
+      console.error('❌ API: Error fetching seller listings:', e.message);
+      res.status(500).json({ error: e.message });
+    }
   });
 
   app.post("/api/listings/:id/boost", verifyToken, async (req: any, res) => {
@@ -314,12 +397,27 @@ async function startServer() {
 
   // --- REQUESTS ENDPOINTS ---
 
-  app.get("/api/requests", async (req, res) => {
-    const snap = await db.collection('offerRequests').where('status', '==', 'Open').orderBy('createdAt', 'desc').get();
-    res.json(snap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() })));
+  app.get("/api/offer-requests", async (req, res) => {
+    try {
+      console.log('📡 API: Fetching open requests...');
+      const snap = await db.collection('offerRequests').where('status', '==', 'Open').get();
+      const requests = snap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
+      
+      // Sort in JS to avoid index requirement
+      requests.sort((a, b) => {
+        const dateA = a.createdAt?.toDate?.() || new Date(0);
+        const dateB = b.createdAt?.toDate?.() || new Date(0);
+        return dateB.getTime() - dateA.getTime();
+      });
+
+      res.json(requests);
+    } catch (e: any) {
+      console.error('❌ API: Error fetching requests:', e.message);
+      res.status(500).json({ error: e.message });
+    }
   });
 
-  app.post("/api/requests", verifyToken, async (req: any, res) => {
+  app.post("/api/offer-requests", verifyToken, async (req: any, res) => {
     const data = {
       ...req.body,
       buyerId: req.user.uid,
@@ -331,18 +429,18 @@ async function startServer() {
     res.status(201).json({ id: docRef.id });
   });
 
-  app.get("/api/requests/:id", async (req, res) => {
+  app.get("/api/offer-requests/:id", async (req, res) => {
     const doc = await db.collection('offerRequests').doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Not found" });
     res.json({ id: doc.id, ...doc.data() });
   });
 
-  app.put("/api/requests/:id/archive", verifyToken, async (req: any, res) => {
+  app.put("/api/offer-requests/:id/archive", verifyToken, async (req: any, res) => {
     await db.collection('offerRequests').doc(req.params.id).update({ status: 'archived' });
     res.json({ status: "ok" });
   });
 
-  app.delete("/api/requests/:id", verifyToken, async (req: any, res) => {
+  app.delete("/api/offer-requests/:id", verifyToken, async (req: any, res) => {
     const docRef = db.collection('offerRequests').doc(req.params.id);
     const snap = await docRef.get();
     if (!snap.exists) return res.status(404).json({ error: "Not found" });
@@ -388,11 +486,16 @@ async function startServer() {
   });
 
   app.get("/api/offers/request/:requestId", verifyToken, async (req: any, res) => {
-    const snap = await db.collection('offers')
-      .where('requestId', '==', req.params.requestId)
-      .orderBy('createdAt', 'desc')
-      .get();
-    res.json(snap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() })));
+    try {
+      const snap = await db.collection('offers')
+        .where('requestId', '==', req.params.requestId)
+        .orderBy('createdAt', 'desc')
+        .get();
+      res.json(snap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() })));
+    } catch (e: any) {
+      console.error('❌ API: Error fetching offers:', e.message);
+      res.status(500).json({ error: e.message });
+    }
   });
 
   app.put("/api/offers/:id/accept", verifyToken, async (req: any, res) => {
@@ -491,6 +594,27 @@ async function startServer() {
   });
 
   // --- ADMIN ENDPOINTS ---
+
+  app.get("/api/admin/stats", verifyToken, isAdmin, async (req, res) => {
+    try {
+      const [usersSnap, adsSnap, activeAdsSnap, requestsSnap] = await Promise.all([
+        db.collection('users').count().get(),
+        db.collection('announcements').count().get(),
+        db.collection('announcements').where('status', '==', 'active').count().get(),
+        db.collection('offerRequests').count().get(),
+      ]);
+
+      res.json({
+        totalUsers: usersSnap.data().count,
+        totalAds: adsSnap.data().count,
+        activeAds: activeAdsSnap.data().count,
+        totalRequests: requestsSnap.data().count
+      });
+    } catch (error) {
+      console.error("Error fetching admin stats:", error);
+      res.status(500).json({ error: "Failed to fetch stats" });
+    }
+  });
 
   app.get("/api/admin/users", verifyToken, isAdmin, async (req, res) => {
     try {

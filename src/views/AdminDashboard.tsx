@@ -8,8 +8,10 @@ import {
   LayoutDashboard, Users, Tag, Layers, Settings, Bell, User, Search, 
   CheckCircle2, Ban, Eye, TrendingUp, DollarSign, ShieldCheck, BadgeCheck,
   AlertCircle, ArrowUpRight, Filter, MoreVertical, Download, Upload, FileText, Database, X,
-  Clock, ChevronLeft, LogOut, MapPin, Heart, HeartHandshake, Zap, Megaphone, Loader2
+  Clock, ChevronLeft, LogOut, MapPin, Heart, HeartHandshake, Zap, Megaphone, Loader2,
+  Lock, Camera, Shield, Globe, Mail, Phone, Calendar, Info
 } from 'lucide-react';
+import { updatePassword, updateProfile, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { useSettings } from '../hooks/useSettings';
 import DashboardHeader from '../components/DashboardHeader';
 import { cityMapping } from '../constants/cityMapping';
@@ -20,7 +22,7 @@ interface Props {
   activeSubView?: string;
 }
 
-type AdminTab = 'overview' | 'stats' | 'users' | 'listings' | 'monetization' | 'ads' | 'settings' | 'stock-market' | 'donations' | 'reports';
+type AdminTab = 'overview' | 'stats' | 'users' | 'listings' | 'monetization' | 'ads' | 'settings' | 'stock-market' | 'donations' | 'reports' | 'profile';
 
 interface StockMarketViewProps {
   settings: any;
@@ -348,7 +350,149 @@ export default function AdminDashboard({ onNavigate, activeSubView }: Props) {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
 
+  // Profile states
+  const [newDisplayName, setNewDisplayName] = useState(profile?.fullName || profile?.displayName || '');
+  const [newPhotoURL, setNewPhotoURL] = useState(profile?.photoURL || '');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileSuccess, setProfileSuccess] = useState<string | null>(null);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [isPhotoUploading, setIsPhotoUploading] = useState(false);
+  
+  // User Preferences States
+  const [prefLanguage, setPrefLanguage] = useState(profile?.preferences?.language || 'ar');
+  const [prefNotifications, setPrefNotifications] = useState(profile?.preferences?.notificationsEnabled ?? true);
+  const [prefCompactMode, setPrefCompactMode] = useState(profile?.preferences?.compactMode ?? false);
+
+  const { refreshProfile } = useAuth();
+
   const { settings, updateSettings } = useSettings();
+
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    setProfileLoading(true);
+    setProfileError(null);
+    setProfileSuccess(null);
+
+    try {
+      // Update Auth Profile
+      await updateProfile(user, {
+        displayName: newDisplayName,
+        photoURL: newPhotoURL
+      });
+
+      // Update Firestore User Document
+      await firestoreService.updateUserProfile(user.uid, {
+        fullName: newDisplayName,
+        displayName: newDisplayName,
+        photoURL: newPhotoURL,
+        preferences: {
+          language: prefLanguage,
+          notificationsEnabled: prefNotifications,
+          compactMode: prefCompactMode
+        }
+      });
+
+
+      await refreshProfile();
+      setProfileSuccess('تم تحديث الملف الشخصي بنجاح!');
+    } catch (error: any) {
+      console.error('Error updating profile:', error);
+      setProfileError('فشل في تحديث الملف الشخصي. المرجو المحاولة لاحقاً.');
+    } finally {
+      setProfileLoading(false);
+    }
+  };
+
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !user.email) return;
+    if (newPassword !== confirmPassword) {
+      setProfileError('كلمات المرور غير متطابقة.');
+      return;
+    }
+
+    setProfileLoading(true);
+    setProfileError(null);
+    setProfileSuccess(null);
+
+    try {
+      // Re-authenticate user first
+      const credential = EmailAuthProvider.credential(user.email, currentPassword);
+      await reauthenticateWithCredential(user, credential);
+      
+      // Update password
+      await updatePassword(user, newPassword);
+      
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setProfileSuccess('تم تغيير كلمة المرور بنجاح!');
+    } catch (error: any) {
+      console.error('Error updating password:', error);
+      if (error.code === 'auth/wrong-password') {
+        setProfileError('كلمة المرور الحالية غير صحيحة.');
+      } else {
+        setProfileError('فشل في تغيير كلمة المرور. المرجو المحاولة لاحقاً.');
+      }
+    } finally {
+      setProfileLoading(false);
+    }
+  };
+
+  // Auto-save preferences when they change
+  useEffect(() => {
+    const savePrefs = async () => {
+      if (!user) return;
+      try {
+        await firestoreService.updateUserProfile(user.uid, {
+          preferences: {
+            language: prefLanguage,
+            notificationsEnabled: prefNotifications,
+            compactMode: prefCompactMode
+          }
+        });
+      } catch (error) {
+        console.error("Failed to auto-save preferences:", error);
+      }
+    };
+
+    if (profile && (
+        profile?.preferences?.language !== prefLanguage || 
+        profile?.preferences?.notificationsEnabled !== prefNotifications ||
+        profile?.preferences?.compactMode !== prefCompactMode)) {
+      savePrefs();
+    }
+  }, [prefLanguage, prefNotifications, prefCompactMode, user, profile]);
+
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    setIsPhotoUploading(true);
+    setProfileError(null);
+
+    try {
+      const url = await firestoreService.uploadImage(file, `profiles/${user.uid}`);
+      setNewPhotoURL(url);
+      
+      // Auto-update profile with new photo
+      await updateProfile(user, { photoURL: url });
+      await firestoreService.updateUserProfile(user.uid, { photoURL: url });
+      await refreshProfile();
+      
+      setProfileSuccess('تم تحديث الصورة الشخصية بنجاح!');
+    } catch (error) {
+      console.error('Error uploading photo:', error);
+      setProfileError('فشل في رفع الصورة.');
+    } finally {
+      setIsPhotoUploading(false);
+    }
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -597,6 +741,7 @@ export default function AdminDashboard({ onNavigate, activeSubView }: Props) {
       case 'stock-market': return 'بورصة الأغنام';
       case 'donations': return 'تبرعات و الاستفادات';
       case 'reports': return 'التبليغات';
+      case 'profile': return 'ملفي الشخصي';
       default: return 'لوحة التحكم';
     }
   };
@@ -895,14 +1040,14 @@ const renderOverview = () => (
                     <span className="text-on-surface-variant uppercase tracking-tighter">عمليات الكتابة (Writes)</span>
                     {quotaExceeded && <span className="bg-error/10 text-error text-[8px] px-1.5 py-0.5 rounded animate-pulse">تجاوز الحد</span>}
                   </div>
-                  <span className="text-primary">{quotaExceeded ? '100' : '85'}%</span>
+                  <span className="text-primary">{quotaExceeded ? '100' : '1'}%</span>
                 </div>
                 <div className="h-2 bg-surface-container-high rounded-full overflow-hidden border border-outline-variant/10">
-                  <div className="h-full bg-gradient-to-l from-primary to-primary-container transition-all duration-1000 shadow-sm" style={{ width: `${quotaExceeded ? 100 : 85}%` }}></div>
+                  <div className="h-full bg-gradient-to-l from-primary to-primary-container transition-all duration-1000 shadow-sm" style={{ width: `${quotaExceeded ? 100 : 1}%` }}></div>
                 </div>
                 <div className="flex justify-between text-[9px] font-black text-on-surface-variant/60">
                   <span>الحد اليومي: 20,000</span>
-                  <span>المستهلك: {quotaExceeded ? '20,000+' : '17,000'}</span>
+                  <span>المستهلك: {quotaExceeded ? '20,000+' : '5'}</span>
                 </div>
               </div>
 
@@ -910,14 +1055,14 @@ const renderOverview = () => (
               <div className="space-y-2">
                 <div className="flex justify-between text-xs font-black text-blue-600">
                   <span className="text-on-surface-variant uppercase tracking-tighter">عمليات القراءة (Reads)</span>
-                  <span>42%</span>
+                  <span>1%</span>
                 </div>
                 <div className="h-2 bg-surface-container-high rounded-full overflow-hidden border border-outline-variant/10">
-                  <div className="h-full bg-gradient-to-l from-blue-600 to-blue-400 transition-all duration-1000 shadow-sm" style={{ width: `42%` }}></div>
+                  <div className="h-full bg-gradient-to-l from-blue-600 to-blue-400 transition-all duration-1000 shadow-sm" style={{ width: `1%` }}></div>
                 </div>
                 <div className="flex justify-between text-[9px] font-black text-on-surface-variant/60">
                   <span>الحد اليومي: 50,000</span>
-                  <span>المستهلك: 21,000</span>
+                  <span>المستهلك: 15</span>
                 </div>
               </div>
 
@@ -1863,6 +2008,295 @@ const renderOverview = () => (
     </div>
   );
 
+  const renderProfile = () => {
+    return (
+      <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="flex justify-between items-center">
+          <div>
+            <h2 className="text-2xl font-black text-on-surface font-headline">ملفي الشخصي</h2>
+            <p className="text-on-surface-variant text-sm mt-1">تعديل معلوماتك الشخصية، كلمة المرور وتفضيلات الحساب.</p>
+          </div>
+          <div className="bg-primary/10 text-primary p-3 rounded-2xl">
+            <User className="w-6 h-6" />
+          </div>
+        </div>
+
+        {(profileSuccess || profileError) && (
+          <div className={`p-4 rounded-2xl flex items-center gap-3 animate-in zoom-in-95 duration-200 ${profileSuccess ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+            {profileSuccess ? <CheckCircle2 className="w-5 h-5 shrink-0" /> : <AlertCircle className="w-5 h-5 shrink-0" />}
+            <span className="font-bold text-sm">{profileSuccess || profileError}</span>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Left Column: Avatar & Summary */}
+          <div className="space-y-6">
+            <div className="bg-surface rounded-3xl p-8 border border-outline-variant/30 shadow-sm flex flex-col items-center">
+              <div className="relative group">
+                <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-white shadow-xl bg-surface-container-low ring-1 ring-outline-variant/20">
+                  {newPhotoURL ? (
+                    <img src={newPhotoURL} alt="Avatar" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-primary/5 text-primary">
+                      <User className="w-12 h-12 opacity-30" />
+                    </div>
+                  )}
+                  {isPhotoUploading && (
+                    <div className="absolute inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center">
+                      <Loader2 className="w-8 h-8 text-white animate-spin" />
+                    </div>
+                  )}
+                </div>
+                <label className="absolute bottom-0 right-0 p-2.5 bg-primary text-on-primary rounded-full shadow-lg cursor-pointer transform transition-transform hover:scale-110 active:scale-95 border-2 border-white">
+                  <Camera className="w-4 h-4" />
+                  <input type="file" className="hidden" accept="image/*" onChange={handlePhotoUpload} disabled={isPhotoUploading} />
+                </label>
+              </div>
+              <h3 className="mt-6 font-black text-lg text-on-surface">{newDisplayName || 'مستخدم كسابكوم'}</h3>
+              <p className="text-on-surface-variant text-sm font-bold">{user?.email}</p>
+              <div className="mt-4 px-3 py-1 bg-primary/10 text-primary rounded-lg text-[10px] font-black uppercase tracking-wider">مدير النظام</div>
+            </div>
+
+            <div className="bg-surface rounded-3xl p-6 border border-outline-variant/30 shadow-sm">
+              <h4 className="font-black text-sm text-on-surface mb-6 flex items-center gap-2">
+                <Info className="w-4 h-4 text-primary" />
+                معلومات الحساب
+              </h4>
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <Mail className="w-4 h-4 text-on-surface-variant" />
+                  <div className="flex-1">
+                    <p className="text-[10px] font-bold text-on-surface-variant uppercase">البريد الإلكتروني</p>
+                    <p className="text-sm font-medium text-on-surface">{user?.email}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Shield className="w-4 h-4 text-on-surface-variant" />
+                  <div className="flex-1">
+                    <p className="text-[10px] font-bold text-on-surface-variant uppercase">الدور</p>
+                    <p className="text-sm font-medium text-on-surface">مسؤول بجميع الصلاحيات</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Calendar className="w-4 h-4 text-on-surface-variant" />
+                  <div className="flex-1">
+                    <p className="text-[10px] font-bold text-on-surface-variant uppercase">عضو منذ</p>
+                    <p className="text-sm font-medium text-on-surface">
+                      {user?.metadata.creationTime ? new Date(user.metadata.creationTime).toLocaleDateString('ar-MA') : '-'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column: Forms & Preferences */}
+          <div className="lg:col-span-2 space-y-8">
+            {/* Personal Details Form */}
+            <div className="bg-surface rounded-3xl p-8 border border-outline-variant/30 shadow-sm">
+              <h4 className="font-black text-lg text-on-surface mb-8 flex items-center gap-3">
+                <Settings className="w-5 h-5 text-primary" />
+                المعلومات الأساسية
+              </h4>
+              <form onSubmit={handleUpdateProfile} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-on-surface-variant mr-1">الاسم الكامل</label>
+                    <div className="relative">
+                      <User className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant" />
+                      <input 
+                        type="text" 
+                        value={newDisplayName}
+                        onChange={(e) => setNewDisplayName(e.target.value)}
+                        placeholder="أدخل اسمك الكامل"
+                        className="w-full pr-12 pl-4 py-4 bg-surface-container-low border border-outline-variant/20 rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm font-bold"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-on-surface-variant mr-1">الصورة الشخصية (رابط)</label>
+                    <div className="relative">
+                      <Globe className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant" />
+                      <input 
+                        type="url" 
+                        value={newPhotoURL}
+                        onChange={(e) => setNewPhotoURL(e.target.value)}
+                        placeholder="https://example.com/photo.jpg"
+                        className="w-full pr-12 pl-4 py-4 bg-surface-container-low border border-outline-variant/20 rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm font-bold"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="flex justify-end pt-4">
+                  <button 
+                    type="submit" 
+                    disabled={profileLoading}
+                    className="px-8 py-4 bg-primary text-on-primary rounded-2xl font-black text-sm shadow-xl shadow-primary/20 transition-all hover:scale-105 active:scale-95 disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {profileLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                    حفظ التعديلات
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {/* Password Change Form */}
+            <div className="bg-surface rounded-3xl p-8 border border-outline-variant/30 shadow-sm">
+              <h4 className="font-black text-lg text-on-surface mb-8 flex items-center gap-3">
+                <Lock className="w-5 h-5 text-primary" />
+                تغيير كلمة المرور
+              </h4>
+              <form onSubmit={handleUpdatePassword} className="space-y-6">
+                <div className="space-y-2">
+                  <label className="text-xs font-black text-on-surface-variant mr-1">كلمة المرور الحالية</label>
+                  <div className="relative">
+                    <ShieldCheck className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant" />
+                    <input 
+                      type="password" 
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full pr-12 pl-4 py-4 bg-surface-container-low border border-outline-variant/20 rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm font-bold"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-on-surface-variant mr-1">كلمة المرور الجديدة</label>
+                    <div className="relative">
+                      <Lock className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant" />
+                      <input 
+                        type="password" 
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        placeholder="••••••••"
+                        className="w-full pr-12 pl-4 py-4 bg-surface-container-low border border-outline-variant/20 rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm font-bold"
+                        required
+                        minLength={6}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-on-surface-variant mr-1">تأكيد كلمة المرور</label>
+                    <div className="relative">
+                      <Lock className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant" />
+                      <input 
+                        type="password" 
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder="••••••••"
+                        className="w-full pr-12 pl-4 py-4 bg-surface-container-low border border-outline-variant/20 rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm font-bold"
+                        required
+                        minLength={6}
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="flex justify-end pt-4">
+                  <button 
+                    type="submit" 
+                    disabled={profileLoading}
+                    className="px-8 py-4 bg-primary text-on-primary rounded-2xl font-black text-sm shadow-xl shadow-primary/20 transition-all hover:scale-105 active:scale-95 disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {profileLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+                    تحديث كلمة المرور
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {/* Relevant Preferences */}
+            <div className="bg-surface rounded-3xl p-8 border border-outline-variant/30 shadow-sm">
+              <h4 className="font-black text-lg text-on-surface mb-8 flex items-center gap-3">
+                <Zap className="w-5 h-5 text-primary" />
+                تفضيلات لوحة التحكم
+              </h4>
+              <div className="space-y-4">
+                <div className="p-4 bg-surface-container-low rounded-2xl border border-outline-variant/10 flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center">
+                      <Globe className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="font-black text-sm text-on-surface">لغة الواجهة</p>
+                      <p className="text-[10px] text-on-surface-variant font-bold">اختر لغة عرض لوحة التحكم</p>
+                    </div>
+                  </div>
+                  <select 
+                    value={prefLanguage}
+                    onChange={(e) => {
+                      setPrefLanguage(e.target.value);
+                      setProfileSuccess('سيتم تطبيق اللغة في التحديث القادم');
+                    }}
+                    className="bg-white border border-outline-variant/30 rounded-xl px-4 py-2 text-sm font-bold outline-none focus:ring-2 focus:ring-primary"
+                  >
+                    <option value="ar">العربية (المغرب)</option>
+                    <option value="fr">Français</option>
+                  </select>
+                </div>
+
+                <div className="p-4 bg-surface-container-low rounded-2xl border border-outline-variant/10 flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 bg-purple-100 text-purple-600 rounded-xl flex items-center justify-center">
+                      <Bell className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="font-black text-sm text-on-surface">تنبيهات الإشعارات</p>
+                      <p className="text-[10px] text-on-surface-variant font-bold">تفعيل صوت الإشعارات عند وصول تبليغ جديد</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setPrefNotifications(!prefNotifications)}
+                    className={`w-12 h-6 rounded-full relative transition-all ${prefNotifications ? 'bg-primary' : 'bg-surface-container-highest'}`}
+                  >
+                    <div 
+                      className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${prefNotifications ? 'right-1' : 'right-7'}`}
+                    ></div>
+                  </button>
+                </div>
+
+                <div className="p-4 bg-surface-container-low rounded-2xl border border-outline-variant/10 flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 bg-green-100 text-green-600 rounded-xl flex items-center justify-center">
+                      <Layers className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="font-black text-sm text-on-surface">الوضع المكثف (Compact Mode)</p>
+                      <p className="text-[10px] text-on-surface-variant font-bold">تقليل المساحات البيضاء لعرض معلومات أكثر</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setPrefCompactMode(!prefCompactMode)}
+                    className={`w-12 h-6 rounded-full relative transition-all ${prefCompactMode ? 'bg-primary' : 'bg-surface-container-highest'}`}
+                  >
+                    <div 
+                      className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${prefCompactMode ? 'right-1' : 'right-7'}`}
+                    ></div>
+                  </button>
+                </div>
+
+                <div className="p-4 bg-surface-container-low rounded-2xl border border-outline-variant/10 flex items-center justify-between opacity-50 cursor-not-allowed">
+
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 bg-orange-100 text-orange-600 rounded-xl flex items-center justify-center">
+                      <Zap className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="font-black text-sm text-on-surface">الوضع الداكن (Dark Mode)</p>
+                      <p className="text-[10px] text-on-surface-variant font-bold">قريباً في التحديث القادم</p>
+                    </div>
+                  </div>
+                  <div className="bg-surface px-2 py-1 rounded text-[8px] font-black uppercase text-on-surface-variant">Soon</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="h-screen flex overflow-hidden bg-surface-container-low" dir="rtl">
       {quotaExceeded && (
@@ -1976,6 +2410,14 @@ const renderOverview = () => (
               <Settings className="w-5 h-5" />
               <span>الإعدادات</span>
             </button>
+
+            <button 
+              onClick={() => setActiveTab('profile')}
+              className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl font-bold transition-colors border ${activeTab === 'profile' ? 'bg-primary-container text-on-primary-container border-primary shadow-sm hover:bg-transparent hover:text-primary' : 'text-on-surface-variant border-transparent hover:border-on-surface-variant'}`}
+            >
+              <User className="w-5 h-5" />
+              <span>ملفي الشخصي</span>
+            </button>
           </nav>
         </div>
         <div className="p-4 border-t border-outline-variant/20">
@@ -1999,7 +2441,8 @@ const renderOverview = () => (
           onNavigate={onNavigate}
         />
 
-        <div className="p-6 md:p-8 max-w-7xl mx-auto w-full">
+        <div className={`${prefCompactMode ? 'p-4 md:p-5' : 'p-6 md:p-8'} max-w-7xl mx-auto w-full transition-all duration-300`}>
+
           {activeTab === 'overview' && renderOverview()}
           {activeTab === 'stats' && renderStats()}
           {activeTab === 'users' && renderUsers()}
@@ -2027,6 +2470,7 @@ const renderOverview = () => (
               </div>
             )
           )}
+          {activeTab === 'profile' && renderProfile()}
           {activeTab === 'settings' && (
             <div className="space-y-8">
               <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">

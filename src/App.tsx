@@ -138,7 +138,9 @@ function AppContent() {
       
       if (protectedViews.includes(currentView) && !profile) {
         if (currentView !== 'auth' && currentView !== 'admin-auth') {
-          setIntendedView({ view: currentView, listingId: selectedListingId });
+          if (!intendedView || intendedView.view !== currentView) {
+            setIntendedView({ view: currentView, listingId: selectedListingId });
+          }
         }
         
         if (currentView === 'admin') {
@@ -158,9 +160,11 @@ function AppContent() {
         }
 
         if (currentView === 'auth') {
+          console.log('App: User is on auth page with profile. Role:', profile?.role);
           if (profile.role === 'admin') handleNavigate('admin');
           else if (profile.role === 'seller') handleNavigate('seller');
-          else handleNavigate('buyer');
+          else if (profile.role === 'buyer') handleNavigate('buyer');
+          // If no role, stay on auth to complete profile
           return;
         }
 

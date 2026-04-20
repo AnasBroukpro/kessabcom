@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Bell, User, MapPin, Search, Navigation, ChevronDown, LogOut, LayoutDashboard, ShoppingBag, List, PlusCircle, Users, Settings, ArrowLeft, Menu, X } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useAuth } from '../contexts/AuthContext';
+import { firestoreService } from '../services/firestoreService';
 import { cityMapping } from '../constants/cityMapping';
 import MobileSidebar from './MobileSidebar';
 import NotificationSidebar from './NotificationSidebar';
@@ -178,7 +179,7 @@ export default function DashboardHeader({ title, subtitle, location, showSearch 
               <div 
                 key={notif.id} 
                 className={`px-5 py-4 border-b border-gray-50 transition-all cursor-pointer ${!notif.isRead ? 'bg-green-50/50 hover:bg-green-50' : 'hover:bg-gray-50'}`}
-                onClick={() => onMarkNotificationAsRead?.(notif.id)}
+                onClick={() => handleMarkNotificationAsRead(notif.id)}
               >
                 <p className="text-sm font-bold text-[#1A1A1A] mb-1 leading-tight">{notif.title}</p>
                 <p className="text-xs text-gray-500 mb-2 leading-relaxed">{notif.message}</p>
@@ -211,7 +212,7 @@ export default function DashboardHeader({ title, subtitle, location, showSearch 
         isOpen={isNotificationSidebarOpen}
         onClose={() => setIsNotificationSidebarOpen(false)}
         notifications={notifications}
-        onMarkNotificationAsRead={onMarkNotificationAsRead}
+        onMarkNotificationAsRead={handleMarkNotificationAsRead}
       />
 
       <div className="max-w-7xl mx-auto px-4 py-3 md:py-0 md:h-20 flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-6">

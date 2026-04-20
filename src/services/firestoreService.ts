@@ -2,9 +2,7 @@ import { auth } from '../lib/firebase';
 import { onSnapshot, query, collection, where, orderBy, limit } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
-const API_BASE = (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.port === '5173'))
-  ? 'http://localhost:3000/api' 
-  : '/api';
+const API_BASE = '/api';
 
 async function getAuthHeaders() {
   const user = auth.currentUser;
@@ -18,12 +16,12 @@ async function getAuthHeaders() {
 
 export const firestoreService = {
   // Auth & Users
-  async syncUser(uid: string, email: string, fullName: string, role: string) {
+  async syncUser(uid: string, email: string, fullName: string, role: string, phone: string) {
     const headers = await getAuthHeaders();
     return fetch(`${API_BASE}/auth/register`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ uid, email, fullName, role })
+      body: JSON.stringify({ uid, email, fullName, role, phone })
     }).then(res => res.json());
   },
 
@@ -86,17 +84,33 @@ export const firestoreService = {
   },
 
   async getSellerListings(sellerId: string) {
-    return fetch(`${API_BASE}/listings/seller/${sellerId}`).then(res => res.json());
+    try {
+      const res = await fetch(`${API_BASE}/listings/seller/${sellerId}`);
+      if (!res.ok) return [];
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    } catch (error) {
+      console.error("getSellerListings error:", error);
+      return [];
+    }
   },
 
   // Requests
   async getOfferRequests() {
-    return fetch(`${API_BASE}/requests`).then(res => res.json());
+    try {
+      const res = await fetch(`${API_BASE}/offer-requests`);
+      if (!res.ok) return [];
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    } catch (error) {
+      console.error("getOfferRequests error:", error);
+      return [];
+    }
   },
 
   async createOfferRequest(data: any) {
     const headers = await getAuthHeaders();
-    return fetch(`${API_BASE}/requests`, {
+    return fetch(`${API_BASE}/offer-requests`, {
       method: 'POST',
       headers,
       body: JSON.stringify(data)
@@ -104,12 +118,12 @@ export const firestoreService = {
   },
 
   async getOfferRequest(id: string) {
-    return fetch(`${API_BASE}/requests/${id}`).then(res => res.json());
+    return fetch(`${API_BASE}/offer-requests/${id}`).then(res => res.json());
   },
 
   async deleteOfferRequest(id: string) {
     const headers = await getAuthHeaders();
-    return fetch(`${API_BASE}/requests/${id}`, {
+    return fetch(`${API_BASE}/offer-requests/${id}`, {
       method: 'DELETE',
       headers
     }).then(res => res.json());
@@ -363,7 +377,7 @@ export const firestoreService = {
 
   async archiveOfferRequest(id: string) {
     const headers = await getAuthHeaders();
-    return fetch(`${API_BASE}/requests/${id}/archive`, {
+    return fetch(`${API_BASE}/offer-requests/${id}/archive`, {
       method: 'PUT',
       headers
     }).then(res => res.json());
@@ -380,6 +394,8 @@ export const firestoreService = {
     );
     return onSnapshot(q, (snapshot) => {
       callback(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => {
+      console.error("subscribeToFavorites error:", error);
     });
   },
 
@@ -445,6 +461,8 @@ export const firestoreService = {
     );
     return onSnapshot(q, (snapshot) => {
       callback(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => {
+      console.error("subscribeToAnnouncements error:", error);
     });
   },
 
@@ -456,6 +474,8 @@ export const firestoreService = {
     );
     return onSnapshot(q, (snapshot) => {
       callback(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => {
+      console.error("subscribeToUserNotifications error:", error);
     });
   },
 
@@ -467,6 +487,8 @@ export const firestoreService = {
     );
     return onSnapshot(q, (snapshot) => {
       callback(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => {
+      console.error("subscribeToOffersForRequest error:", error);
     });
   },
 
@@ -478,6 +500,8 @@ export const firestoreService = {
     );
     return onSnapshot(q, (snapshot) => {
       callback(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => {
+      console.error("subscribeToUserRequests error:", error);
     });
   },
 

@@ -109,6 +109,13 @@ export default function Auth({ onNavigate, intendedView }: Props) {
     setError(null);
     setLoading(true);
 
+    // Reset registration data if we are coming from a plain sign-in (not a pre-filled registration)
+    if (!registrationData.fullName) {
+      console.log('Auth: Resetting registration data, no default role set');
+      setRegistrationData({ fullName: '', city: '', termsAccepted: false });
+      setSelectedRole(null as any); // Don't default to buyer
+    }
+
     try {
       const appVerifier = initRecaptcha();
       if (!appVerifier) {
@@ -190,6 +197,13 @@ export default function Auth({ onNavigate, intendedView }: Props) {
     
     setLoading(true);
     setError(null);
+    
+    // Reset registration data if starting from specific login mode
+    if (mode === 'login') {
+      console.log('Auth: Resetting registration data for login mode');
+      setRegistrationData({ fullName: '', city: '', termsAccepted: false });
+      // No default role, user will be prompted if new
+    }
     try {
       // Format phone number to match storage format (e.g., +2126...)
       let cleanPhone = phoneNumber.replace(/\D/g, '');
@@ -205,15 +219,11 @@ export default function Auth({ onNavigate, intendedView }: Props) {
       // Check if phone exists via API
       const { exists } = await firestoreService.checkPhoneExists(formattedPhone);
 
-      if (exists || isTestKessab || isTestAcheteur) {
-        // User exists or is a test account, proceed to OTP and then login
-        await onSignInSubmit(undefined, phoneNumber);
-      } else {
-        // User doesn't exist, proceed to confirmation
-        setStep('confirm-register');
-      }
+      // Always proceed to OTP. If user is new, we will ask for confirmation AFTER OTP.
+      console.log('Auth: Proceeding to OTP for phone:', formattedPhone);
+      await onSignInSubmit(undefined, phoneNumber);
     } catch (err) {
-      console.error(err);
+      console.error('onPhoneSubmit Error:', err);
       setError('وقع مشكل فالتأكد من الحساب. عاود جرب.');
     } finally {
       setLoading(false);
@@ -247,12 +257,14 @@ export default function Auth({ onNavigate, intendedView }: Props) {
       const user = result.user;
 
       const profileData = await firestoreService.getUserProfile(user.uid);
-
+      console.log('User Profile Data:', profileData);
       const isTestKessab = user.phoneNumber === '+212600880088';
       const isTestAcheteur = user.phoneNumber === '+212700770077';
 
-      if (profileData && profileData.fullName) {
+      // Check if profile exists AND has both fullName and role
+      if (profileData && profileData.fullName && profileData.role) {
         let role = profileData.role;
+        console.log('Existing user detected. Role:', role);
         let needsUpdate = false;
 
         if (isTestKessab && role !== 'seller') {
@@ -264,29 +276,37 @@ export default function Auth({ onNavigate, intendedView }: Props) {
         }
 
         if (needsUpdate) {
+          console.log('Test account role mismatch. Updating...');
           await firestoreService.updateProfile({ role });
           await refreshProfile();
         }
 
         if (intendedView) {
+          console.log('Redirecting to intended view:', intendedView);
           onNavigate(intendedView.view, intendedView.listingId);
         } else if (role === 'seller') {
           onNavigate('seller');
         } else if (role === 'admin') {
           onNavigate('admin');
-        } else {
+        } else if (role === 'buyer') {
           onNavigate('buyer');
+        } else {
+          console.log('Role found but not recognized or empty. Prompting for role selection.');
+          setStep('role');
         }
       } else {
+        // No profile or missing data
+        console.log('New or incomplete user. Registration data:', registrationData);
         if (registrationData.fullName && registrationData.city) {
-          // We already have the data from the register mode, submit it directly
+          console.log('Data found in registration state, submitting details...');
           await onDetailsSubmit();
         } else if (isTestKessab || isTestAcheteur) {
-          // Test accounts skip role selection and go straight to details
+          console.log('Test account detected, going to details step');
           setStep('details');
         } else {
-          // New user from login mode, proceed to role selection
-          setStep('role');
+          // New user detected after OTP. Prompting for confirmation.
+          console.log('New user detected after OTP. Prompting for confirmation.');
+          setStep('confirm-register');
         }
       }
     } catch (err: any) {
@@ -305,15 +325,18 @@ export default function Auth({ onNavigate, intendedView }: Props) {
 
   const onDetailsSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!registrationData.fullName || !registrationData.city) return;
+    if (!registrationData.fullName || !registrationData.city) {
+      console.error('onDetailsSubmit: Missing name or city', registrationData);
+      return;
+    }
     
     setLoading(true);
     try {
-      const user = auth.currentUser;
-      if (!user) throw new Error('User not found');
+      const fbUser = auth.currentUser;
+      if (!fbUser) throw new Error('User not found');
 
       // Format phone number
-      let cleanPhone = phoneNumber.replace(/\D/g, '');
+      let cleanPhone = (phoneNumber || fbUser.phoneNumber || '').replace(/\D/g, '');
       if (cleanPhone.startsWith('212')) {
         cleanPhone = cleanPhone.substring(3);
       } else if (cleanPhone.startsWith('0')) {
@@ -325,26 +348,33 @@ export default function Auth({ onNavigate, intendedView }: Props) {
       const isTestAcheteur = formattedPhone === '+212700770077';
       const finalRole = isTestKessab ? 'seller' : (isTestAcheteur ? 'buyer' : selectedRole);
 
+      console.log(`onDetailsSubmit: Syncing user ${fbUser.uid} with role ${finalRole}`);
+
       await firestoreService.syncUser(
-        user.uid,
-        user.email || '',
+        fbUser.uid,
+        fbUser.email || '',
         registrationData.fullName,
-        finalRole
+        finalRole,
+        formattedPhone
       );
 
       // Force profile update in context before navigating
       await refreshProfile();
 
       if (intendedView) {
+        console.log('onDetailsSubmit: Navigating to intended view', intendedView);
         onNavigate(intendedView.view, intendedView.listingId);
       } else if (finalRole === 'admin') {
         onNavigate('admin');
-      } else if (selectedRole === 'seller') {
-        onNavigate('add-listing');
+      } else if (finalRole === 'seller' || selectedRole === 'seller') {
+        console.log('onDetailsSubmit: Navigating to seller dashboard');
+        onNavigate('seller');
       } else {
+        console.log('onDetailsSubmit: Navigating to buyer dashboard');
         onNavigate('buyer');
       }
     } catch (err) {
+      console.error('onDetailsSubmit error:', err);
       setError('وقع مشكل فإتمام التسجيل. عاود جرب.');
     } finally {
       setLoading(false);
@@ -424,7 +454,8 @@ export default function Auth({ onNavigate, intendedView }: Props) {
                     <button 
                       onClick={(e) => {
                         e.preventDefault();
-                        onSignInSubmit(undefined, phoneNumber);
+                        console.log('Auth: User confirmed new account, going to role selection');
+                        setStep('role');
                       }} 
                       className="w-full h-16 bg-[#1B5E20] text-white font-black text-xl rounded-2xl shadow-xl shadow-[#1B5E20]/30 border border-transparent hover:bg-transparent hover:text-[#1B5E20] hover:border-[#1B5E20] transition-colors flex items-center justify-center gap-4 group"
                     >

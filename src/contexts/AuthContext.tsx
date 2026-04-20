@@ -28,7 +28,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (firebaseUser) {
         try {
           const profileData = await firestoreService.getUserProfile(firebaseUser.uid);
-          setProfile(profileData);
+          if (profileData && profileData.error) {
+             setProfile(null);
+          } else {
+             setProfile(profileData);
+          }
         } catch (error) {
           console.warn("Profile fetch issue:", error);
           setProfile(null);
