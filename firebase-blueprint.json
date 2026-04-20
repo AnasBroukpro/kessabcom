@@ -1,0 +1,152 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile information and identity.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email" },
+        "fullName": { "type": "string" },
+        "role": { "type": "string", "enum": ["buyer", "seller", "admin"] },
+        "photoURL": { "type": "string", "format": "uri" },
+        "status": { "type": "string", "enum": ["active", "blocked"] },
+        "rating": { "type": "number" },
+        "reviewsCount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "role"]
+    },
+    "Listing": {
+      "title": "Listing (Announcement)",
+      "description": "Sheep flock advertisement posted by a seller.",
+      "type": "object",
+      "properties": {
+        "sellerId": { "type": "string" },
+        "title": { "type": "string" },
+        "category": { "type": "string" },
+        "price": { "type": "number" },
+        "sheepCount": { "type": "number" },
+        "description": { "type": "string" },
+        "location": { "type": "string" },
+        "images": { "type": "array", "items": { "type": "string" } },
+        "status": { "type": "string", "enum": ["active", "archived", "pending"] },
+        "clicks": { 
+          "type": "object",
+          "properties": {
+            "phone": { "type": "number" },
+            "whatsapp": { "type": "number" }
+          }
+        },
+        "totalClicks": { "type": "number" },
+        "rating": { "type": "number" },
+        "ratingCount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["sellerId", "title", "price"]
+    },
+    "OfferRequest": {
+      "title": "Offer Request",
+      "description": "A request for sheep created by a buyer.",
+      "type": "object",
+      "properties": {
+        "buyerId": { "type": "string" },
+        "title": { "type": "string" },
+        "sheepCount": { "type": "number" },
+        "breed": { "type": "string" },
+        "budget": { "type": "number" },
+        "location": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "type": "string", "enum": ["Open", "Closed", "Archived"] },
+        "offersCount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["buyerId", "title"]
+    },
+    "Offer": {
+      "title": "Offer",
+      "description": "A proposal sent by a seller in response to an Offer Request.",
+      "type": "object",
+      "properties": {
+        "requestId": { "type": "string" },
+        "sellerId": { "type": "string" },
+        "price": { "type": "number" },
+        "deliveryIncluded": { "type": "boolean" },
+        "message": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "accepted", "rejected"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["requestId", "sellerId", "price"]
+    },
+    "Favorite": {
+      "title": "Favorite",
+      "description": "A listing bookmarked by a user.",
+      "type": "object",
+      "properties": {
+        "listingId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["listingId"]
+    },
+    "Report": {
+      "title": "Report",
+      "description": "A report filed against a listing or user.",
+      "type": "object",
+      "properties": {
+        "reporterId": { "type": "string" },
+        "targetId": { "type": "string" },
+        "targetType": { "type": "string", "enum": ["listing", "user"] },
+        "reason": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "resolved", "dismissed"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["reporterId", "targetId", "reason"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "An alert for a user.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "type": { "type": "string" },
+        "relatedId": { "type": "string" },
+        "isRead": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "message", "type"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "/announcements/{announcementId}": {
+      "schema": "Listing",
+      "description": "Public listings"
+    },
+    "/offerRequests/{requestId}": {
+      "schema": "OfferRequest",
+      "description": "Buying requests"
+    },
+    "/offers/{offerId}": {
+      "schema": "Offer",
+      "description": "Seller offers for requests"
+    },
+    "/users/{userId}/favorites/{listingId}": {
+      "schema": "Favorite",
+      "description": "User favorite listings"
+    },
+    "/users/{userId}/notifications/{notificationId}": {
+      "schema": "Notification",
+      "description": "User notifications"
+    },
+    "/reports/{reportId}": {
+      "schema": "Report",
+      "description": "Activity reports"
+    }
+  }
+}

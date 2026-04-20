@@ -1,0 +1,102 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 0. Default Deny Catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isEmailVerified() {
+      return request.auth.token.email_verified == true;
+    }
+    
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+    
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+    
+    function isAdmin() {
+      return isSignedIn() && getUserRole() == 'admin';
+    }
+    
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+    
+    function existing() {
+      return resource.data;
+    }
+
+    // --- Entities ---
+
+    // Users
+    match /users/{userId} {
+      allow get: if isSignedIn();
+      allow list: if isAdmin();
+      allow create: if isOwner(userId) && incoming().role in ['buyer', 'seller'] && incoming().status == 'active';
+      allow update: if (isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['fullName', 'photoURL', 'phoneNumber', 'location'])) || isAdmin();
+    }
+
+    // Announcements (Listings)
+    match /announcements/{announcementId} {
+      allow read: if true;
+      allow create: if isSignedIn() && isEmailVerified() && incoming().sellerId == request.auth.uid;
+      allow update: if (isSignedIn() && existing().sellerId == request.auth.uid && incoming().sellerId == existing().sellerId) || isAdmin();
+      allow delete: if (isSignedIn() && existing().sellerId == request.auth.uid) || isAdmin();
+    }
+
+    // Offer Requests
+    match /offerRequests/{requestId} {
+      allow read: if true;
+      allow create: if isSignedIn() && isEmailVerified() && incoming().buyerId == request.auth.uid;
+      allow update: if (isSignedIn() && existing().buyerId == request.auth.uid && incoming().buyerId == existing().buyerId) || isAdmin();
+      allow delete: if (isSignedIn() && existing().buyerId == request.auth.uid) || isAdmin();
+    }
+
+    // Offers
+    match /offers/{offerId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isEmailVerified() && incoming().sellerId == request.auth.uid;
+      allow update: if (isSignedIn() && (existing().sellerId == request.auth.uid || 
+                     get(/databases/$(database)/documents/offerRequests/$(existing().requestId)).data.buyerId == request.auth.uid)) || isAdmin();
+      allow delete: if (isSignedIn() && existing().sellerId == request.auth.uid) || isAdmin();
+    }
+
+    // Favorites
+    match /users/{userId}/favorites/{listingId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // Notifications
+    match /users/{userId}/notifications/{notifId} {
+      allow read: if isOwner(userId);
+      allow update: if isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['isRead']);
+      allow delete: if isOwner(userId);
+    }
+
+    // Reports
+    match /reports/{reportId} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn();
+    }
+    
+    // Logs
+    match /logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if true; // Public logging for analytics if needed
+    }
+  }
+}
