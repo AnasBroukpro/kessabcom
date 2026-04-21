@@ -129,62 +129,24 @@ function AppContent() {
   // Role-based and Authentication access restrictions
   useEffect(() => {
     if (!authLoading) {
-      const protectedViews: ViewType[] = ['buyer', 'seller', 'admin', 'add-listing', 'solidarity-request', 'solidarity-donate'];
-      
-      // If guestBuyerMode is OFF, listing-details also becomes protected
-      if (!settings.guestBuyerMode) {
-        protectedViews.push('listing-details');
-      }
+      const protectedViews: ViewType[] = ['buyer', 'seller', 'admin', 'add-listing', 'solidarity-request', 'solidarity-donate', 'listing-details'];
       
       if (protectedViews.includes(currentView) && !profile) {
+        // Only set intended view if we are not already going to auth
         if (currentView !== 'auth' && currentView !== 'admin-auth') {
-          if (!intendedView || intendedView.view !== currentView) {
-            setIntendedView({ view: currentView, listingId: selectedListingId });
-          }
+           if (!intendedView) {
+             setIntendedView({ view: currentView, listingId: selectedListingId });
+           }
         }
-        
-        if (currentView === 'admin') {
-          handleNavigate('admin-auth');
-        } else {
-          handleNavigate('auth');
-        }
-        return;
       }
 
-      if (profile) {
-        if (intendedView) {
-          handleNavigate(intendedView.view);
-          setSelectedListingId(intendedView.listingId);
+      if (profile && intendedView) {
+          const next = intendedView;
           setIntendedView(null);
-          return;
-        }
-
-        if (currentView === 'auth') {
-          console.log('App: User is on auth page with profile. Role:', profile?.role);
-          if (profile.role === 'admin') handleNavigate('admin');
-          else if (profile.role === 'seller') handleNavigate('seller');
-          else if (profile.role === 'buyer') handleNavigate('buyer');
-          // If no role, stay on auth to complete profile
-          return;
-        }
-
-        // Fix: If user is admin and currentView is seller or buyer, they might be trying to see their own dashboard
-        // But if they click "Dashboard" from the menu, it should go to their primary role dashboard.
-        // The issue reported is that navigating back to dashboard shows Kessab instead of Admin.
-        // This usually happens if the navigation link points to 'seller' or 'buyer' instead of 'admin'.
-        
-        if (currentView === 'admin' && profile.role !== 'admin') {
-          handleNavigate('home');
-        }
-        if (currentView === 'seller' && profile.role !== 'seller' && profile.role !== 'admin') {
-          handleNavigate('home');
-        }
-        if (currentView === 'buyer' && profile.role !== 'buyer' && profile.role !== 'admin') {
-          handleNavigate('home');
-        }
+          handleNavigate(next.view, next.listingId);
       }
     }
-  }, [profile, currentView, authLoading, settings.guestBuyerMode, intendedView, selectedListingId]);
+  }, [profile, currentView, authLoading, intendedView]);
 
   if (settings.maintenanceMode && profile?.role !== 'admin' && currentView !== 'admin-auth') {
     return <Maintenance activationDate={settings.activationDate} onNavigate={handleNavigate} />;

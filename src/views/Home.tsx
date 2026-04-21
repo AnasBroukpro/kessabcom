@@ -259,7 +259,7 @@ export default function Home({ onNavigate }: Props) {
                     className={`p-2 rounded-xl border border-transparent transition-colors relative ${showNotifications ? 'bg-[#E8F5E9] text-[#2E7D32] border-[#2E7D32]' : 'bg-[#F9F9F6] text-[#757575] hover:bg-white hover:text-[#2E7D32] hover:border-[#2E7D32]'}`}
                   >
                     <Bell className="w-5 h-5" />
-                    {notifications.some(n => !n.isRead) && (
+                    {notifications.some(n => !n.read) && (
                       <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
                     )}
                   </button>
@@ -267,8 +267,8 @@ export default function Home({ onNavigate }: Props) {
                     <div className="absolute top-full left-0 mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-outline-variant/20 overflow-hidden z-[60] animate-in fade-in slide-in-from-top-2 duration-200 text-right">
                       <div className="p-4 border-b border-outline-variant/10 flex items-center justify-between">
                         <h3 className="font-bold text-[#1A1A1A]">التنبيهات</h3>
-                        {notifications.filter(n => !n.isRead).length > 0 && (
-                          <span className="text-[10px] bg-[#2E7D32] text-white px-2 py-0.5 rounded-full">{notifications.filter(n => !n.isRead).length} جديد</span>
+                        {notifications.filter(n => !n.read).length > 0 && (
+                          <span className="text-[10px] bg-[#2E7D32] text-white px-2 py-0.5 rounded-full">{notifications.filter(n => !n.read).length} جديد</span>
                         )}
                       </div>
                       <div className="max-h-96 overflow-y-auto">
@@ -276,7 +276,7 @@ export default function Home({ onNavigate }: Props) {
                           notifications.map((notif) => (
                             <div 
                               key={notif.id} 
-                              className={`p-4 border-b border-outline-variant/5 transition-colors cursor-pointer ${!notif.isRead ? 'bg-[#E8F5E9]/30 hover:bg-[#E8F5E9]/50' : 'hover:bg-[#F9F9F6]'}`}
+                              className={`p-4 border-b border-outline-variant/5 transition-colors cursor-pointer ${!notif.read ? 'bg-[#E8F5E9]/30 hover:bg-[#E8F5E9]/50' : 'hover:bg-[#F9F9F6]'}`}
                               onClick={() => handleMarkNotifAsRead(notif.id)}
                             >
                               <p className="text-sm font-bold text-[#1A1A1A] mb-1">{notif.title}</p>

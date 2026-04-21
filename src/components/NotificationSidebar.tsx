@@ -43,7 +43,7 @@ export default function NotificationSidebar({ isOpen, onClose, notifications = [
                 notifications.map((notif) => (
                   <div                
                     key={notif.id}
-                    className={`px-4 py-3 border-b border-gray-50 transition-all cursor-pointer ${!notif.isRead ? 'bg-green-50/50 hover:bg-green-50' : 'hover:bg-gray-50'}`}
+                    className={`px-4 py-3 border-b border-gray-50 transition-all cursor-pointer ${!notif.read ? 'bg-green-50/50 hover:bg-green-50' : 'hover:bg-gray-50'}`}
                     onClick={() => onMarkNotificationAsRead?.(notif.id)}
                   >
                     <p className="text-sm font-bold text-[#1A1A1A] mb-1 leading-tight">{notif.title}</p>

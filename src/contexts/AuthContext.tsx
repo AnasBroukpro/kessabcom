@@ -3,9 +3,24 @@ import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 import { firestoreService } from '../services/firestoreService';
 
+export interface UserProfile {
+  uid: string;
+  fullName: string;
+  phone: string;
+  city: string;
+  role: 'buyer' | 'seller' | 'admin';
+  status: 'active' | 'blocked';
+  experience?: number;
+  rating?: number;
+  ratingCount?: number;
+  verified?: boolean;
+  createdAt: any;
+  [key: string]: any;
+}
+
 interface AuthContextType {
   user: User | null;
-  profile: any | null;
+  profile: UserProfile | null;
   notifications: any[];
   unreadCount: number;
   loading: boolean;
@@ -17,7 +32,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<any | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 

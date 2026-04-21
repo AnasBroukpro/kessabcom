@@ -21,7 +21,7 @@ export default function Auth({ onNavigate, intendedView }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState<'phone' | 'confirm-register' | 'role' | 'otp' | 'details'>('phone');
-  const [selectedRole, setSelectedRole] = useState<'buyer' | 'seller'>('buyer');
+  const [selectedRole, setSelectedRole] = useState<'buyer' | 'seller' | null>(null);
   const [registrationData, setRegistrationData] = useState({
     fullName: '',
     city: '',
@@ -71,13 +71,13 @@ export default function Auth({ onNavigate, intendedView }: Props) {
 
   const initRecaptcha = () => {
     // Destroy previous instance
-    if ((window as any).recaptchaVerifier) {
+    if (recaptchaVerifierRef.current) {
       try {
-        (window as any).recaptchaVerifier.clear();
+        recaptchaVerifierRef.current.clear();
       } catch (e) {
         console.log('recaptcha clear error:', e);
       }
-      (window as any).recaptchaVerifier = null;
+      recaptchaVerifierRef.current = null;
     }
     // Clear the DOM element
     const container = document.getElementById('recaptcha-container');
@@ -85,14 +85,14 @@ export default function Auth({ onNavigate, intendedView }: Props) {
     
     // Create fresh instance
     try {
-      (window as any).recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+      recaptchaVerifierRef.current = new RecaptchaVerifier(auth, 'recaptcha-container', {
         size: 'invisible',
         callback: () => {},
         'expired-callback': () => {
-          (window as any).recaptchaVerifier = null;
+          recaptchaVerifierRef.current = null;
         }
       });
-      return (window as any).recaptchaVerifier;
+      return recaptchaVerifierRef.current;
     } catch (err) {
       console.error('reCAPTCHA initialization error:', err);
       setError('حدث خطأ في التحقق. يرجى تحديث الصفحة والمحاولة مرة أخرى.');
@@ -112,8 +112,8 @@ export default function Auth({ onNavigate, intendedView }: Props) {
     // Reset registration data if we are coming from a plain sign-in (not a pre-filled registration)
     if (!registrationData.fullName) {
       console.log('Auth: Resetting registration data, no default role set');
-      setRegistrationData({ fullName: '', city: '', termsAccepted: false });
-      setSelectedRole(null as any); // Don't default to buyer
+      setRegistrationData({ fullName: '', city: registrationData.city || '', termsAccepted: false });
+      setSelectedRole(null); // Don't default to buyer
     }
 
     try {
@@ -128,14 +128,10 @@ export default function Auth({ onNavigate, intendedView }: Props) {
       // Small delay to ensure reCAPTCHA is fully ready
       await new Promise(resolve => setTimeout(resolve, 500));
       
-      // Robust phone number formatting
-      let cleanPhone = phone.replace(/\D/g, ''); // Remove all non-digits
-      
-      if (cleanPhone.startsWith('212')) {
-        cleanPhone = cleanPhone.substring(3);
-      } else if (cleanPhone.startsWith('06') || cleanPhone.startsWith('07')) {
-        cleanPhone = cleanPhone.substring(1);
-      }
+      // Robust phone number formatting (Fix #7: Unified formatting)
+      let cleanPhone = phone.replace(/\D/g, ''); 
+      if (cleanPhone.startsWith('212')) cleanPhone = cleanPhone.substring(3);
+      if (cleanPhone.startsWith('0')) cleanPhone = cleanPhone.substring(1);
       
       // Validation: Must be 9 digits after country code (e.g., 612345678)
       if (!/^[67]\d{8}$/.test(cleanPhone)) {
@@ -219,9 +215,9 @@ export default function Auth({ onNavigate, intendedView }: Props) {
       // Check if phone exists via API
       const { exists } = await firestoreService.checkPhoneExists(formattedPhone);
 
-      // Always proceed to OTP. If user is new, we will ask for confirmation AFTER OTP.
+      // Always proceed to OTP. Pass the formatted phone to ensure consistent behavior.
       console.log('Auth: Proceeding to OTP for phone:', formattedPhone);
-      await onSignInSubmit(undefined, phoneNumber);
+      await onSignInSubmit(undefined, formattedPhone);
     } catch (err) {
       console.error('onPhoneSubmit Error:', err);
       setError('وقع مشكل فالتأكد من الحساب. عاود جرب.');
@@ -383,8 +379,10 @@ export default function Auth({ onNavigate, intendedView }: Props) {
 
   return (
     <div className="min-h-screen flex flex-col" dir="rtl">
-      {/* Invisible Recaptcha Container - Must not be display:none for some browser versions */}
-      <div id="recaptcha-container" className="fixed bottom-0 left-0 opacity-0 pointer-events-none z-[-1]"></div>
+      {/* reCAPTCHA invisible container.
+        IMPORTANT: Must NOT use z-index:-1 — iOS Safari WebKit may block the callback.
+        Use zero-size absolute positioning instead (Bug #27 fix). */}
+      <div id="recaptcha-container" style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden' }} />
       
       {mode === 'login' ? (
         <div className="min-h-screen flex flex-col md:flex-row overflow-hidden">
@@ -427,6 +425,9 @@ export default function Auth({ onNavigate, intendedView }: Props) {
                         placeholder="6 00 00 00 00" 
                         required 
                         type="tel"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        autoComplete="tel-national"
                         value={phoneNumber}
                         onChange={(e) => setPhoneNumber(e.target.value)}
                       />
@@ -497,8 +498,11 @@ export default function Auth({ onNavigate, intendedView }: Props) {
                       required 
                       maxLength={6}
                       type="text"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      pattern="[0-9]{6}"
                       value={verificationCode}
-                      onChange={(e) => setVerificationCode(e.target.value)}
+                      onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                     />
                   </div>
 
@@ -525,6 +529,7 @@ export default function Auth({ onNavigate, intendedView }: Props) {
                       placeholder="الاسم الكامل" 
                       required 
                       type="text"
+                      autoComplete="name"
                       value={registrationData.fullName}
                       onChange={(e) => setRegistrationData({...registrationData, fullName: e.target.value})}
                     />
@@ -668,17 +673,16 @@ export default function Auth({ onNavigate, intendedView }: Props) {
                 }}>
                   <div className="space-y-2">
                     <label className="block text-sm font-bold text-on-surface-variant mr-1">الاسم الكامل</label>
-                    <input name="fullName" className="w-full h-14 px-4 bg-surface-container-highest border-none rounded-xl text-on-surface focus:ring-2 focus:ring-primary transition-all" placeholder="كتب سميتك الكاملة" required type="text" />
+                    <input name="fullName" autoComplete="name" className="w-full h-16 px-4 bg-surface-container-highest border-none rounded-xl text-on-surface focus:ring-2 focus:ring-primary transition-all" placeholder="كتب سميتك الكاملة" required type="text" />
                   </div>
                   <div className="space-y-2">
                     <label className="block text-sm font-bold text-on-surface-variant mr-1">المدينة</label>
-                    <select name="city" className="w-full h-14 px-4 bg-surface-container-highest border-none rounded-xl text-on-surface focus:ring-2 focus:ring-primary transition-all" required>
+                    {/* Bug #24 fix: expanded to full 51-city list, same as buyer/details forms */}
+                    <select name="city" className="w-full h-16 px-4 bg-surface-container-highest border-none rounded-xl text-on-surface focus:ring-2 focus:ring-primary transition-all" required>
                       <option value="">ختار المدينة ديالك</option>
-                      <option>سطات</option>
-                      <option>برشيد</option>
-                      <option>خريبكة</option>
-                      <option>بني ملال</option>
-                      <option>فاس</option>
+                      {['الدار البيضاء', 'الرباط', 'فاس', 'مراكش', 'أكادير', 'طنجة', 'مكناس', 'وجدة', 'القنيطرة', 'تطوان', 'خريبكة', 'بني ملال', 'الجديدة', 'آسفي', 'سطات', 'برشيد', 'الخميسات', 'الناظور', 'تازة', 'المحمدية', 'سلا', 'تمارة', 'العرائش', 'كلميم', 'بركان', 'الفقيه بن صالح', 'تاوريرت', 'بوسكورة', 'ورزازات', 'العيون', 'الداخلة', 'تارودانت', 'قلعة السراغنة', 'سيدي سليمان', 'سيدي قاسم', 'تيزنيت', 'طانطان', 'شفشاون', 'الحسيمة', 'تيفلت', 'وزان', 'جرسيف', 'المضيق', 'الفنيدق', 'سوق الأربعاء', 'بوجدور', 'تنغير', 'زاكورة', 'ميدلت', 'اليوسفية', 'بن جرير'].map(c => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
                     </select>
                   </div>
                   
@@ -686,11 +690,11 @@ export default function Auth({ onNavigate, intendedView }: Props) {
                     <label className="block text-sm font-bold text-on-surface-variant mr-1">رقم الهاتف</label>
                     <div className="relative flex items-center">
                       <span className="absolute left-3 text-[10px] font-bold text-on-surface-variant border-r border-outline-variant pr-2">+212</span>
-                      <input name="phone" className="w-full h-14 pl-12 pr-4 bg-surface-container-highest border-none rounded-xl text-on-surface focus:ring-2 focus:ring-primary transition-all text-left text-sm" dir="ltr" placeholder="6 XX XX XX XX" required type="tel" />
+                      <input name="phone" autoComplete="tel-national" inputMode="numeric" pattern="[0-9]*" className="w-full h-16 pl-12 pr-4 bg-surface-container-highest border-none rounded-xl text-on-surface focus:ring-2 focus:ring-primary transition-all text-left text-sm" dir="ltr" placeholder="6 XX XX XX XX" required type="tel" />
                     </div>
                   </div>
 
-                  <button type="submit" className="w-full h-14 hero-gradient text-on-primary font-bold text-lg rounded-xl shadow-lg shadow-primary/20 border border-transparent hover:bg-transparent hover:text-primary hover:border-primary transition-colors flex items-center justify-center gap-3">
+                  <button type="submit" className="w-full h-16 hero-gradient text-on-primary font-bold text-lg rounded-xl shadow-lg shadow-primary/20 border border-transparent hover:bg-transparent hover:text-primary hover:border-primary transition-colors flex items-center justify-center gap-3">
                     سجل دابا <ArrowLeft className="w-5 h-5" />
                   </button>
                 </form>
@@ -720,31 +724,29 @@ export default function Auth({ onNavigate, intendedView }: Props) {
                 }}>
                   <div className="space-y-2">
                     <label className="block text-sm font-bold text-on-surface-variant mr-1">الاسم الكامل</label>
-                    <input name="fullName" className="w-full h-14 px-4 bg-surface-container-low border-none rounded-xl text-on-surface focus:ring-2 focus:ring-primary transition-all" placeholder="كتب سميتك الكاملة" required type="text" />
+                    <input name="fullName" autoComplete="name" className="w-full h-16 px-4 bg-surface-container-low border-none rounded-xl text-on-surface focus:ring-2 focus:ring-primary transition-all" placeholder="كتب سميتك الكاملة" required type="text" />
                   </div>
                   <div className="space-y-2">
                     <label className="block text-sm font-bold text-on-surface-variant mr-1">رقم الهاتف</label>
                     <div className="relative flex items-center">
                       <span className="absolute left-4 font-bold text-on-surface-variant border-r border-outline-variant pr-3">+212</span>
-                      <input name="phone" className="w-full h-14 pl-20 pr-4 bg-surface-container-low border-none rounded-xl text-on-surface focus:ring-2 focus:ring-primary transition-all text-left" dir="ltr" placeholder="6 XX XX XX XX" required type="tel" />
+                      <input name="phone" autoComplete="tel-national" inputMode="numeric" pattern="[0-9]*" className="w-full h-16 pl-20 pr-4 bg-surface-container-low border-none rounded-xl text-on-surface focus:ring-2 focus:ring-primary transition-all text-left" dir="ltr" placeholder="6 XX XX XX XX" required type="tel" />
                     </div>
                   </div>
                   <div className="space-y-2">
                     <label className="block text-sm font-bold text-on-surface-variant mr-1">المدينة</label>
-                    <select name="city" className="w-full h-14 px-4 bg-surface-container-low border-none rounded-xl text-on-surface focus:ring-2 focus:ring-primary transition-all" required>
+                    <select name="city" className="w-full h-16 px-4 bg-surface-container-low border-none rounded-xl text-on-surface focus:ring-2 focus:ring-primary transition-all" required>
                       <option value="">ختار المدينة ديالك</option>
-                      <option>سطات</option>
-                      <option>برشيد</option>
-                      <option>خريبكة</option>
-                      <option>بني ملال</option>
-                      <option>فاس</option>
+                      {['الدار البيضاء', 'الرباط', 'فاس', 'مراكش', 'أكادير', 'طنجة', 'مكناس', 'وجدة', 'القنيطرة', 'تطوان', 'خريبكة', 'بني ملال', 'الجديدة', 'آسفي', 'سطات', 'برشيد', 'الخميسات', 'الناظور', 'تازة', 'المحمدية', 'سلا', 'تمارة', 'العرائش', 'كلميم', 'بركان', 'الفقيه بن صالح', 'تاوريرت', 'بوسكورة', 'ورزازات', 'العيون', 'الداخلة', 'تارودانت', 'قلعة السراغنة', 'سيدي سليمان', 'سيدي قاسم', 'تيزنيت', 'طانطان', 'شفشاون', 'الحسيمة', 'تيفلت', 'وزان', 'جرسيف', 'المضيق', 'الفنيدق', 'سوق الأربعاء', 'بوجدور', 'تنغير', 'زاكورة', 'ميدلت', 'اليوسفية', 'بن جرير'].map(c => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
                     </select>
                   </div>
                   <div className="flex items-center gap-3 py-2">
                     <input className="w-5 h-5 rounded text-primary border-outline-variant focus:ring-primary" id="terms" type="checkbox" />
                     <label className="text-sm text-on-surface-variant" htmlFor="terms">أنا موافق على <a className="text-primary font-bold underline" href="#">الشروط والأحكام</a> و <a className="text-primary font-bold underline" href="#">سياسة الخصوصية</a> ديالنا.</label>
                   </div>
-                  <button type="submit" className="w-full h-14 bg-surface-container-highest text-on-surface font-bold text-lg rounded-xl border border-transparent hover:bg-transparent hover:text-primary hover:border-primary transition-colors flex items-center justify-center gap-3">
+                  <button type="submit" className="w-full h-16 bg-surface-container-highest text-on-surface font-bold text-lg rounded-xl border border-transparent hover:bg-transparent hover:text-primary hover:border-primary transition-colors flex items-center justify-center gap-3">
                     سجل دابا
                     <UserPlus className="w-5 h-5" />
                   </button>
@@ -757,6 +759,5 @@ export default function Auth({ onNavigate, intendedView }: Props) {
           </main>
         </>
       )}
-    </div>
   );
 }

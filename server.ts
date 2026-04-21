@@ -1,53 +1,74 @@
 import "dotenv/config";
 import express, { Request, Response, NextFunction } from "express";
-
 import path from "path";
 import { fileURLToPath } from "url";
 import admin from "firebase-admin";
 import fs from "fs";
 import { Firestore, FieldValue, Timestamp } from '@google-cloud/firestore';
+import fetch from "node-fetch";
+import cors from "cors";
+import rateLimit from "express-rate-limit";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Initialize Firebase Admin (for Auth only)
-const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
-let firebaseConfig: any = {};
+const appletConfigPath = path.join(process.cwd(), "firebase-applet-config.json");
+const serviceAccountPath = path.join(process.cwd(), "firebase-service-account.json");
 
-if (fs.existsSync(configPath)) {
-  firebaseConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+let firebaseConfig: any = {};
+if (fs.existsSync(appletConfigPath)) {
+  firebaseConfig = JSON.parse(fs.readFileSync(appletConfigPath, "utf-8"));
 } else {
-  console.warn('⚠️ firebase-applet-config.json missing, using environment variables');
   firebaseConfig = {
     projectId: process.env.FIREBASE_PROJECT_ID,
-    firestoreDatabaseId: process.env.FIREBASE_FIRESTORE_DATABASE_ID || '(default)'
+    firestoreDatabaseId: process.env.FIRESTORE_DATABASE_ID || "(default)",
   };
 }
 
 if (!admin.apps.length) {
-  const serviceAccountPath = path.resolve(process.cwd(), 'firebase-service-account.json');
   if (fs.existsSync(serviceAccountPath)) {
-    console.log('🔑 Using service account from:', serviceAccountPath);
+    // Priority 1: JSON file on disk (local dev)
+    const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, "utf-8"));
     admin.initializeApp({
-      credential: admin.credential.cert(serviceAccountPath),
+      credential: admin.credential.cert(serviceAccount),
       projectId: firebaseConfig.projectId,
     });
+    console.log('✅ Firebase Admin: initialized from service account file');
+  } else if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+    // Priority 2: Full JSON injected as env var (Vercel, production)
+    try {
+      const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+      admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
+        projectId: firebaseConfig.projectId || serviceAccount.project_id,
+      });
+      console.log('✅ Firebase Admin: initialized from FIREBASE_SERVICE_ACCOUNT_JSON env var');
+    } catch (e) {
+      console.error('❌ Failed to parse FIREBASE_SERVICE_ACCOUNT_JSON:', e);
+      process.exit(1);
+    }
+  } else if (process.env.FIREBASE_PRIVATE_KEY) {
+    // Priority 3: Individual env vars (fallback)
+    admin.initializeApp({
+      credential: admin.credential.cert({
+        projectId: process.env.FIREBASE_PROJECT_ID,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
+      } as any),
+      projectId: process.env.FIREBASE_PROJECT_ID,
+    });
+    console.log('✅ Firebase Admin: initialized from individual env vars');
   } else {
-    console.warn('⚠️ No service account file found, falling back to applicationDefault');
-    admin.initializeApp({
-      projectId: firebaseConfig.projectId,
-      credential: admin.credential.applicationDefault()
-    });
+    console.warn('⚠️ No service account credentials found — using applicationDefault(). This will fail on Vercel.');
+    admin.initializeApp({ projectId: process.env.FIREBASE_PROJECT_ID });
   }
 }
 
-// Initialize Firestore with named database
 const firestoreOptions: any = {
-  projectId: firebaseConfig.projectId,
-  databaseId: firebaseConfig.firestoreDatabaseId || '(default)',
+  projectId: firebaseConfig.projectId || process.env.FIREBASE_PROJECT_ID,
+  databaseId: firebaseConfig.firestoreDatabaseId || process.env.FIRESTORE_DATABASE_ID || "(default)",
 };
 
-const serviceAccountPath = path.resolve(process.cwd(), 'firebase-service-account.json');
 if (fs.existsSync(serviceAccountPath)) {
   firestoreOptions.keyFilename = serviceAccountPath;
 }
@@ -140,25 +161,36 @@ async function startServer() {
 
   app.use(express.json());
 
-  // CORS Middleware
-  app.use((req, res, next) => {
-    const allowedOrigins = ['http://localhost:5173', 'http://localhost:3000', 'https://kessabcom.ma', 'https://www.kessabcom.ma'];
-    const origin = req.headers.origin;
-    if (origin && allowedOrigins.includes(origin)) {
-      res.setHeader('Access-Control-Allow-Origin', origin);
-    } else {
-      res.setHeader('Access-Control-Allow-Origin', allowedOrigins[0]); // Fallback to first
-    }
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-    if (req.method === 'OPTIONS') {
-      return res.sendStatus(200);
-    }
-    next();
-  });
+  // CORS Middleware (Strict)
+  const allowedOrigins = [
+    "https://kessabcom.ma",
+    "https://www.kessabcom.ma",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:3000",
+  ];
 
-  // Simple In-memory Rate Limiter for sensitive endpoints
-  const phoneCheckLimiter: Record<string, { count: number, resetAt: number }> = {};
+  app.use(cors({
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      return callback(new Error("Origin not allowed by CORS"));
+    },
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: false,
+  }));
+
+  app.set("trust proxy", 1);
+
+  // Rate Limiters
+  const checkPhoneLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Trop de tentatives, réessayez dans 1 minute." }
+  });
 
   // --- PUBLIC ENDPOINTS ---
 
@@ -271,25 +303,16 @@ async function startServer() {
     res.json({ id: userDoc.id, ...userDoc.data() });
   });
 
-  app.get("/api/auth/check-phone/:phone", (req, res, next) => {
-    // Simple rate limit: 10 checks per minute per IP
-    const ip = req.ip || req.get('x-forwarded-for') || 'unknown';
-    const now = Date.now();
-    if (!phoneCheckLimiter[ip] || now > phoneCheckLimiter[ip].resetAt) {
-      phoneCheckLimiter[ip] = { count: 1, resetAt: now + 60000 };
-    } else {
-      phoneCheckLimiter[ip].count++;
-    }
-    if (phoneCheckLimiter[ip].count > 10) {
-      return res.status(429).json({ error: "Too many attempts. Please wait a minute." });
-    }
-    next();
-  }, async (req, res) => {
+  app.get("/api/auth/check-phone/:phone", checkPhoneLimiter, async (req, res) => {
     try {
-      const snap = await db.collection('users').where('phoneNumber', '==', req.params.phone).limit(1).get();
+      const phone = req.params.phone?.trim();
+      if (!phone) return res.status(400).json({ error: "Numéro invalide" });
+
+      const snap = await db.collection('users').where('phoneNumber', '==', phone).limit(1).get();
       res.json({ exists: !snap.empty });
     } catch (e: any) {
-      res.status(500).json({ error: e.message });
+      console.error("check-phone error:", e);
+      res.status(500).json({ error: "Erreur serveur" });
     }
   });
 
@@ -310,9 +333,10 @@ async function startServer() {
       const doc = await db.collection('users').doc(req.params.id).get();
       if (!doc.exists) return res.status(404).json({ error: "Not found" });
       const data = doc.data() || {};
-      // Filter sensitive data unless admin or owner
+      // Fix #12: Read role from Firestore, not from JWT (JWT doesn't have custom role)
       const isOwner = req.user.uid === req.params.id;
-      const isAdminUser = req.user.role === 'admin';
+      const callerDoc = await db.collection('users').doc(req.user.uid).get();
+      const isAdminUser = callerDoc.data()?.role === 'admin';
       
       if (!isOwner && !isAdminUser) {
         delete data.email;
@@ -342,6 +366,29 @@ async function startServer() {
       res.json(data);
     } catch (e: any) {
       console.error('API Listings Error:', e.message);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // Fix #3: /seller/:sellerId MUST be declared BEFORE /:id to avoid Express route shadowing
+  app.get("/api/listings/seller/:sellerId", async (req, res) => {
+    try {
+      console.log(`📡 API: Fetching listings for seller ${req.params.sellerId}`);
+      const snap = await db.collection('announcements')
+        .where('sellerId', '==', req.params.sellerId)
+        .get();
+      
+      const listings = snap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
+      // Sort in JS to avoid index requirement
+      listings.sort((a, b) => {
+        const dateA = a.createdAt?.toDate?.() || new Date(0);
+        const dateB = b.createdAt?.toDate?.() || new Date(0);
+        return dateB.getTime() - dateA.getTime();
+      });
+      
+      res.json(listings);
+    } catch (e: any) {
+      console.error('❌ API: Error fetching seller listings:', e.message);
       res.status(500).json({ error: e.message });
     }
   });
@@ -406,27 +453,7 @@ async function startServer() {
     res.json({ status: "deleted" });
   });
 
-  app.get("/api/listings/seller/:sellerId", async (req, res) => {
-    try {
-      console.log(`📡 API: Fetching listings for seller ${req.params.sellerId}`);
-      const snap = await db.collection('announcements')
-        .where('sellerId', '==', req.params.sellerId)
-        .get();
-      
-      const listings = snap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
-      // Sort in JS to avoid index requirement
-      listings.sort((a, b) => {
-        const dateA = a.createdAt?.toDate?.() || new Date(0);
-        const dateB = b.createdAt?.toDate?.() || new Date(0);
-        return dateB.getTime() - dateA.getTime();
-      });
-      
-      res.json(listings);
-    } catch (e: any) {
-      console.error('❌ API: Error fetching seller listings:', e.message);
-      res.status(500).json({ error: e.message });
-    }
-  });
+  // NOTE: /api/listings/seller/:sellerId was moved above /:id — this duplicate block is removed.
 
   app.post("/api/listings/:id/boost", verifyToken, async (req: any, res) => {
     await db.collection('announcements').doc(req.params.id).update({ boosted: true });
@@ -902,12 +929,19 @@ async function startServer() {
 
   app.put("/api/notifications/:id/read", verifyToken, async (req: any, res) => {
     try {
-      await db.collection('users').doc(req.user.uid).collection('notifications').doc(req.params.id).update({
-        read: true
+      const ref = db.collection('users').doc(req.user.uid).collection('notifications').doc(req.params.id);
+      const snap = await ref.get();
+      
+      if (!snap.exists) return res.status(404).json({ error: "Notification introuvable" });
+
+      await ref.update({
+        read: true,
+        readAt: new Date().toISOString()
       });
       res.json({ status: "ok" });
     } catch (e) {
-      res.status(500).json({ error: "Failed to mark as read" });
+      console.error("mark notification read error:", e);
+      res.status(500).json({ error: "Erreur serveur" });
     }
   });
 

@@ -1,5 +1,25 @@
+/**
+ * firestoreService.ts
+ * ===================
+ * Architecture note (Bug #22):
+ *
+ * WRITES  → Express API (/api/*) — secured by Admin SDK + verifyToken middleware.
+ * READS (one-shot) — also via Express API for consistency.
+ * READS (real-time) — direct Firestore onSnapshot, because HTTP cannot push events.
+ *
+ * This is intentional: the real-time subscriptions are governed exclusively by
+ * firestore.rules (not by server.ts middleware). The rules must therefore be
+ * correct and complete. As of this version, isEmailVerified() has been removed
+ * from all rules to be compatible with phone authentication.
+ *
+ * Security posture:
+ * - Public collections (announcements, offerRequests): read allowed to anyone — this
+ *   is deliberate for a marketplace. Writes still require auth.
+ * - Private collections (notifications, favorites): read requires isOwner(userId).
+ * - Admin collections: restricted to admin role.
+ */
 import { auth } from '../lib/firebase';
-import { onSnapshot, query, collection, where, orderBy, limit } from 'firebase/firestore';
+import { onSnapshot, query, collection, where, orderBy, limit, doc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
 const API_BASE = '/api';
@@ -181,15 +201,7 @@ export const firestoreService = {
     }).then(res => res.json());
   },
 
-  // Admin
-  async submitReport(data: any) {
-    const headers = await getAuthHeaders();
-    return fetch(`${API_BASE}/reports`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(data)
-    }).then(res => res.json());
-  },
+  // Admin section ...
 
   async adminGetUsers() {
     try {
@@ -384,19 +396,39 @@ export const firestoreService = {
   },
 
   async createDonation(data: any) {
-    return this.submitDonation(data);
+    const headers = await getAuthHeaders();
+    return fetch(`${API_BASE}/donations`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(data)
+    }).then(res => res.json());
   },
 
+  /**
+   * subscribeToFavorites (Bug #23)
+   * Reads from users/{userId}/favorites sub-collection.
+   * This matches the server-side POST /api/favorites which also writes there.
+   * The Firestore rules enforce isOwner(userId) so only the user can see their favorites.
+   */
   subscribeToFavorites(userId: string, callback: (favorites: any[]) => void) {
+    if (!userId) {
+      callback([]);
+      return () => {};
+    }
     const q = query(
       collection(db, 'users', userId, 'favorites'),
       orderBy('createdAt', 'desc')
     );
-    return onSnapshot(q, (snapshot) => {
-      callback(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (error) => {
-      console.error("subscribeToFavorites error:", error);
-    });
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        callback(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      },
+      (error) => {
+        console.error('[subscribeToFavorites] Firestore error:', error.code, error.message);
+        callback([]);
+      }
+    );
   },
 
   async rateAnnouncement(id: string, rating: number) {
@@ -443,15 +475,15 @@ export const firestoreService = {
   },
 
   async submitDonation(data: any) {
-    const headers = await getAuthHeaders();
-    return fetch(`${API_BASE}/donations`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(data)
-    }).then(res => res.json());
+    return this.createDonation(data);
   },
 
   // Real-time subscriptions (Keeping these as client-side onSnapshot for best UX)
+  /**
+   * subscribeToAnnouncements
+   * Public read — firestore.rules: allow read: if true (marketplace listings).
+   * Keeping as onSnapshot for real-time UX (new listings appear without page refresh).
+   */
   subscribeToAnnouncements(callback: (announcements: any[]) => void) {
     const q = query(
       collection(db, 'announcements'), 
@@ -459,50 +491,97 @@ export const firestoreService = {
       orderBy('createdAt', 'desc'),
       limit(100)
     );
-    return onSnapshot(q, (snapshot) => {
-      callback(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (error) => {
-      console.error("subscribeToAnnouncements error:", error);
-    });
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        callback(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      },
+      (error) => {
+        console.error('[subscribeToAnnouncements] Firestore error:', error.code, error.message);
+        // Fall back to REST API on Firestore permission/index error
+        this.getAnnouncements().then(callback).catch(console.error);
+      }
+    );
   },
 
+  /**
+   * subscribeToUserNotifications
+   * Private read — firestore.rules: allow read: if isOwner(userId).
+   * Requires the user to be signed in. Caller must ensure userId is valid.
+   */
   subscribeToUserNotifications(userId: string, callback: (notifications: any[]) => void) {
+    if (!userId) {
+      callback([]);
+      return () => {};
+    }
     const q = query(
       collection(db, 'users', userId, 'notifications'),
       orderBy('createdAt', 'desc'),
       limit(20)
     );
-    return onSnapshot(q, (snapshot) => {
-      callback(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (error) => {
-      console.error("subscribeToUserNotifications error:", error);
-    });
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        callback(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      },
+      (error) => {
+        console.error('[subscribeToUserNotifications] Firestore error:', error.code, error.message);
+        callback([]);
+      }
+    );
   },
 
+  /**
+   * subscribeToOffersForRequest
+   * Private read — requires auth (firestore.rules: allow read: if isSignedIn()).
+   */
   subscribeToOffersForRequest(requestId: string, callback: (offers: any[]) => void) {
+    if (!requestId) {
+      callback([]);
+      return () => {};
+    }
     const q = query(
       collection(db, 'offers'),
       where('requestId', '==', requestId),
       orderBy('createdAt', 'desc')
     );
-    return onSnapshot(q, (snapshot) => {
-      callback(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (error) => {
-      console.error("subscribeToOffersForRequest error:", error);
-    });
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        callback(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      },
+      (error) => {
+        console.error('[subscribeToOffersForRequest] Firestore error:', error.code, error.message);
+        callback([]);
+      }
+    );
   },
 
+  /**
+   * subscribeToUserRequests
+   * Private read — filters by buyerId == current user.
+   * firestore.rules: allow read: if true (public collection, but filtered by buyer).
+   */
   subscribeToUserRequests(userId: string, callback: (requests: any[]) => void) {
+    if (!userId) {
+      callback([]);
+      return () => {};
+    }
     const q = query(
       collection(db, 'offerRequests'), 
       where('buyerId', '==', userId), 
       orderBy('createdAt', 'desc')
     );
-    return onSnapshot(q, (snapshot) => {
-      callback(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (error) => {
-      console.error("subscribeToUserRequests error:", error);
-    });
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        callback(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      },
+      (error) => {
+        console.error('[subscribeToUserRequests] Firestore error:', error.code, error.message);
+        callback([]);
+      }
+    );
   },
 
   // Re-adding essential methods for existing components

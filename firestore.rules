@@ -53,7 +53,8 @@ service cloud.firestore {
     // Announcements (Listings)
     match /announcements/{announcementId} {
       allow read: if true;
-      allow create: if isSignedIn() && isEmailVerified() && incoming().sellerId == request.auth.uid;
+      // Fix: isEmailVerified() is incompatible with phone auth — phone users never have email_verified=true
+      allow create: if isSignedIn() && incoming().sellerId == request.auth.uid;
       allow update: if (isSignedIn() && existing().sellerId == request.auth.uid && incoming().sellerId == existing().sellerId) || isAdmin();
       allow delete: if (isSignedIn() && existing().sellerId == request.auth.uid) || isAdmin();
     }
@@ -61,7 +62,8 @@ service cloud.firestore {
     // Offer Requests
     match /offerRequests/{requestId} {
       allow read: if true;
-      allow create: if isSignedIn() && isEmailVerified() && incoming().buyerId == request.auth.uid;
+      // Fix: phone auth users don't have a verified email — removed isEmailVerified()
+      allow create: if isSignedIn() && incoming().buyerId == request.auth.uid;
       allow update: if (isSignedIn() && existing().buyerId == request.auth.uid && incoming().buyerId == existing().buyerId) || isAdmin();
       allow delete: if (isSignedIn() && existing().buyerId == request.auth.uid) || isAdmin();
     }
@@ -69,7 +71,8 @@ service cloud.firestore {
     // Offers
     match /offers/{offerId} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn() && isEmailVerified() && incoming().sellerId == request.auth.uid;
+      // Fix: phone auth users don't have a verified email — removed isEmailVerified()
+      allow create: if isSignedIn() && incoming().sellerId == request.auth.uid;
       allow update: if (isSignedIn() && (existing().sellerId == request.auth.uid || 
                      get(/databases/$(database)/documents/offerRequests/$(existing().requestId)).data.buyerId == request.auth.uid)) || isAdmin();
       allow delete: if (isSignedIn() && existing().sellerId == request.auth.uid) || isAdmin();
@@ -83,7 +86,7 @@ service cloud.firestore {
     // Notifications
     match /users/{userId}/notifications/{notifId} {
       allow read: if isOwner(userId);
-      allow update: if isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['isRead']);
+      allow update: if isOwner(userId) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
       allow delete: if isOwner(userId);
     }
 
@@ -96,7 +99,7 @@ service cloud.firestore {
     // Logs
     match /logs/{logId} {
       allow read: if isAdmin();
-      allow create: if true; // Public logging for analytics if needed
+      allow create: if request.auth != null;
     }
   }
 }

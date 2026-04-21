@@ -163,7 +163,7 @@ export default function DashboardHeader({ title, subtitle, location, showSearch 
   };
 
   const renderNotifications = () => {
-    const unreadCount = notifications.filter(n => !n.isRead).length;
+    const unreadCount = notifications.filter(n => !n.read).length;
     
     return (
       <div className="absolute top-full left-0 mt-3 w-80 bg-white rounded-3xl shadow-2xl border border-gray-100 overflow-hidden z-[60] animate-in fade-in slide-in-from-top-3 duration-200">
@@ -178,7 +178,7 @@ export default function DashboardHeader({ title, subtitle, location, showSearch 
             notifications.map((notif) => (
               <div 
                 key={notif.id} 
-                className={`px-5 py-4 border-b border-gray-50 transition-all cursor-pointer ${!notif.isRead ? 'bg-green-50/50 hover:bg-green-50' : 'hover:bg-gray-50'}`}
+                className={`px-5 py-4 border-b border-gray-50 transition-all cursor-pointer ${!notif.read ? 'bg-green-50/50 hover:bg-green-50' : 'hover:bg-gray-50'}`}
                 onClick={() => handleMarkNotificationAsRead(notif.id)}
               >
                 <p className="text-sm font-bold text-[#1A1A1A] mb-1 leading-tight">{notif.title}</p>
@@ -246,7 +246,7 @@ export default function DashboardHeader({ title, subtitle, location, showSearch 
               className={`p-2 rounded-xl border border-transparent transition-colors relative ${isNotificationSidebarOpen ? 'bg-white text-[#2E7D32] border-[#2E7D32]' : 'bg-[#F9F9F6] text-[#757575] hover:bg-white hover:text-[#2E7D32] hover:border-[#2E7D32]'}`}
             >
               <Bell className="w-5 h-5" />
-              {notifications.some(n => !n.isRead) && (
+              {notifications.some(n => !n.read) && (
                 <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
               )}
             </button>
@@ -349,7 +349,7 @@ export default function DashboardHeader({ title, subtitle, location, showSearch 
               className={`p-2.5 rounded-xl border border-transparent transition-colors relative ${showNotifications ? 'bg-white text-[#2E7D32] border-[#2E7D32]' : 'bg-[#F9F9F6] text-[#757575] hover:bg-white hover:text-[#2E7D32] hover:border-[#2E7D32]'}`}
             >
               <Bell className="w-5 h-5" />
-              {notifications.some(n => !n.isRead) && (
+              {notifications.some(n => !n.read) && (
                 <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
               )}
             </button>
