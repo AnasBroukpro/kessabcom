@@ -30,6 +30,6 @@ if (typeof window !== 'undefined') {
   }
 }
 
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId || '(default)');
 
 export { RecaptchaVerifier, signInWithPhoneNumber };
