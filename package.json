@@ -4,14 +4,14 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev:api": "node_modules\\.bin\\tsx.cmd server.ts",
-    "dev:client": "node_modules\\.bin\\vite.cmd",
-    "dev": "node -e \"const {spawn}=require('child_process');const a=spawn('node_modules\\\\.bin\\\\tsx.cmd',['server.ts'],{stdio:'inherit',shell:true});const b=spawn('node_modules\\\\.bin\\\\vite.cmd',[],{stdio:'inherit',shell:true});[a,b].forEach(p=>p.on('exit',()=>{process.exit()}))\"",
-    "start": "node_modules\\.bin\\tsx.cmd server.ts",
-    "build": "vite build",
-    "preview": "vite preview",
+    "dev:api": "npx tsx server.ts",
+    "dev:client": "npx vite",
+    "dev": "node -e \"const {spawn}=require('child_process');const a=spawn('npx',['tsx','server.ts'],{stdio:'inherit',shell:true});const b=spawn('npx',['vite'],{stdio:'inherit',shell:true});[a,b].forEach(p=>p.on('exit',()=>{process.exit()}))\"",
+    "start": "npx tsx server.ts",
+    "build": "npx vite build",
+    "preview": "npx vite preview",
     "clean": "rm -rf dist",
-    "lint": "tsc --noEmit"
+    "lint": "npx tsc --noEmit"
   },
   "dependencies": {
     "@google-cloud/firestore": "^7.10.0",

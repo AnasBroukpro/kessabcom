@@ -12,7 +12,17 @@ const __dirname = path.dirname(__filename);
 
 // Initialize Firebase Admin (for Auth only)
 const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
-const firebaseConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+let firebaseConfig: any = {};
+
+if (fs.existsSync(configPath)) {
+  firebaseConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+} else {
+  console.warn('⚠️ firebase-applet-config.json missing, using environment variables');
+  firebaseConfig = {
+    projectId: process.env.FIREBASE_PROJECT_ID,
+    firestoreDatabaseId: process.env.FIREBASE_FIRESTORE_DATABASE_ID || '(default)'
+  };
+}
 
 if (!admin.apps.length) {
   const serviceAccountPath = path.resolve(process.cwd(), 'firebase-service-account.json');
@@ -32,11 +42,17 @@ if (!admin.apps.length) {
 }
 
 // Initialize Firestore with named database
-const db = new Firestore({
+const firestoreOptions: any = {
   projectId: firebaseConfig.projectId,
   databaseId: firebaseConfig.firestoreDatabaseId || '(default)',
-  keyFilename: path.resolve(process.cwd(), 'firebase-service-account.json'),
-});
+};
+
+const serviceAccountPath = path.resolve(process.cwd(), 'firebase-service-account.json');
+if (fs.existsSync(serviceAccountPath)) {
+  firestoreOptions.keyFilename = serviceAccountPath;
+}
+
+const db = new Firestore(firestoreOptions);
 const auth = admin.auth();
 
 // Helper to verify reCAPTCHA Enterprise token
@@ -126,7 +142,13 @@ async function startServer() {
 
   // CORS Middleware
   app.use((req, res, next) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    const allowedOrigins = ['http://localhost:5173', 'http://localhost:3000', 'https://kessabcom.ma', 'https://www.kessabcom.ma'];
+    const origin = req.headers.origin;
+    if (origin && allowedOrigins.includes(origin)) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+    } else {
+      res.setHeader('Access-Control-Allow-Origin', allowedOrigins[0]); // Fallback to first
+    }
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
     if (req.method === 'OPTIONS') {
@@ -134,6 +156,9 @@ async function startServer() {
     }
     next();
   });
+
+  // Simple In-memory Rate Limiter for sensitive endpoints
+  const phoneCheckLimiter: Record<string, { count: number, resetAt: number }> = {};
 
   // --- PUBLIC ENDPOINTS ---
 
@@ -246,7 +271,20 @@ async function startServer() {
     res.json({ id: userDoc.id, ...userDoc.data() });
   });
 
-  app.get("/api/auth/check-phone/:phone", async (req, res) => {
+  app.get("/api/auth/check-phone/:phone", (req, res, next) => {
+    // Simple rate limit: 10 checks per minute per IP
+    const ip = req.ip || req.get('x-forwarded-for') || 'unknown';
+    const now = Date.now();
+    if (!phoneCheckLimiter[ip] || now > phoneCheckLimiter[ip].resetAt) {
+      phoneCheckLimiter[ip] = { count: 1, resetAt: now + 60000 };
+    } else {
+      phoneCheckLimiter[ip].count++;
+    }
+    if (phoneCheckLimiter[ip].count > 10) {
+      return res.status(429).json({ error: "Too many attempts. Please wait a minute." });
+    }
+    next();
+  }, async (req, res) => {
     try {
       const snap = await db.collection('users').where('phoneNumber', '==', req.params.phone).limit(1).get();
       res.json({ exists: !snap.empty });
@@ -267,11 +305,20 @@ async function startServer() {
     }
   });
 
-  app.get("/api/users/:id", async (req, res) => {
+  app.get("/api/users/:id", verifyToken, async (req: any, res) => {
     try {
       const doc = await db.collection('users').doc(req.params.id).get();
       if (!doc.exists) return res.status(404).json({ error: "Not found" });
       const data = doc.data() || {};
+      // Filter sensitive data unless admin or owner
+      const isOwner = req.user.uid === req.params.id;
+      const isAdminUser = req.user.role === 'admin';
+      
+      if (!isOwner && !isAdminUser) {
+        delete data.email;
+        delete data.phoneNumber;
+      }
+      
       res.json({ id: doc.id, ...data });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
@@ -524,13 +571,47 @@ async function startServer() {
   });
 
   app.put("/api/offers/:id/status", verifyToken, async (req: any, res) => {
-    await db.collection('offers').doc(req.params.id).update({ status: req.body.status });
-    res.json({ status: "ok" });
+    try {
+      const offerRef = db.collection('offers').doc(req.params.id);
+      const offerSnap = await offerRef.get();
+      if (!offerSnap.exists) return res.status(404).json({ error: "Offer not found" });
+      
+      const offerData = offerSnap.data();
+      const requestId = offerData?.requestId;
+      const requestSnap = await db.collection('offerRequests').doc(requestId).get();
+      const requestData = requestSnap.data();
+
+      // Check if user is the seller of the offer OR the buyer of the request
+      const isSeller = offerData?.sellerId === req.user.uid;
+      const isBuyer = requestData?.buyerId === req.user.uid;
+      const isAdminUser = req.user.role === 'admin';
+
+      if (!isSeller && !isBuyer && !isAdminUser) {
+        return res.status(403).json({ error: "Unauthorized to update this offer" });
+      }
+
+      await offerRef.update({ status: req.body.status });
+      res.json({ status: "ok" });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
   });
 
   app.delete("/api/offers/:id", verifyToken, async (req: any, res) => {
-    await db.collection('offers').doc(req.params.id).delete();
-    res.json({ status: "ok" });
+    try {
+      const offerRef = db.collection('offers').doc(req.params.id);
+      const offerSnap = await offerRef.get();
+      if (!offerSnap.exists) return res.sendStatus(200); // Already deleted
+      
+      if (offerSnap.data()?.sellerId !== req.user.uid && req.user.role !== 'admin') {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+
+      await offerRef.delete();
+      res.json({ status: "ok" });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
   });
 
   // --- FAVORITES ENDPOINTS ---
@@ -554,28 +635,35 @@ async function startServer() {
     res.json({ status: "ok" });
   });
 
-  // --- REPORTS ENDPOINTS ---
-
+  // --- REPORTS & DONATIONS ---
   app.post("/api/reports", verifyToken, async (req: any, res) => {
-    const data = {
-      ...req.body,
-      reporterId: req.user.uid,
-      status: 'pending',
-      createdAt: admin.firestore.FieldValue.serverTimestamp()
-    };
-    await db.collection('reports').add(data);
-    res.json({ status: "ok" });
+    try {
+      const data = {
+        ...req.body,
+        reporterId: req.user.uid,
+        status: 'pending',
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      };
+      await db.collection('reports').add(data);
+      res.status(201).json({ status: "ok" });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
   });
 
   app.post("/api/donations", verifyToken, async (req: any, res) => {
-    const data = {
-      ...req.body,
-      donorId: req.user.uid,
-      status: 'pending',
-      createdAt: admin.firestore.FieldValue.serverTimestamp()
-    };
-    await db.collection('donations').add(data);
-    res.json({ status: "ok" });
+    try {
+      const data = {
+        ...req.body,
+        donorId: req.user.uid,
+        status: 'pending',
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      };
+      await db.collection('donations').add(data);
+      res.status(201).json({ status: "ok" });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
   });
 
   app.post("/api/users/:sellerId/reviews", verifyToken, async (req: any, res) => {
@@ -766,34 +854,7 @@ async function startServer() {
     res.json(snap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() })));
   });
 
-  app.post("/api/reports", verifyToken, async (req: any, res) => {
-    try {
-      const data = {
-        ...req.body,
-        reporterId: req.user.uid,
-        status: 'pending',
-        createdAt: admin.firestore.FieldValue.serverTimestamp()
-      };
-      await db.collection('reports').add(data);
-      res.status(201).json({ status: "ok" });
-    } catch (e: any) {
-      res.status(500).json({ error: e.message });
-    }
-  });
 
-  app.post("/api/donations", async (req, res) => {
-    try {
-      const data = {
-        ...req.body,
-        status: 'pending',
-        createdAt: admin.firestore.FieldValue.serverTimestamp()
-      };
-      await db.collection('donations').add(data);
-      res.status(201).json({ status: "ok" });
-    } catch (e: any) {
-      res.status(500).json({ error: e.message });
-    }
-  });
 
   app.post("/api/clicks", verifyToken, async (req: any, res) => {
     const { listingId, type } = req.body;
@@ -842,7 +903,7 @@ async function startServer() {
   app.put("/api/notifications/:id/read", verifyToken, async (req: any, res) => {
     try {
       await db.collection('users').doc(req.user.uid).collection('notifications').doc(req.params.id).update({
-        isRead: true
+        read: true
       });
       res.json({ status: "ok" });
     } catch (e) {
