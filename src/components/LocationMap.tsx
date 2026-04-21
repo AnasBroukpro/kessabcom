@@ -1,5 +1,6 @@
 import React, { useCallback } from 'react';
 import { GoogleMap, useJsApiLoader, MarkerF } from '@react-google-maps/api';
+import { useSettings } from '../hooks/useSettings';
 
 const containerStyle = {
   width: '100%',
@@ -19,9 +20,12 @@ interface Props {
 }
 
 export default function LocationMap({ lat, lng, onLocationSelect }: Props) {
+  const { settings, loading } = useSettings();
+  const apiKey = settings?.googleMapsApiKey || import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
+
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script',
-    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '',
+    googleMapsApiKey: apiKey,
   });
 
   const center = (lat && lng) ? { lat, lng } : defaultCenter;

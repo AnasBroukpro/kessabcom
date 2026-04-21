@@ -1,23 +1,23 @@
 import React, { useState, useRef } from 'react';
 import { ViewType } from '../App';
-import { MapPin, Phone, MessageCircle, Navigation, Star, ArrowLeft, BadgeCheck, Play, Heart, AlertTriangle, X, CheckCircle2, AlertCircle, ChevronRight, ChevronLeft } from 'lucide-react';
+import { MapPin, Phone, MessageCircle, Navigation, Star, ArrowLeft, BadgeCheck, Play, Heart, AlertTriangle, X, CheckCircle2, AlertCircle, ChevronRight, ChevronLeft, User } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import SearchHeader from '../components/SearchHeader';
 import { firestoreService } from '../services/firestoreService';
 import { useAuth } from '../contexts/AuthContext';
-import { cityMapping } from '../constants/cityMapping';
+import { cityMapping, getDisplayCity } from '../constants/cityMapping';
 import ContactSellerModal from '../components/ContactSellerModal';
 import LoginRequiredModal from '../components/LoginRequiredModal';
 import { useSettings } from '../hooks/useSettings';
 
 interface Props {
-  onNavigate: (view: ViewType, listingId?: string, city?: string, radius?: string, subView?: string) => void;
+  onNavigate: (view: ViewType, listingId?: string, city?: string, radius?: string, subView?: string, breed?: string) => void;
   listingId?: string;
 }
 
 export default function ListingDetails({ onNavigate, listingId }: Props) {
   const { user, profile } = useAuth();
-  const isAdmin = profile?.role === 'admin' || user?.email === 'anas.brouk.s4@gmail.com';
+  const isAdmin = profile?.role === 'admin';
   const [listing, setListing] = useState<any>(null);
   const [sellerProfile, setSellerProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -74,8 +74,7 @@ export default function ListingDetails({ onNavigate, listingId }: Props) {
               <span className="truncate">
                 {(() => {
                   const dist = relatedListing.distance || 0;
-                  const rawCity = relatedListing.location?.split(' ')[0] || 'غير محدد';
-                  const city = cityMapping[rawCity.toLowerCase()] || rawCity;
+                  const city = getDisplayCity(relatedListing);
                   
                   if (dist < 5) return `${city} (قريب ليك)`;
                   if (dist < 25) return `${city} (على بعد ${Math.round(dist)} كلم)`;
@@ -139,25 +138,31 @@ export default function ListingDetails({ onNavigate, listingId }: Props) {
               setActiveMedia({ type: 'image', url: docRef.images[0] });
             }
             
-            if (docRef.sellerId) {
-              const sellerProfileData = await firestoreService.getPublicProfile(docRef.sellerId);
-              if (sellerProfileData) {
-                setSellerProfile(sellerProfileData);
-                // If user is logged in, check if they have a review and pre-fill
-                if (user) {
-                  const existingReview = sellerProfileData.reviews?.find((r: any) => r.userId === user.uid);
-                  if (existingReview) {
-                    setNewReviewRating(existingReview.rating);
-                    setNewReviewComment(existingReview.comment);
-                  }
+            // Bug #12 FIX: fetch seller profile + related listings in parallel (was sequential N+1)
+            const [sellerProfileData, relatedRaw] = await Promise.all([
+              docRef.sellerId
+                ? firestoreService.getPublicProfile(docRef.sellerId)
+                : Promise.resolve(null),
+              firestoreService.getAnnouncements(docRef.category)
+            ]);
+
+            if (sellerProfileData) {
+              setSellerProfile(sellerProfileData);
+              // If user is logged in, check if they have a review and pre-fill
+              if (user) {
+                const existingReview = (sellerProfileData as any).reviews?.find((r: any) => r.userId === user.uid);
+                if (existingReview) {
+                  setNewReviewRating(existingReview.rating);
+                  setNewReviewComment(existingReview.comment);
                 }
               }
             }
 
-            // Fetch related listings based on category (Efficient query)
-            const related = await firestoreService.getAnnouncements(docRef.category) as any[];
-            if (related) {
-               setRelatedListings(related.filter((l: any) => l.id !== listingId).slice(0, 3));
+            if (relatedRaw) {
+              const relatedArr = Array.isArray(relatedRaw)
+                ? relatedRaw
+                : ((relatedRaw as any).data ?? []);
+              setRelatedListings(relatedArr.filter((l: any) => l.id !== listingId).slice(0, 3));
             }
           }
         } catch (error) {
@@ -167,6 +172,8 @@ export default function ListingDetails({ onNavigate, listingId }: Props) {
         }
       };
       fetchListing();
+      // Real Statistics: Increment view on mount
+      firestoreService.incrementView(listingId);
     } else {
       setLoading(false);
     }
@@ -254,12 +261,18 @@ export default function ListingDetails({ onNavigate, listingId }: Props) {
               <div className="bg-white rounded-3xl p-6 shadow-sm border border-outline-variant/10">
                 <div className="flex items-center gap-4 mb-6">
                   <div className="relative">
-                    <img 
-                      src={sellerProfile?.photoURL || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=150&h=150"} 
-                      alt="الكساب" 
-                      className="w-16 h-16 rounded-full object-cover border-2 border-white shadow-sm"
-                      referrerPolicy="no-referrer"
-                    />
+                    {sellerProfile?.photoURL ? (
+                      <img 
+                        src={sellerProfile.photoURL} 
+                        alt="الكساب" 
+                        className="w-16 h-16 rounded-full object-cover border-2 border-white shadow-sm"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <div className="w-16 h-16 rounded-full bg-[#E8F5E9] flex items-center justify-center border-2 border-white shadow-sm">
+                        <User className="w-8 h-8 text-[#2E7D32]" />
+                      </div>
+                    )}
                     {sellerProfile?.isCertified && (
                       <div className="absolute bottom-0 right-0 bg-white rounded-full p-0.5">
                         <BadgeCheck className="w-5 h-5 text-[#2E7D32] fill-current" />
@@ -267,7 +280,13 @@ export default function ListingDetails({ onNavigate, listingId }: Props) {
                     )}
                   </div>
                   <div>
-                    <h3 className="font-bold text-lg text-[#1A1A1A]">{sellerProfile?.fullName || sellerProfile?.displayName || 'كساب'}</h3>
+                    <h3 className="font-bold text-lg text-[#1A1A1A]">
+                      {(() => {
+                        const name = sellerProfile?.fullName || sellerProfile?.displayName || listing?.sellerName;
+                        if (!name || name.toLowerCase() === 'user') return 'كساب';
+                        return name;
+                      })()}
+                    </h3>
                     {sellerProfile?.isCertified ? (
                       <p className="text-[10px] text-[#2E7D32] font-bold mb-1">
                         كساب معتمد فـ كسابكوم
@@ -275,11 +294,13 @@ export default function ListingDetails({ onNavigate, listingId }: Props) {
                     ) : (
                       <p className="text-sm text-[#2E7D32] font-bold mb-1">كساب</p>
                     )}
-                    <div className="flex items-center gap-1 text-sm font-bold text-[#1A1A1A]">
-                      <Star className="w-4 h-4 text-[#FF9800] fill-current" />
-                      <span>{(sellerProfile?.rating || 5).toFixed(1)}</span>
-                      <span className="text-[#757575] font-normal">({sellerProfile?.reviewsCount || 0} تقييم)</span>
-                    </div>
+                    {sellerProfile?.reviewsCount > 0 && (
+                      <div className="flex items-center gap-1 text-sm font-bold text-[#1A1A1A]">
+                        <Star className="w-4 h-4 text-[#FF9800] fill-current" />
+                        <span>{(sellerProfile?.rating || 5).toFixed(1)}</span>
+                        <span className="text-[#757575] font-normal">({sellerProfile?.reviewsCount} تقييم)</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -337,20 +358,29 @@ export default function ListingDetails({ onNavigate, listingId }: Props) {
                   <div>
                     <p className="text-xs text-[#757575] mb-1 font-medium">موقع الضيعة</p>
                     <p className="font-bold text-[#1A1A1A]">
-                      {listing?.farmLocation || (() => {
-                        const rawLocation = listing?.location || 'غير محدد';
-                        return cityMapping[rawLocation.toLowerCase()] || rawLocation;
-                      })()}
+                      {listing?.farmLocation || getDisplayCity(listing)}
                     </p>
                   </div>
                 </div>
                 {listing?.coordinates ? (
-                  <a href={`https://www.google.com/maps/dir/?api=1&destination=${listing.coordinates.lat},${listing.coordinates.lng}`} target="_blank" rel="noopener noreferrer" className="w-full flex items-center justify-center gap-2 bg-[#1A1A1A] text-white py-4 rounded-xl font-bold transition-colors border border-transparent hover:bg-transparent hover:text-[#1A1A1A] hover:border-[#1A1A1A]">
+                  <a 
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${listing.coordinates.lat},${listing.coordinates.lng}`} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    onClick={() => firestoreService.incrementContactClick(listing.id, 'location')}
+                    className="w-full flex items-center justify-center gap-2 bg-[#1A1A1A] text-white py-4 rounded-xl font-bold transition-colors border border-transparent hover:bg-transparent hover:text-[#1A1A1A] hover:border-[#1A1A1A]"
+                  >
                     <Navigation className="w-5 h-5" />
                     <span>طريق الضيعة (GPS)</span>
                   </a>
                 ) : listing?.location ? (
-                  <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(listing.location)}`} target="_blank" rel="noopener noreferrer" className="w-full flex items-center justify-center gap-2 bg-[#1A1A1A] text-white py-4 rounded-xl font-bold transition-colors border border-transparent hover:bg-transparent hover:text-[#1A1A1A] hover:border-[#1A1A1A]">
+                  <a 
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(listing.location)}`} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    onClick={() => firestoreService.incrementContactClick(listing.id, 'location')}
+                    className="w-full flex items-center justify-center gap-2 bg-[#1A1A1A] text-white py-4 rounded-xl font-bold transition-colors border border-transparent hover:bg-transparent hover:text-[#1A1A1A] hover:border-[#1A1A1A]"
+                  >
                     <Navigation className="w-5 h-5" />
                     <span>طريق الضيعة (GPS)</span>
                   </a>
@@ -450,14 +480,13 @@ export default function ListingDetails({ onNavigate, listingId }: Props) {
                   }).join('، ');
                 }).join(' - ') || 'إعلان بدون عنوان'}
               </h1>
-              <p className="text-[#2E7D32] font-bold text-xl mb-4">ضيعة {sellerProfile?.fullName || sellerProfile?.displayName || listing?.sellerName || 'كساب'}</p>
+              <p className="text-[#2E7D32] font-bold text-xl mb-4">
+                ضيعة {sellerProfile?.fullName || sellerProfile?.displayName || listing?.sellerName || 'كساب'}
+              </p>
               <div className="flex items-center gap-2 text-[#4A4A4A] mb-6">
                 <MapPin className="w-5 h-5 text-[#2E7D32]" />
                 <span className="font-medium">
-                  {listing?.farmLocation || (() => {
-                    const rawLocation = listing?.location || 'غير محدد';
-                    return cityMapping[rawLocation.toLowerCase()] || rawLocation;
-                  })()}
+                  {listing?.farmLocation || getDisplayCity(listing)}
                 </span>
               </div>
               

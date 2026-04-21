@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Suspense, lazy } from 'react';
+import React, { useState, useEffect, Suspense, lazy, Component, ErrorInfo, ReactNode } from 'react';
 import { Minus, ChevronUp } from 'lucide-react';
 import { AuthProvider } from './contexts/AuthContext';
 import { SettingsProvider } from './contexts/SettingsContext';
@@ -21,6 +21,7 @@ const AddListing = lazy(() => import('./views/AddListing'));
 const AdminDashboard = lazy(() => import('./views/AdminDashboard'));
 const AdminAuth = lazy(() => import('./views/AdminAuth'));
 const ListingDetails = lazy(() => import('./views/ListingDetails'));
+const Notifications = lazy(() => import('./views/Notifications'));
 const SolidarityRequest = lazy(() => import('./views/SolidarityRequest'));
 const SolidarityDonate = lazy(() => import('./views/SolidarityDonate'));
 const PriceCatalog = lazy(() => import('./views/PriceCatalog'));
@@ -33,7 +34,7 @@ import { firestoreService } from './services/firestoreService';
 import { useAuth } from './contexts/AuthContext';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation, useParams, Navigate } from 'react-router-dom';
 
-export type ViewType = 'home' | 'auth' | 'admin-auth' | 'buyer' | 'seller' | 'add-listing' | 'admin' | 'listing-details' | 'search-results' | 'solidarity-request' | 'solidarity-donate' | 'price-catalog' | 'tips' | 'contact' | 'terms' | 'privacy';
+export type ViewType = 'home' | 'auth' | 'admin-auth' | 'buyer' | 'seller' | 'add-listing' | 'admin' | 'listing-details' | 'search-results' | 'solidarity-request' | 'solidarity-donate' | 'price-catalog' | 'tips' | 'contact' | 'terms' | 'privacy' | 'notifications';
 
 function AppContent() {
   const navigate = useNavigate();
@@ -66,6 +67,7 @@ function AppContent() {
     if (pathname === '/contact') return 'contact';
     if (pathname === '/terms') return 'terms';
     if (pathname === '/privacy') return 'privacy';
+    if (pathname === '/notifications') return 'notifications';
     return 'home';
   };
 
@@ -83,11 +85,12 @@ function AppContent() {
     }
   }, []);
 
-  const handleNavigate = (view: ViewType, listingId?: string, city?: string, radius?: string, subView?: string) => {
+  const handleNavigate = (view: ViewType, listingId?: string, city?: string, radius?: string, subView?: string, breed?: string) => {
     const params = new URLSearchParams();
     if (city) params.set('city', city);
     if (radius) params.set('radius', radius);
     if (subView) params.set('sub', subView);
+    if (breed) params.set('breed', breed);
     
     const search = params.toString() ? `?${params.toString()}` : '';
 
@@ -108,6 +111,7 @@ function AppContent() {
       case 'contact': navigate('/contact'); break;
       case 'terms': navigate('/terms'); break;
       case 'privacy': navigate('/privacy'); break;
+      case 'notifications': navigate('/notifications'); break;
       default: navigate('/');
     }
   };
@@ -135,7 +139,11 @@ function AppContent() {
   useEffect(() => {
     if (!authLoading) {
       const protectedViews: ViewType[] = ['buyer', 'seller', 'admin', 'add-listing', 'solidarity-request', 'solidarity-donate', 'listing-details'];
-      
+      if (settings.guestBuyerMode) {
+        const index = protectedViews.indexOf('listing-details');
+        if (index > -1) protectedViews.splice(index, 1);
+      }
+
       if (protectedViews.includes(currentView) && !profile) {
         // Only set intended view if we are not already going to auth
         if (currentView !== 'auth' && currentView !== 'admin-auth') {
@@ -150,14 +158,23 @@ function AppContent() {
           setIntendedView(null);
           handleNavigate(next.view, next.listingId);
       }
+
+      // Bug Fix: Auto-redirect logged-in users who land on auth pages
+      if (profile?.role && (currentView === 'auth' || currentView === 'admin-auth')) {
+        console.log(`🚀 App: Auto-redirecting ${profile.role} to dashboard`);
+        if (profile.role === 'admin') handleNavigate('admin');
+        else if (profile.role === 'seller') handleNavigate('seller');
+        else if (profile.role === 'buyer') handleNavigate('buyer');
+      }
     }
-  }, [profile, currentView, authLoading, intendedView]);
+  }, [profile, currentView, authLoading, intendedView, settings.guestBuyerMode]);
 
   if (settings.maintenanceMode && profile?.role !== 'admin' && currentView !== 'admin-auth') {
     return <Maintenance activationDate={settings.activationDate} onNavigate={handleNavigate} />;
   }
 
   const renderView = () => {
+    // BUG FIX: Removed (user && !profile) which was trapping new users on a permanent loading screen
     if (authLoading || !isAppReady) {
       return <LoadingScreen />;
     }
@@ -170,21 +187,32 @@ function AppContent() {
       <Suspense fallback={<LoadingScreen />}>
         <Routes>
           <Route path="/" element={<Home onNavigate={handleNavigate} />} />
-          <Route path="/login" element={<Auth onNavigate={handleNavigate} intendedView={null} />} />
+          <Route path="/login" element={<Auth onNavigate={handleNavigate} intendedView={intendedView} />} />
           <Route path="/panelaccess" element={<AdminAuth onNavigate={handleNavigate} />} />
           
           {/* Protected Routes */}
           <Route path="/buyer" element={
-            profile ? <BuyerDashboard onNavigate={handleNavigate} activeSubView={new URLSearchParams(location.search).get('sub') || undefined} /> : <Navigate to="/login" />
+            profile?.role === 'buyer' || profile?.role === 'admin' ? (
+              <BuyerDashboard onNavigate={handleNavigate} activeSubView={new URLSearchParams(location.search).get('sub') || undefined} />
+            ) : <Navigate to="/login" />
           } />
+          
           <Route path="/seller" element={
-            profile ? <SellerDashboard onNavigate={handleNavigate} activeSubView={new URLSearchParams(location.search).get('sub') || undefined} /> : <Navigate to="/login" />
+            profile?.role === 'seller' || profile?.role === 'admin' ? (
+              <SellerDashboard onNavigate={handleNavigate} activeSubView={new URLSearchParams(location.search).get('sub') || undefined} />
+            ) : <Navigate to="/login" />
           } />
+          
           <Route path="/add-listing" element={
-            profile ? <AddListing onNavigate={handleNavigate} listingId={new URLSearchParams(location.search).get('id') || undefined} /> : <Navigate to="/login" />
+            profile?.role === 'seller' || profile?.role === 'admin' ? (
+              <AddListing onNavigate={handleNavigate} listingId={new URLSearchParams(location.search).get('id') || undefined} />
+            ) : <Navigate to="/login" />
           } />
+          
           <Route path="/admin" element={
-            profile?.role === 'admin' ? <AdminDashboard onNavigate={handleNavigate} activeSubView={new URLSearchParams(location.search).get('sub') || undefined} /> : <Navigate to="/login" />
+            profile?.role === 'admin' ? (
+              <AdminDashboard onNavigate={handleNavigate} activeSubView={new URLSearchParams(location.search).get('sub') || undefined} />
+            ) : <Navigate to="/panelaccess" />
           } />
           
           <Route path="/listing/:id" element={<ListingDetailsWrapper onNavigate={handleNavigate} />} />
@@ -198,6 +226,7 @@ function AppContent() {
           <Route path="/contact" element={<ContactPage onNavigate={handleNavigate} />} />
           <Route path="/terms" element={<TermsPage onNavigate={handleNavigate} />} />
           <Route path="/privacy" element={<PrivacyPage onNavigate={handleNavigate} />} />
+          <Route path="/notifications" element={<Notifications onNavigate={handleNavigate} />} />
           
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
@@ -225,17 +254,70 @@ function ListingDetailsWrapper({ onNavigate }: { onNavigate: any }) {
 function SearchResultsWrapper({ onNavigate }: { onNavigate: any }) {
   const location = useLocation();
   const params = new URLSearchParams(location.search);
-  return <SearchResults onNavigate={onNavigate} initialCity={params.get('city') || undefined} initialRadius={params.get('radius') || undefined} />;
+  return <SearchResults 
+    onNavigate={onNavigate} 
+    initialCity={params.get('city') || undefined} 
+    initialRadius={params.get('radius') || undefined}
+    initialBreed={params.get('breed') || undefined}
+  />;
+}
+
+// Bug #8 FIX: Root-level ErrorBoundary to prevent silent white-screen crashes
+interface ErrorBoundaryState { hasError: boolean; error: Error | null; }
+class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryState> {
+  declare state: ErrorBoundaryState;
+  declare props: { children: ReactNode };
+  declare setState: Component<{ children: ReactNode }, ErrorBoundaryState>['setState'];
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error('[ErrorBoundary] Caught unhandled error:', error, info.componentStack);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', direction: 'rtl', fontFamily: 'system-ui, sans-serif', background: '#f8fafc' }}>
+          <div style={{ maxWidth: 480, textAlign: 'center', background: '#fff', borderRadius: 16, padding: '2.5rem', boxShadow: '0 4px 24px rgba(0,0,0,0.08)' }}>
+            <div style={{ fontSize: '3.5rem', marginBottom: '1rem' }}>⚠️</div>
+            <h1 style={{ fontSize: '1.4rem', fontWeight: 900, color: '#1a1a1a', marginBottom: '0.5rem' }}>وقع خطأ غير متوقع</h1>
+            <p style={{ color: '#6b7280', marginBottom: '1.5rem', lineHeight: 1.6 }}>واجه التطبيق مشكلة تقنية. يرجى إعادة تحميل الصفحة أو المحاولة لاحقاً.</p>
+            {this.state.error && (
+              <details style={{ textAlign: 'left', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '0.75rem', marginBottom: '1.5rem', fontSize: 12 }}>
+                <summary style={{ cursor: 'pointer', color: '#ef4444', fontWeight: 600 }}>تفاصيل الخطأ</summary>
+                <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', marginTop: 8, color: '#7f1d1d' }}>{this.state.error.message}</pre>
+              </details>
+            )}
+            <button
+              onClick={() => { this.setState({ hasError: false, error: null }); window.location.reload(); }}
+              style={{ background: '#16a34a', color: '#fff', border: 'none', padding: '0.75rem 2rem', borderRadius: 10, fontWeight: 700, cursor: 'pointer', fontSize: '1rem', transition: 'background 0.2s' }}
+              onMouseOver={e => (e.currentTarget.style.background = '#15803d')}
+              onMouseOut={e => (e.currentTarget.style.background = '#16a34a')}
+            >
+              🔄 إعادة التحميل
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
 }
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <SettingsProvider>
-        <AuthProvider>
-          <AppContent />
-        </AuthProvider>
-      </SettingsProvider>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <SettingsProvider>
+          <AuthProvider>
+            <AppContent />
+          </AuthProvider>
+        </SettingsProvider>
+      </BrowserRouter>
+    </ErrorBoundary>
   );
 }

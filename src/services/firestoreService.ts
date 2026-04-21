@@ -20,9 +20,31 @@
  */
 import { auth } from '../lib/firebase';
 import { onSnapshot, query, collection, where, orderBy, limit, doc } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage } from '../lib/firebase';
 
 const API_BASE = '/api';
+
+/**
+ * Bug #7 FIX: centralised HTTP helper.
+ * All bare `.then(res => res.json())` calls silently swallowed 4xx/5xx errors.
+ * apiFetch throws a descriptive Error for any non-2xx response so callers can
+ * react appropriately (show toast, update UI state, etc.).
+ */
+async function apiFetch(url: string, options?: RequestInit): Promise<any> {
+  const res = await fetch(url, options);
+  if (!res.ok) {
+    let message = `HTTP ${res.status} ${res.statusText}`;
+    try {
+      const body = await res.json();
+      if (body?.error) message = body.error;
+    } catch { /* ignore parse errors */ }
+    throw new Error(message);
+  }
+  // 204 No Content has no body
+  if (res.status === 204) return null;
+  return res.json();
+}
 
 async function getAuthHeaders() {
   const user = auth.currentUser;
@@ -38,69 +60,110 @@ export const firestoreService = {
   // Auth & Users
   async syncUser(uid: string, email: string, fullName: string, role: string, phone: string) {
     const headers = await getAuthHeaders();
-    return fetch(`${API_BASE}/auth/register`, {
+    return apiFetch(`${API_BASE}/auth/register`, {
       method: 'POST',
       headers,
       body: JSON.stringify({ uid, email, fullName, role, phone })
-    }).then(res => res.json());
+    });
   },
 
   async getUserProfile(uid: string) {
     const headers = await getAuthHeaders();
-    return fetch(`${API_BASE}/users/${uid}`, { headers }).then(res => res.json());
+    return apiFetch(`${API_BASE}/users/${uid}`, { headers });
   },
 
   async getPublicProfile(id: string) {
-    return fetch(`${API_BASE}/users/${id}`).then(res => res.json());
+    return apiFetch(`${API_BASE}/users/${id}`);
   },
 
   async checkPhoneExists(phone: string) {
-    return fetch(`${API_BASE}/auth/check-phone/${encodeURIComponent(phone)}`).then(res => res.json());
+    return apiFetch(`${API_BASE}/auth/check-phone/${encodeURIComponent(phone)}`);
   },
 
   async updateProfile(data: any) {
     const headers = await getAuthHeaders();
-    return fetch(`${API_BASE}/auth/profile`, {
+    return apiFetch(`${API_BASE}/auth/profile`, {
       method: 'PUT',
       headers,
       body: JSON.stringify(data)
-    }).then(res => res.json());
+    });
+  },
+
+  async updateUserProfile(uid: string, data: any) {
+    const headers = await getAuthHeaders();
+    return apiFetch(`${API_BASE}/users/${uid}`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify(data)
+    });
+  },
+
+  async uploadImage(file: File, path: string) {
+    const storageRef = ref(storage, path);
+    await uploadBytes(storageRef, file);
+    return getDownloadURL(storageRef);
   },
 
   // Listings (Announcements)
-  async getAnnouncements(category?: string) {
-    const url = category ? `${API_BASE}/listings?category=${category}` : `${API_BASE}/listings`;
-    return fetch(url).then(res => res.json());
+  async getAnnouncements(category?: string, startAfter?: string, limitCount = 12) {
+    let url = `${API_BASE}/listings?limit=${limitCount}`;
+    if (category) url += `&category=${encodeURIComponent(category)}`;
+    if (startAfter) url += `&startAfter=${encodeURIComponent(startAfter)}`;
+    
+    try {
+      const response = await fetch(url);
+      const data = await response.json();
+      return (data && data.data) ? data : { data: Array.isArray(data) ? data : [], nextCursor: null };
+    } catch (error) {
+      console.error("Error fetching announcements:", error);
+      return { data: [], nextCursor: null };
+    }
+  },
+
+  async getSearchResults(city?: string, breed?: string, radius?: string) {
+    try {
+      const params = new URLSearchParams();
+      if (city) params.append('city', city);
+      if (breed) params.append('breed', breed);
+      if (radius) params.append('radius', radius);
+
+      const res = await fetch(`${API_BASE}/listings/search?${params.toString()}`);
+      const data = await res.json();
+      return Array.isArray(data) ? data : (data?.data || []);
+    } catch (error) {
+      console.error("Search error:", error);
+      return [];
+    }
   },
 
   async getAnnouncement(id: string) {
-    return fetch(`${API_BASE}/listings/${id}`).then(res => res.json());
+    return apiFetch(`${API_BASE}/listings/${id}`);
   },
 
   async createAnnouncement(data: any) {
     const headers = await getAuthHeaders();
-    return fetch(`${API_BASE}/listings`, {
+    return apiFetch(`${API_BASE}/listings`, {
       method: 'POST',
       headers,
       body: JSON.stringify(data)
-    }).then(res => res.json());
+    });
   },
 
   async updateAnnouncement(id: string, data: any) {
     const headers = await getAuthHeaders();
-    return fetch(`${API_BASE}/listings/${id}`, {
+    return apiFetch(`${API_BASE}/listings/${id}`, {
       method: 'PUT',
       headers,
       body: JSON.stringify(data)
-    }).then(res => res.json());
+    });
   },
 
   async deleteAnnouncement(id: string) {
     const headers = await getAuthHeaders();
-    return fetch(`${API_BASE}/listings/${id}`, {
+    return apiFetch(`${API_BASE}/listings/${id}`, {
       method: 'DELETE',
       headers
-    }).then(res => res.json());
+    });
   },
 
   async getSellerListings(sellerId: string) {
@@ -116,40 +179,49 @@ export const firestoreService = {
   },
 
   // Requests
-  async getOfferRequests() {
+  async getOfferRequests(startAfter?: string, limitCount = 12) {
+    let url = `${API_BASE}/offer-requests?limit=${limitCount}`;
+    if (startAfter) url += `&startAfter=${encodeURIComponent(startAfter)}`;
+
     try {
-      const res = await fetch(`${API_BASE}/offer-requests`);
-      if (!res.ok) return [];
-      const data = await res.json();
-      return Array.isArray(data) ? data : [];
+      const response = await fetch(url);
+      return await response.json();
     } catch (error) {
       console.error("getOfferRequests error:", error);
-      return [];
+      return { data: [], nextCursor: null };
     }
   },
 
   async createOfferRequest(data: any) {
     const headers = await getAuthHeaders();
-    return fetch(`${API_BASE}/offer-requests`, {
+    return apiFetch(`${API_BASE}/offer-requests`, {
       method: 'POST',
       headers,
       body: JSON.stringify(data)
-    }).then(res => res.json());
+    });
   },
 
   async getOfferRequest(id: string) {
-    return fetch(`${API_BASE}/offer-requests/${id}`).then(res => res.json());
+    return apiFetch(`${API_BASE}/offer-requests/${id}`);
   },
 
   async deleteOfferRequest(id: string) {
     const headers = await getAuthHeaders();
-    return fetch(`${API_BASE}/offer-requests/${id}`, {
+    return apiFetch(`${API_BASE}/offer-requests/${id}`, {
       method: 'DELETE',
       headers
-    }).then(res => res.json());
+    });
   },
 
-  // Offers
+  async updateOfferRequest(id: string, data: any) {
+    const headers = await getAuthHeaders();
+    return apiFetch(`${API_BASE}/offer-requests/${id}`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify(data)
+    });
+  },
+
   async createOffer(data: any) {
     const headers = await getAuthHeaders();
     return fetch(`${API_BASE}/offers`, {
@@ -470,6 +542,12 @@ export const firestoreService = {
     return fetch(`${API_BASE}/stats`).then(res => res.json());
   },
 
+  async getAdminStats() {
+    const headers = await getAuthHeaders();
+    return fetch(`${API_BASE}/admin/stats`, { headers }).then(res => res.json());
+  },
+
+
   async getMarketTrends() {
     return fetch(`${API_BASE}/market-trends`).then(res => res.json());
   },
@@ -585,13 +663,22 @@ export const firestoreService = {
   },
 
   // Re-adding essential methods for existing components
+  async incrementView(announcementId: string) {
+    return fetch(`${API_BASE}/listings/${announcementId}/view`, {
+      method: 'POST'
+    }).then(res => res.json()).catch(() => {});
+  },
+
   async incrementContactClick(announcementId: string, type: string) {
     const headers = await getAuthHeaders();
     return fetch(`${API_BASE}/clicks`, {
       method: 'POST',
       headers,
       body: JSON.stringify({ listingId: announcementId, type })
-    }).catch(() => {});
+    }).then(res => {
+      if (!res.ok) throw new Error('API Error');
+      return res.json();
+    }).catch((error) => { throw error; });
   },
 
   async markNotificationAsRead(userId: string, notificationId: string) {

@@ -9,7 +9,8 @@ import {
   Users, 
   Settings, 
   LogOut, 
-  BarChart3
+  BarChart3,
+  Heart
 } from 'lucide-react';
 import { ViewType } from '../App';
 import { useAuth } from '../contexts/AuthContext';
@@ -31,7 +32,8 @@ export default function MobileSidebar({ isOpen, onClose, onNavigate }: Props) {
       items: [
         { icon: <LayoutDashboard size={20} />, label: 'لوحة التحكم', view: 'buyer' as ViewType, subView: 'dashboard' },
         { icon: <ShoppingBag size={20} />, label: 'طلباتي', view: 'buyer' as ViewType, subView: 'kessaba-offers' },
-      ]
+        { icon: <Heart size={20} />, label: 'المفضلة', view: 'buyer' as ViewType, subView: 'favorites' },
+      ],
     },
     { 
       role: 'seller', 

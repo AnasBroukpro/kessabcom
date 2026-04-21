@@ -25,6 +25,10 @@ export const compressImage = (base64Str: string, maxWidth = 800, maxHeight = 800
       ctx?.drawImage(img, 0, 0, width, height);
       resolve(canvas.toDataURL('image/jpeg', quality));
     };
+    img.onerror = () => {
+      console.error('Failed to load image for compression');
+      resolve(base64Str); // Fallback to original if compression fails
+    };
   });
 };
 
@@ -35,5 +39,7 @@ export const getBase64Size = (base64Str: string): number => {
 
 export const checkPayloadSize = (data: any, limitBytes = 800000): boolean => {
   const json = JSON.stringify(data);
-  return json.length < limitBytes; // Rough estimate, JSON string is usually larger than actual bytes but safe for Firestore limit
+  // Use TextEncoder to get actual byte size (important for multi-byte Arabic characters)
+  const sizeInBytes = new TextEncoder().encode(json).length;
+  return sizeInBytes < limitBytes;
 };

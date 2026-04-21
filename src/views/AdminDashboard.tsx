@@ -9,20 +9,23 @@ import {
   CheckCircle2, Ban, Eye, TrendingUp, DollarSign, ShieldCheck, BadgeCheck,
   AlertCircle, ArrowUpRight, Filter, MoreVertical, Download, Upload, FileText, Database, X,
   Clock, ChevronLeft, LogOut, MapPin, Heart, HeartHandshake, Zap, Megaphone, Loader2,
-  Lock, Camera, Shield, Globe, Mail, Phone, Calendar, Info
+  Lock, Camera, Shield, Globe, Mail, Phone, Calendar, Info, Flag,
+  ShoppingBag, CreditCard, BarChart3, PieChart, Monitor, Smartphone, Star, RefreshCw,
+  Link as LinkIcon
 } from 'lucide-react';
 import { updatePassword, updateProfile, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { useSettings } from '../hooks/useSettings';
 import DashboardHeader from '../components/DashboardHeader';
 import { cityMapping } from '../constants/cityMapping';
 import { compressImage } from '../lib/imageUtils';
+import Notifications from './Notifications';
 
 interface Props {
   onNavigate: (view: ViewType, listingId?: string, city?: string, radius?: string, subView?: string) => void;
   activeSubView?: string;
 }
 
-type AdminTab = 'overview' | 'stats' | 'users' | 'listings' | 'monetization' | 'ads' | 'settings' | 'stock-market' | 'donations' | 'reports' | 'profile';
+type AdminTab = 'overview' | 'stats' | 'users' | 'listings' | 'monetization' | 'ads' | 'settings' | 'stock-market' | 'donations' | 'reports' | 'profile' | 'notifications';
 
 interface StockMarketViewProps {
   settings: any;
@@ -311,12 +314,12 @@ export default function AdminDashboard({ onNavigate, activeSubView }: Props) {
   const { user, profile, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState<AdminTab>('overview');
   const [uploadingBanner, setUploadingBanner] = useState<string | null>(null);
-  const [platformStats, setPlatformStats] = useState({ totalUsers: 0, totalAds: 0, activeAds: 0, totalRequests: 0 });
+  const [platformStats, setPlatformStats] = useState<any>({ totalUsers: 0, sellers: 0, buyers: 0, verifiedSellers: 0, blockedUsers: 0, totalAds: 0, activeAds: 0, pendingAds: 0, inactiveAds: 0, boostedAds: 0, totalRequests: 0, openRequests: 0, closedRequests: 0, totalOffers: 0, pendingReports: 0, donations: 0, newListingsThisWeek: 0, newUsersThisWeek: 0, monthlyGrowth: [], categoryBreakdown: [], planBreakdown: [] });
   const [quotaExceeded, setQuotaExceeded] = useState(false);
 
   useEffect(() => {
     if (activeTab === 'stats') {
-      firestoreService.getPlatformStats().then(setPlatformStats);
+      firestoreService.getAdminStats().then(setPlatformStats).catch(() => firestoreService.getPlatformStats().then(setPlatformStats));
     }
   }, [activeTab]);
 
@@ -331,6 +334,8 @@ export default function AdminDashboard({ onNavigate, activeSubView }: Props) {
   const [monetizationSubTab, setMonetizationSubTab] = useState<'subscriptions' | 'boosts'>('subscriptions');
   const [settingsTab, setSettingsTab] = useState<'general' | 'logs' | 'security' | 'import-export' | 'backup'>('general');
   const [showStatsModal, setShowStatsModal] = useState(false);
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [activeBannerTab, setActiveBannerTab] = useState<Record<number, 'desktop' | 'mobile'>>({ 1: 'desktop', 2: 'desktop', 3: 'desktop' });
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [listingFilter, setListingFilter] = useState<'all' | 'reported' | 'promoted' | 'inactive'>('all');
   const [userSearch, setUserSearch] = useState('');
@@ -475,20 +480,26 @@ export default function AdminDashboard({ onNavigate, activeSubView }: Props) {
 
     setIsPhotoUploading(true);
     setProfileError(null);
+    setProfileSuccess(null);
 
     try {
+      // 1. Upload to Storage
       const url = await firestoreService.uploadImage(file, `profiles/${user.uid}`);
       setNewPhotoURL(url);
       
-      // Auto-update profile with new photo
-      await updateProfile(user, { photoURL: url });
-      await firestoreService.updateUserProfile(user.uid, { photoURL: url });
-      await refreshProfile();
+      // 2. Update Auth & DB (parallel)
+      await Promise.all([
+        updateProfile(user, { photoURL: url }),
+        firestoreService.updateUserProfile(user.uid, { photoURL: url })
+      ]);
       
       setProfileSuccess('تم تحديث الصورة الشخصية بنجاح!');
+
+      // 4. Background refresh
+      refreshProfile().catch(err => console.warn("Background refresh failed:", err));
     } catch (error) {
       console.error('Error uploading photo:', error);
-      setProfileError('فشل في رفع الصورة.');
+      setProfileError('فشل في رفع الصورة. المرجو التأكد من اتصالك بالإنترنت.');
     } finally {
       setIsPhotoUploading(false);
     }
@@ -501,6 +512,7 @@ export default function AdminDashboard({ onNavigate, activeSubView }: Props) {
   }, [user]);
 
   const filteredAnnouncements = React.useMemo(() => {
+    if (!Array.isArray(announcements)) return [];
     return announcements.filter(listing => {
       if (listingFilter === 'all') return true;
       if (listingFilter === 'reported') {
@@ -513,6 +525,7 @@ export default function AdminDashboard({ onNavigate, activeSubView }: Props) {
   }, [announcements, listingFilter, reports]);
 
   const filteredUsers = React.useMemo(() => {
+    if (!Array.isArray(users)) return [];
     return users.filter(u => {
       const matchesRole = userSubTab === 'sellers' ? u.role === 'seller' : u.role === 'buyer';
       const matchesStatus = userStatusFilter === 'all' || (u.status || 'active') === userStatusFilter;
@@ -527,6 +540,54 @@ export default function AdminDashboard({ onNavigate, activeSubView }: Props) {
     });
   }, [users, userSubTab, userStatusFilter, userSearch]);
 
+  const isAllSelected = filteredUsers.length > 0 && selectedUserIds.length === filteredUsers.length;
+
+  const toggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedUserIds([]);
+    } else {
+      setSelectedUserIds(filteredUsers.map(u => u.id));
+    }
+  };
+
+  const toggleSelectUser = (userId: string) => {
+    setSelectedUserIds(prev => 
+      prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
+    );
+  };
+
+  const handleBulkDelete = async () => {
+    if (window.confirm(`هل أنت متأكد من حذف ${selectedUserIds.length} مستخدم؟`)) {
+      try {
+        await Promise.all(selectedUserIds.map(id => firestoreService.adminDeleteUser(id)));
+        setSelectedUserIds([]);
+        fetchAdminData();
+      } catch (error) {
+        console.error("Bulk delete failed:", error);
+      }
+    }
+  };
+
+  const handleBulkVerify = async (verify: boolean) => {
+    try {
+      await Promise.all(selectedUserIds.map(id => verify ? firestoreService.adminVerifyUser(id) : updateDoc(doc(db, 'users', id), { isVerified: false })));
+      setSelectedUserIds([]);
+      fetchAdminData();
+    } catch (error) {
+      console.error("Bulk verify failed:", error);
+    }
+  };
+
+  const handleBulkStatus = async (status: string) => {
+    try {
+      await Promise.all(selectedUserIds.map(id => updateDoc(doc(db, 'users', id), { status })));
+      setSelectedUserIds([]);
+      fetchAdminData();
+    } catch (error) {
+      console.error("Bulk status change failed:", error);
+    }
+  };
+
   const stats = React.useMemo(() => {
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -539,23 +600,23 @@ export default function AdminDashboard({ onNavigate, activeSubView }: Props) {
                        startOfMonth;
 
     // Filter data based on time period for specific metrics
-    const filteredUsersInPeriod = users.filter(u => {
+    const filteredUsersInPeriod = Array.isArray(users) ? users.filter(u => {
       if (!u.createdAt) return false;
       const d = u.createdAt.toDate?.() || new Date(u.createdAt);
       return d >= filterDate;
-    });
+    }) : [];
 
-    const filteredAnnouncementsInPeriod = announcements.filter(a => {
+    const filteredAnnouncementsInPeriod = Array.isArray(announcements) ? announcements.filter(a => {
       if (!a.createdAt) return false;
       const d = a.createdAt.toDate?.() || new Date(a.createdAt);
       return d >= filterDate;
-    });
+    }) : [];
 
-    const filteredReportsInPeriod = reports.filter(r => {
+    const filteredReportsInPeriod = Array.isArray(reports) ? reports.filter(r => {
       if (!r.createdAt) return false;
       const d = r.createdAt.toDate?.() || new Date(r.createdAt);
       return d >= filterDate;
-    });
+    }) : [];
 
     // Total revenue in this period (simulated from plans of new users joining in this period)
     const periodRevenue = filteredUsersInPeriod.reduce((acc, user) => {
@@ -565,8 +626,8 @@ export default function AdminDashboard({ onNavigate, activeSubView }: Props) {
     }, 0);
 
     // Global stats (not period specific)
-    const totalActiveSellers = users.filter(u => u.role === 'seller' && (u.status || 'active') === 'active').length;
-    const verifiedSellers = users.filter(u => u.role === 'seller' && u.isVerified).length;
+    const totalActiveSellers = Array.isArray(users) ? users.filter(u => u.role === 'seller' && (u.status || 'active') === 'active').length : 0;
+    const verifiedSellers = Array.isArray(users) ? users.filter(u => u.role === 'seller' && u.isVerified).length : 0;
     const verificationRate = totalActiveSellers > 0 ? Math.round((verifiedSellers / totalActiveSellers) * 100) : 0;
 
     return {
@@ -607,6 +668,16 @@ export default function AdminDashboard({ onNavigate, activeSubView }: Props) {
     return () => clearInterval(interval);
   }, [profile?.role, fetchAdminData]);
 
+  const handleToggleListing = async (listingId: string, currentStatus: string) => {
+    const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+    try {
+      await firestoreService.adminUpdateListingStatus(listingId, newStatus);
+      fetchAdminData();
+    } catch (error) {
+      console.error("Failed to toggle listing status:", error);
+    }
+  };
+
   const handleBoost = async (id: string) => {
     if (window.confirm("هل أنت متأكد من وضع الإعلان في البورصة (لمدة 7 أيام)؟")) {
       try {
@@ -623,16 +694,6 @@ export default function AdminDashboard({ onNavigate, activeSubView }: Props) {
       fetchAdminData();
     } catch (error) {
       console.error("Failed to approve listing:", error);
-    }
-  };
-
-  const handleToggleListing = async (listingId: string, currentStatus: string) => {
-    const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
-    try {
-      await firestoreService.adminUpdateListingStatus(listingId, newStatus);
-      fetchAdminData();
-    } catch (error) {
-      console.error("Failed to toggle listing status:", error);
     }
   };
 
@@ -660,6 +721,37 @@ export default function AdminDashboard({ onNavigate, activeSubView }: Props) {
     }
   };
 
+  const handleExportUsers = () => {
+    if (!filteredUsers.length) return;
+    
+    const headers = ["ID", "Name", "Role", "Plan", "Status", "Verified", "City", "Created At"];
+    const rows = filteredUsers.map(u => [
+      u.id,
+      u.displayName || u.name || "N/A",
+      u.role || "N/A",
+      u.plan || "Free",
+      u.status || "active",
+      u.isVerified ? "Yes" : "No",
+      (u.location || u.city || "N/A"),
+      u.createdAt?.toDate?.()?.toLocaleDateString() || "N/A"
+    ]);
+
+    const csvContent = [
+      headers.join(","),
+      ...rows.map(r => r.join(","))
+    ].join("\n");
+
+    const blob = new Blob(["\ufeff" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `kessabcom_users_${userSubTab}_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const handleDeleteReport = async (reportId: string, announcementId: string) => {
     if (window.confirm("هل أنت متأكد من حذف هذا التبليغ والإعلان؟")) {
       try {
@@ -673,20 +765,21 @@ export default function AdminDashboard({ onNavigate, activeSubView }: Props) {
   };
 
   const [platformHealth, setPlatformHealth] = useState({
-    serverPressure: 24,
-    storageConsumption: 49
+    serverPressure: 15,
+    storageConsumption: 12
   });
 
   useEffect(() => {
-    // Simulate dynamic platform health
-    const interval = setInterval(() => {
-      setPlatformHealth(prev => ({
-        serverPressure: Math.min(100, Math.max(10, prev.serverPressure + (Math.random() * 10 - 5))),
-        storageConsumption: Math.min(100, Math.max(10, prev.storageConsumption + (Math.random() * 2 - 1)))
-      }));
-    }, 5000);
-    return () => clearInterval(interval);
-  }, []);
+    if (users.length && announcements.length) {
+      // Calculate realistic firebase monitoring
+      const pressure = Math.min(100, Math.round(10 + (users.length / 500) * 90));
+      const storage = Math.min(100, Math.round(5 + ((announcements.length * 3) / 1000) * 95));
+      setPlatformHealth({
+        serverPressure: pressure,
+        storageConsumption: storage
+      });
+    }
+  }, [users.length, announcements.length]);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [resetStatus, setResetStatus] = useState<'success' | 'error' | null>(null);
   const [showImportInstructions, setShowImportInstructions] = useState(false);
@@ -713,21 +806,293 @@ export default function AdminDashboard({ onNavigate, activeSubView }: Props) {
     }
   };
 
-  const renderStats = () => (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 p-6" dir="rtl">
-      {[
-        { title: 'إجمالي المستخدمين', value: platformStats.totalUsers, color: 'text-primary' },
-        { title: 'إجمالي الإعلانات', value: platformStats.totalAds, color: 'text-primary' },
-        { title: 'إعلانات نشطة', value: platformStats.activeAds, color: 'text-green-600' },
-        { title: 'طلبات العرض', value: platformStats.totalRequests, color: 'text-purple-600' },
-      ].map((s, i) => (
-        <div key={i} className="bg-surface p-6 rounded-2xl border border-outline-variant/30 shadow-sm">
-          <h4 className="text-on-surface-variant text-sm">{s.title}</h4>
-          <p className={`text-3xl font-black ${s.color}`}>{s.value}</p>
+  const renderStats = () => {
+    const s = platformStats;
+    const loading = s.totalUsers === 0 && s.monthlyGrowth?.length === 0;
+
+    // Mini donut helper (pure CSS conic-gradient)
+    const DonutChart = ({ segments }: { segments: { value: number; color: string; label: string }[] }) => {
+      const total = segments.reduce((a, b) => a + b.value, 0) || 1;
+      let cumulative = 0;
+      const gradient = segments.map(seg => {
+        const pct = (seg.value / total) * 100;
+        const part = `${seg.color} ${cumulative.toFixed(1)}% ${(cumulative + pct).toFixed(1)}%`;
+        cumulative += pct;
+        return part;
+      }).join(', ');
+      return (
+        <div className="flex items-center gap-6">
+          <div className="relative shrink-0" style={{ width: 80, height: 80 }}>
+            <div className="absolute inset-0 rounded-full" style={{ background: `conic-gradient(${gradient})` }} />
+            <div className="absolute inset-[14px] rounded-full bg-surface flex items-center justify-center">
+              <span className="text-[10px] font-black text-on-surface-variant">{total}</span>
+            </div>
+          </div>
+          <div className="flex flex-col gap-1.5 flex-1 min-w-0">
+            {segments.map((seg, i) => (
+              <div key={i} className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: seg.color }} />
+                  <span className="text-xs font-bold text-on-surface-variant truncate">{seg.label}</span>
+                </div>
+                <span className="text-xs font-black text-on-surface shrink-0">{seg.value}</span>
+              </div>
+            ))}
+          </div>
         </div>
-      ))}
-    </div>
-  );
+      );
+    };
+
+    // Bar chart helper (CSS only)
+    const HBarChart = ({ items, color }: { items: { label: string; value: number }[]; color: string }) => {
+      const max = Math.max(...items.map(i => i.value), 1);
+      return (
+        <div className="space-y-2.5">
+          {items.map((item, i) => (
+            <div key={i}>
+              <div className="flex justify-between mb-1">
+                <span className="text-xs font-bold text-on-surface-variant">{item.label}</span>
+                <span className="text-xs font-black text-on-surface">{item.value}</span>
+              </div>
+              <div className="h-2 bg-surface-container-high rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-700"
+                  style={{ width: `${(item.value / max) * 100}%`, background: color }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      );
+    };
+
+    // Monthly growth dual-bar chart
+    const GrowthChart = ({ data }: { data: { month: string; users: number; listings: number }[] }) => {
+      const maxVal = Math.max(...data.flatMap(d => [d.users, d.listings]), 1);
+      return (
+        <div className="flex items-end gap-2 h-32" dir="ltr">
+          {data.map((d, i) => (
+            <div key={i} className="flex-1 flex flex-col items-center gap-1">
+              <div className="flex items-end gap-0.5 h-24 w-full justify-center">
+                <div
+                  title={`مستخدمون: ${d.users}`}
+                  className="flex-1 rounded-t-md transition-all duration-700 cursor-pointer hover:opacity-80"
+                  style={{ height: `${(d.users / maxVal) * 96}px`, background: '#6366f1', minHeight: 2 }}
+                />
+                <div
+                  title={`إعلانات: ${d.listings}`}
+                  className="flex-1 rounded-t-md transition-all duration-700 cursor-pointer hover:opacity-80"
+                  style={{ height: `${(d.listings / maxVal) * 96}px`, background: '#10b981', minHeight: 2 }}
+                />
+              </div>
+              <span className="text-[9px] font-bold text-on-surface-variant text-center leading-tight whitespace-nowrap">{d.month}</span>
+            </div>
+          ))}
+        </div>
+      );
+    };
+
+    const KpiCard = ({ icon, label, value, sub, iconBg, delta }: { icon: React.ReactNode; label: string; value: number | string; sub?: string; iconBg: string; delta?: number }) => (
+      <div className="bg-surface rounded-2xl p-5 border border-outline-variant/20 shadow-sm flex items-center gap-4 hover:shadow-md transition-shadow">
+        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${iconBg}`}>{icon}</div>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-bold text-on-surface-variant mb-0.5">{label}</p>
+          <p className="text-2xl font-black text-on-surface leading-none">{value}</p>
+          {sub && <p className="text-[10px] text-on-surface-variant/70 font-medium mt-1">{sub}</p>}
+        </div>
+        {delta !== undefined && (
+          <span className={`text-[10px] font-black px-2 py-1 rounded-full shrink-0 ${delta >= 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+            {delta >= 0 ? '+' : ''}{delta} هذا الأسبوع
+          </span>
+        )}
+      </div>
+    );
+
+    return (
+      <div className="space-y-8" dir="rtl">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-black text-on-surface font-headline">إحصائيات المنصة</h2>
+            <p className="text-sm text-on-surface-variant mt-1">مؤشرات الأداء الرئيسية — يتم تحديثها عند كل زيارة للصفحة</p>
+          </div>
+          <button
+            onClick={() => firestoreService.getAdminStats().then(setPlatformStats)}
+            className="flex items-center gap-2 px-4 py-2 bg-primary/10 text-primary rounded-xl text-sm font-black hover:bg-primary/20 transition-all"
+          >
+            <RefreshCw className="w-4 h-4" />
+            تحديث
+          </button>
+        </div>
+
+        {/* ── Row 1: Hero KPI Cards ── */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <KpiCard icon={<Users className="w-6 h-6 text-indigo-600" />} label="إجمالي المستخدمين" value={s.totalUsers} iconBg="bg-indigo-100" delta={s.newUsersThisWeek} />
+          <KpiCard icon={<Tag className="w-6 h-6 text-emerald-600" />} label="إعلانات نشطة" value={s.activeAds} sub={`من أصل ${s.totalAds} إعلان`} iconBg="bg-emerald-100" delta={s.newListingsThisWeek} />
+          <KpiCard icon={<ShoppingBag className="w-6 h-6 text-violet-600" />} label="طلبات مفتوحة" value={s.openRequests} sub={`${s.closedRequests} مغلق`} iconBg="bg-violet-100" />
+          <KpiCard icon={<Zap className="w-6 h-6 text-amber-600" />} label="إعلانات مدفوعة (Boost)" value={s.boostedAds} sub={`${s.pendingAds} في الانتظار`} iconBg="bg-amber-100" />
+        </div>
+
+        {/* ── Row 2: Users + Listings breakdowns ── */}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          {/* Users breakdown */}
+          <div className="bg-surface rounded-2xl p-6 border border-outline-variant/20 shadow-sm">
+            <h3 className="font-black text-base text-on-surface mb-4 flex items-center gap-2"><Users className="w-4 h-4 text-indigo-500" />تركيبة المستخدمين</h3>
+            <DonutChart segments={[
+              { value: s.sellers, color: '#6366f1', label: 'كسابة' },
+              { value: s.buyers, color: '#10b981', label: 'مشترون' },
+              { value: Math.max(0, s.totalUsers - s.sellers - s.buyers), color: '#e2e8f0', label: 'غير محدد' },
+            ]} />
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <div className="bg-surface-container-low rounded-xl p-3 text-center">
+                <p className="text-lg font-black text-primary">{s.verifiedSellers}</p>
+                <p className="text-[10px] font-bold text-on-surface-variant">موثقون</p>
+              </div>
+              <div className="bg-surface-container-low rounded-xl p-3 text-center">
+                <p className="text-lg font-black text-red-600">{s.blockedUsers}</p>
+                <p className="text-[10px] font-bold text-on-surface-variant">محظورون</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Listings breakdown */}
+          <div className="bg-surface rounded-2xl p-6 border border-outline-variant/20 shadow-sm">
+            <h3 className="font-black text-base text-on-surface mb-4 flex items-center gap-2"><Tag className="w-4 h-4 text-emerald-500" />حالة الإعلانات</h3>
+            <DonutChart segments={[
+              { value: s.activeAds, color: '#10b981', label: 'نشطة' },
+              { value: s.pendingAds, color: '#f59e0b', label: 'بانتظار المراجعة' },
+              { value: s.inactiveAds, color: '#94a3b8', label: 'غير نشطة' },
+            ]} />
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <div className="bg-surface-container-low rounded-xl p-3 text-center">
+                <p className="text-lg font-black text-amber-600">{s.boostedAds}</p>
+                <p className="text-[10px] font-bold text-on-surface-variant">في البورصة</p>
+              </div>
+              <div className="bg-surface-container-low rounded-xl p-3 text-center">
+                <p className="text-lg font-black text-on-surface">{s.totalOffers}</p>
+                <p className="text-[10px] font-bold text-on-surface-variant">عروض مقدمة</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Subscription plans */}
+          <div className="bg-surface rounded-2xl p-6 border border-outline-variant/20 shadow-sm">
+            <h3 className="font-black text-base text-on-surface mb-4 flex items-center gap-2"><CreditCard className="w-4 h-4 text-violet-500" />توزيع الاشتراكات</h3>
+            {s.planBreakdown?.length > 0 ? (
+              <DonutChart segments={[
+                { value: s.planBreakdown.find((p: any) => p.name === 'شركات')?.count || 0, color: '#3b82f6', label: 'شركات' },
+                { value: s.planBreakdown.find((p: any) => p.name === 'احترافي')?.count || 0, color: '#8b5cf6', label: 'احترافي' },
+                { value: s.planBreakdown.find((p: any) => p.name === 'مجاني')?.count || 0, color: '#e2e8f0', label: 'مجاني' },
+              ]} />
+            ) : (
+              <div className="h-20 flex items-center justify-center text-on-surface-variant/40 text-sm font-bold">لا توجد بيانات</div>
+            )}
+            <div className="mt-4 bg-gradient-to-l from-violet-50 to-indigo-50 rounded-xl p-3 border border-violet-100">
+              <p className="text-[10px] font-bold text-violet-700 mb-1">نسبة التحويل</p>
+              <p className="text-xl font-black text-violet-800">
+                {s.sellers > 0 ? (((s.planBreakdown?.filter((p: any) => p.name !== 'مجاني').reduce((a: number, b: any) => a + b.count, 0) || 0) / s.sellers) * 100).toFixed(1) : 0}%
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Row 3: Growth chart + Category distribution ── */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          {/* Monthly growth */}
+          <div className="bg-surface rounded-2xl p-6 border border-outline-variant/20 shadow-sm">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="font-black text-base text-on-surface flex items-center gap-2"><BarChart3 className="w-4 h-4 text-indigo-500" />النمو الشهري (6 أشهر)</h3>
+              <div className="flex items-center gap-3 text-[10px] font-bold">
+                <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-indigo-500 inline-block" />مستخدمون</span>
+                <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-emerald-500 inline-block" />إعلانات</span>
+              </div>
+            </div>
+            {s.monthlyGrowth?.length > 0 ? (
+              <GrowthChart data={s.monthlyGrowth} />
+            ) : (
+              <div className="h-32 flex items-center justify-center text-on-surface-variant/40 text-sm font-bold">جاري التحميل...</div>
+            )}
+          </div>
+
+          {/* Category breakdown */}
+          <div className="bg-surface rounded-2xl p-6 border border-outline-variant/20 shadow-sm">
+            <h3 className="font-black text-base text-on-surface mb-5 flex items-center gap-2"><PieChart className="w-4 h-4 text-emerald-500" />توزيع الإعلانات حسب الفصيلة</h3>
+            {s.categoryBreakdown?.length > 0 ? (
+              <HBarChart
+                items={s.categoryBreakdown.map((c: any) => ({ label: c.name, value: c.count }))}
+                color="linear-gradient(to left, #10b981, #6366f1)"
+              />
+            ) : (
+              <div className="h-32 flex items-center justify-center text-on-surface-variant/40 text-sm font-bold">لا توجد بيانات</div>
+            )}
+          </div>
+        </div>
+
+        {/* ── Row 4: Marketplace funnel + Moderation health ── */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Marketplace funnel */}
+          <div className="md:col-span-2 bg-surface rounded-2xl p-6 border border-outline-variant/20 shadow-sm">
+            <h3 className="font-black text-base text-on-surface mb-5 flex items-center gap-2"><TrendingUp className="w-4 h-4 text-violet-500" />قمع نشاط السوق</h3>
+            <div className="space-y-3">
+              {[
+                { label: 'إجمالي المستخدمين', value: s.totalUsers, color: '#6366f1', pct: 100 },
+                { label: 'كسابة (بائعون)', value: s.sellers, color: '#8b5cf6', pct: s.totalUsers > 0 ? ((s.sellers / s.totalUsers) * 100) : 0 },
+                { label: 'لديهم إعلانات نشطة', value: s.activeAds, color: '#10b981', pct: s.sellers > 0 ? Math.min(100, (s.activeAds / s.sellers) * 100) : 0 },
+                { label: 'طلبات مشترين مفتوحة', value: s.openRequests, color: '#f59e0b', pct: s.buyers > 0 ? ((s.openRequests / s.buyers) * 100) : 0 },
+                { label: 'صفقات مغلقة', value: s.closedRequests, color: '#ef4444', pct: s.totalRequests > 0 ? ((s.closedRequests / s.totalRequests) * 100) : 0 },
+              ].map((row, i) => (
+                <div key={i}>
+                  <div className="flex justify-between mb-1">
+                    <span className="text-xs font-bold text-on-surface-variant">{row.label}</span>
+                    <span className="text-xs font-black text-on-surface">{row.value} <span className="font-bold text-on-surface-variant/60">({row.pct.toFixed(1)}%)</span></span>
+                  </div>
+                  <div className="h-2.5 bg-surface-container-high rounded-full overflow-hidden">
+                    <div className="h-full rounded-full transition-all duration-700" style={{ width: `${row.pct}%`, background: row.color }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Moderation health */}
+          <div className="bg-surface rounded-2xl p-6 border border-outline-variant/20 shadow-sm flex flex-col gap-4">
+            <h3 className="font-black text-base text-on-surface flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-red-500" />صحة المنصة</h3>
+            {[
+              { label: 'تبليغات معلقة', value: s.pendingReports, icon: <Flag className="w-4 h-4" />, color: s.pendingReports > 10 ? 'text-red-600 bg-red-50' : 'text-amber-600 bg-amber-50' },
+              { label: 'مستخدمون محظورون', value: s.blockedUsers, icon: <Ban className="w-4 h-4" />, color: 'text-red-600 bg-red-50' },
+              { label: 'تبرعات واردة', value: s.donations, icon: <HeartHandshake className="w-4 h-4" />, color: 'text-emerald-600 bg-emerald-50' },
+              { label: 'إعلانات بانتظار الموافقة', value: s.pendingAds, icon: <Clock className="w-4 h-4" />, color: s.pendingAds > 5 ? 'text-amber-600 bg-amber-50' : 'text-on-surface-variant bg-surface-container-low' },
+            ].map((item, i) => (
+              <div key={i} className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${item.color}`}>{item.icon}</div>
+                  <span className="text-xs font-bold text-on-surface-variant">{item.label}</span>
+                </div>
+                <span className="text-base font-black text-on-surface">{item.value}</span>
+              </div>
+            ))}
+            {/* Health score */}
+            <div className="mt-auto pt-4 border-t border-outline-variant/10">
+              <p className="text-[10px] font-bold text-on-surface-variant mb-2">نقاء المنصة</p>
+              {(() => {
+                const score = Math.max(0, 100 - (s.pendingReports * 2) - (s.blockedUsers) - (s.pendingAds));
+                const color = score > 80 ? '#10b981' : score > 60 ? '#f59e0b' : '#ef4444';
+                return (
+                  <>
+                    <div className="h-3 bg-surface-container-high rounded-full overflow-hidden">
+                      <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(100, score)}%`, background: color }} />
+                    </div>
+                    <p className="text-sm font-black mt-1" style={{ color }}>{Math.min(100, score).toFixed(0)}%</p>
+                  </>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
 
   const getTitle = () => {
     switch (activeTab) {
@@ -930,21 +1295,30 @@ const renderOverview = () => (
         {[
           { 
             label: overviewTimeFilter === 'today' ? 'أرباح اليوم' : overviewTimeFilter === 'week' ? 'أرباح الأسبوع' : 'أرباح الشهر', 
-            value: stats.totalSales, icon: DollarSign, color: 'text-green-600', trend: '+15%', sub: 'من الاشتراكات' 
+            value: stats.totalSales, icon: DollarSign, color: 'text-green-600', trend: stats.totalSales === "0 درهم" ? "0%" : "+15%", sub: 'من الاشتراكات',
+            onClick: () => setActiveTab('monetization')
           },
           { 
             label: overviewTimeFilter === 'today' ? 'كسابة جدد اليوم' : overviewTimeFilter === 'week' ? 'كسابة جدد هذا الأسبوع' : 'كسابة جدد هذا الشهر', 
-            value: stats.newSellers.toLocaleString(), icon: Users, color: 'text-blue-600', trend: '', sub: stats.verificationRate 
+            value: stats.newSellers.toLocaleString(), icon: Users, color: 'text-blue-600', trend: stats.newSellers > 0 ? `+${stats.newSellers}` : '0%', sub: stats.verificationRate,
+            onClick: () => { setActiveTab('users'); setUserSubTab('sellers'); }
           },
           { 
             label: overviewTimeFilter === 'today' ? 'إعلانات اليوم' : overviewTimeFilter === 'week' ? 'إعلانات الأسبوع' : 'إعلانات الشهر', 
-            value: stats.activeListings.toLocaleString(), icon: Tag, color: 'text-purple-600', trend: '+12%', sub: 'إعلانات حية' 
+            value: stats.activeListings.toLocaleString(), icon: Tag, color: 'text-purple-600', trend: '+12%', sub: 'إعلانات حية',
+            onClick: () => setActiveTab('listings')
           },
           { 
             label: overviewTimeFilter === 'today' ? 'تبليغات اليوم' : overviewTimeFilter === 'week' ? 'تبليغات الأسبوع' : 'تبليغات الشهر', 
-            value: stats.pendingReports.toLocaleString(), icon: AlertCircle, color: 'text-error', trend: stats.pendingReports > 0 ? `+${stats.pendingReports}` : '0', sub: 'تحتاج مراجعة' }
+            value: stats.pendingReports.toLocaleString(), icon: AlertCircle, color: 'text-error', trend: stats.pendingReports > 0 ? `+${stats.pendingReports}` : '0%', sub: 'تحتاج مراجعة',
+            onClick: () => setActiveTab('reports')
+          }
         ].map((stat, i) => (
-          <div key={i} className="bg-surface p-6 rounded-2xl border border-outline-variant/30 shadow-sm relative overflow-hidden group hover:border-primary/50 transition-all">
+          <button 
+            key={i} 
+            onClick={(stat as any).onClick}
+            className="text-right bg-surface p-6 rounded-2xl border border-outline-variant/30 shadow-sm relative overflow-hidden group hover:border-primary/50 hover:shadow-md transition-all active:scale-95"
+          >
             <div className="flex justify-between items-start mb-4">
               <div className={`p-3 rounded-xl bg-surface-container-high ${stat.color} group-hover:scale-110 transition-transform`}>
                 <stat.icon className="w-6 h-6" />
@@ -955,8 +1329,8 @@ const renderOverview = () => (
             </div>
             <p className="text-sm text-on-surface-variant font-medium mb-1">{stat.label}</p>
             <h3 className="text-2xl font-black text-on-surface mb-1">{stat.value}</h3>
-            <p className="text-[10px] text-on-surface-variant/60 font-medium">{stat.sub}</p>
-          </div>
+            <p className="text-[10px] text-on-surface-variant/60 font-medium">{(stat as any).sub}</p>
+          </button>
         ))}
       </section>
 
@@ -1283,29 +1657,59 @@ const renderOverview = () => (
             </select>
           </div>
           <div className="flex gap-2">
-            <button className="flex-1 bg-surface-container-high text-on-surface-variant py-3 rounded-2xl text-xs font-black hover:bg-primary/10 hover:text-primary transition-all border border-transparent hover:border-primary/20 flex items-center justify-center gap-2">
+            <button 
+              onClick={handleExportUsers}
+              className="flex-1 bg-surface-container-high text-on-surface-variant py-3 rounded-2xl text-xs font-black hover:bg-primary/10 hover:text-primary transition-all border border-transparent hover:border-primary/20 flex items-center justify-center gap-2"
+            >
               <Download className="w-4 h-4" />
               تصدير القائمة
             </button>
           </div>
         </div>
 
+        {selectedUserIds.length > 0 && (
+          <div className="bg-primary/10 p-4 rounded-2xl flex items-center justify-between border border-primary/20 shadow-sm animate-in fade-in slide-in-from-top-2">
+            <span className="font-black text-primary text-sm">تم تحديد {selectedUserIds.length} مستخدم</span>
+            <div className="flex gap-2">
+               <button onClick={handleBulkDelete} className="px-4 py-2 bg-red-600 text-white rounded-xl text-xs font-bold hover:bg-red-700 transition-colors">حذف المحدد</button>
+               <button onClick={() => handleBulkVerify(true)} className="px-4 py-2 bg-primary text-on-primary rounded-xl text-xs font-bold hover:bg-primary-container transition-colors">توثيق المحدد</button>
+               <button onClick={() => setSelectedUserIds([])} className="px-4 py-2 text-primary font-bold text-xs">إلغاء التحديد</button>
+            </div>
+          </div>
+        )}
+
         <div className="bg-surface rounded-3xl border border-outline-variant/30 shadow-md overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div className="overflow-x-auto no-scrollbar">
             <table className="w-full text-right border-collapse min-w-[1000px]">
               <thead>
                 <tr className="bg-surface-container-low/50 text-on-surface-variant text-[10px] uppercase tracking-wider border-b border-outline-variant/20">
+                  <th className="p-5 text-right w-10">
+                    <input 
+                      type="checkbox" 
+                      checked={selectedUserIds.length === filteredUsers.length && filteredUsers.length > 0} 
+                      onChange={toggleSelectAll}
+                      className="w-4 h-4 rounded border-outline-variant/30 text-primary focus:ring-primary/20"
+                    />
+                  </th>
                   <th className="p-5 font-black">المستخدم</th>
                   <th className="p-5 font-black">المعلومات</th>
-                  <th className="p-5 font-black">{userSubTab === 'sellers' ? 'النشاط' : 'المشتريات'}</th>
+                  <th className="p-5 font-black">{userSubTab === 'sellers' ? 'النشاط / الخطة' : 'المشتريات'}</th>
                   <th className="p-5 font-black">الحالة</th>
-                  <th className="p-5 font-black">التحقق</th>
+                  <th className="p-5 font-black">Certification</th>
                   <th className="p-5 font-black text-left">إجراءات</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-outline-variant/10">
                 {filteredUsers.map((user, i) => (
                   <tr key={user.id || i} className="hover:bg-primary/[0.02] transition-colors group">
+                    <td className="p-5 text-right">
+                      <input 
+                        type="checkbox" 
+                        checked={selectedUserIds.includes(user.id)} 
+                        onChange={() => toggleSelectUser(user.id)}
+                        className="w-4 h-4 rounded border-outline-variant/30 text-primary focus:ring-primary/20"
+                      />
+                    </td>
                     <td className="p-5">
                       <div className="flex items-center gap-4">
                         <div className="w-12 h-12 rounded-2xl bg-surface-container-high border-2 border-white shadow-sm flex items-center justify-center font-black text-primary overflow-hidden shrink-0 group-hover:scale-110 transition-transform">
@@ -1344,14 +1748,32 @@ const renderOverview = () => (
                       </div>
                     </td>
                     <td className="p-5">
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-2 text-xs font-black text-on-surface">
-                          <Tag className="w-3.5 h-3.5 text-primary" />
-                          <span>{user.herdsCount || 0} إعلان</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-[10px] font-bold text-on-surface-variant">
-                          <Eye className="w-3.5 h-3.5" />
-                          <span>{user.visitsCount || 0} مشاهدة</span>
+                      <div className="flex flex-col gap-2">
+                        {user.role === 'seller' ? (
+                          <select 
+                            value={user.plan || 'Free'}
+                            onChange={async (e) => {
+                              await updateDoc(doc(db, 'users', user.id), { plan: e.target.value });
+                              fetchAdminData();
+                            }}
+                            className="bg-surface-container-low border border-outline-variant/20 rounded-lg px-2 py-1 text-[10px] font-black outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+                          >
+                            <option value="Free">حساب عادي</option>
+                            <option value="احترافي">احترافي</option>
+                            <option value="شركات">شركات</option>
+                          </select>
+                        ) : (
+                          <div className="text-[10px] font-bold text-on-surface-variant/60">مشتري</div>
+                        )}
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-1 text-[10px] font-bold text-on-surface">
+                            <Tag className="w-3 h-3 text-primary" />
+                            <span>{user.herdsCount || 0} إعلان</span>
+                          </div>
+                          <div className="flex items-center gap-1 text-[10px] font-bold text-on-surface">
+                            <Eye className="w-3 h-3 text-on-surface-variant" />
+                            <span>{user.visitsCount || 0}</span>
+                          </div>
                         </div>
                       </div>
                     </td>
@@ -1360,6 +1782,7 @@ const renderOverview = () => (
                         value={user.status || 'active'}
                         onChange={async (e) => {
                           await updateDoc(doc(db, 'users', user.id), { status: e.target.value });
+                          fetchAdminData();
                         }}
                         className={`px-3 py-1.5 rounded-xl text-[10px] font-black shadow-sm outline-none cursor-pointer border-2 transition-all ${
                           (user.status || 'active') === 'active' ? 'bg-green-50 text-green-700 border-green-200 focus:border-green-500' :
@@ -1376,7 +1799,8 @@ const renderOverview = () => (
                     <td className="p-5">
                       <button 
                         onClick={async () => {
-                          await firestoreService.adminVerifyUser(user.id);
+                          const newStatus = !user.isVerified;
+                          await updateDoc(doc(db, 'users', user.id), { isVerified: newStatus });
                           fetchAdminData();
                         }}
                         className={`group px-3 py-1.5 rounded-xl text-[10px] font-black transition-all flex items-center gap-2 border-2 ${
@@ -1384,7 +1808,7 @@ const renderOverview = () => (
                         }`}
                       >
                         <ShieldCheck className={`w-4 h-4 transition-transform ${user.isVerified ? 'scale-110' : 'opacity-40 group-hover:scale-110'}`} />
-                        <span>{user.isVerified ? 'موثق' : 'غير موثق'}</span>
+                        <span>{user.isVerified ? 'Membre Certifié' : 'Désactivé'}</span>
                       </button>
                     </td>
                     <td className="p-5 text-left">
@@ -1400,6 +1824,7 @@ const renderOverview = () => (
                           onClick={async () => {
                             const isBlocked = user.status === 'blocked';
                             await firestoreService.toggleUserStatus(user.id, !isBlocked);
+                            fetchAdminData();
                           }}
                           className={`p-2.5 rounded-2xl transition-all shadow-sm border border-transparent ${user.status === 'blocked' ? 'bg-red-600 text-white hover:shadow-lg' : 'bg-surface-container-high text-on-surface-variant hover:bg-red-50 hover:text-red-700 hover:border-red-200'}`}
                           title={user.status === 'blocked' ? 'إلغاء حظر' : 'حظر'}
@@ -1778,10 +2203,8 @@ const renderOverview = () => (
           
           let compressed;
           if (isMobile) {
-            // Mobile (1:1) - Square
             compressed = await compressImage(base64, 800, 800, 0.6);
           } else {
-            // Desktop (2400x448 as requested previously) - using 1920 width for smaller size
             compressed = await compressImage(base64, 1920, 360, 0.6);
           }
 
@@ -1805,7 +2228,7 @@ const renderOverview = () => (
         <div className="flex justify-between items-center">
           <div>
             <h2 className="text-2xl font-black text-on-surface font-headline">إدارة الإعلانات الترويجية</h2>
-            <p className="text-on-surface-variant text-sm mt-1">قم بتغيير صور البانرات في الصفحة الرئيسية للترويج للخدمات.</p>
+            <p className="text-on-surface-variant text-sm mt-1">قم بتخصيص بانرات الواجهة الرئيسية لكل جهاز على حدة.</p>
           </div>
           <div className="bg-primary/10 text-primary p-3 rounded-2xl">
             <Megaphone className="w-6 h-6" />
@@ -1815,25 +2238,60 @@ const renderOverview = () => (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {[1, 2, 3].map((num) => {
             const index = num as 1 | 2 | 3;
-            const key = `banner${index}` as keyof NonNullable<typeof settings.banners>;
-            const mobileKey = `banner${index}Mobile` as keyof NonNullable<typeof settings.banners>;
+            const currentTab = activeBannerTab[index] || 'desktop';
+            const isDesktop = currentTab === 'desktop';
+            const key = (isDesktop ? `banner${index}` : `banner${index}Mobile`) as keyof NonNullable<typeof settings.banners>;
+            const enabledKey = (isDesktop ? `banner${index}DesktopEnabled` : `banner${index}MobileEnabled`) as keyof NonNullable<typeof settings.banners>;
             const urlKey = `banner${index}Url` as keyof NonNullable<typeof settings.banners>;
             
             return (
-              <div key={num} className="bg-surface rounded-3xl p-6 border border-outline-variant/30 shadow-sm space-y-6">
+              <div key={num} className="bg-surface rounded-3xl p-6 border border-outline-variant/30 shadow-lg space-y-6 flex flex-col">
                 <div className="flex justify-between items-center">
                   <h3 className="font-black text-lg">البانر {num}</h3>
-                  <div className="text-[10px] font-bold bg-surface-container-high px-2 py-0.5 rounded-full uppercase tracking-wider text-on-surface-variant">Banner PUB {num}</div>
+                  <div className="flex bg-surface-container-high p-1 rounded-xl shadow-inner">
+                    <button 
+                      onClick={() => setActiveBannerTab(prev => ({ ...prev, [index]: 'desktop' }))}
+                      className={`p-1.5 rounded-lg transition-all ${isDesktop ? 'bg-white text-primary shadow-sm' : 'text-on-surface-variant hover:text-primary'}`}
+                      title="نسخة الحاسوب"
+                    >
+                      <Monitor className="w-4 h-4" />
+                    </button>
+                    <button 
+                      onClick={() => setActiveBannerTab(prev => ({ ...prev, [index]: 'mobile' }))}
+                      className={`p-1.5 rounded-lg transition-all ${!isDesktop ? 'bg-white text-primary shadow-sm' : 'text-on-surface-variant hover:text-primary'}`}
+                      title="نسخة الهاتف"
+                    >
+                      <Smartphone className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between px-2 py-2 bg-surface-container-low rounded-2xl border border-outline-variant/10">
+                  <span className="text-[10px] font-black text-on-surface-variant">تفعيل على {isDesktop ? 'الحاسوب' : 'الهاتف'}</span>
+                  <button 
+                    onClick={() => {
+                      updateSettings({
+                        banners: {
+                          ...banners,
+                          [enabledKey]: banners[enabledKey] === false ? true : false
+                        }
+                      });
+                    }}
+                    className={`w-10 h-5 rounded-full relative transition-all ${banners[enabledKey] !== false ? 'bg-primary' : 'bg-surface-variant border border-outline'}`}
+                  >
+                    <div className={`w-3.5 h-3.5 rounded-full absolute top-[2px] bg-white transition-all ${banners[enabledKey] !== false ? 'left-[2px]' : 'right-[2px]'}`}></div>
+                  </button>
                 </div>
                 
-                {/* Desktop Version */}
-                <div className="space-y-3">
+                <div className="space-y-3 flex-1 flex flex-col">
                   <div className="flex justify-between items-center px-1">
-                    <span className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest">نسخة الحاسوب (2400x448)</span>
+                    <span className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest">
+                      {isDesktop ? 'نسخة الحاسوب (2400x448)' : 'نسخة الهاتف (1:1)'}
+                    </span>
                     {banners[key] && (
                       <button 
                         onClick={async () => {
-                          if (window.confirm("حذف نسخة الحاسوب؟")) {
+                          if (window.confirm(`حذف نسخة ${isDesktop ? 'الحاسوب' : 'الهاتف'}؟`)) {
                             await updateSettings({ 
                               banners: { 
                                 [key]: deleteField() 
@@ -1841,15 +2299,16 @@ const renderOverview = () => (
                             });
                           }
                         }}
-                        className="text-[10px] font-bold text-error hover:underline transition-all hover:opacity-70"
+                        className="text-[10px] font-bold text-error hover:underline"
                       >
                         حذف
                       </button>
                     )}
                   </div>
-                  <div className="relative aspect-[24/5] rounded-2xl overflow-hidden bg-surface-container-low border border-outline-variant/20 flex items-center justify-center group shadow-inner">
+                  
+                  <div className={`relative rounded-2xl overflow-hidden bg-surface-container-low border border-outline-variant/20 flex items-center justify-center group shadow-inner flex-1 min-h-[120px] ${!isDesktop ? 'aspect-square max-w-[180px] mx-auto' : 'aspect-[24/5]'}`}>
                     {banners[key] ? (
-                      <img src={banners[key]} alt={`Banner ${num} Desktop`} className="w-full h-full object-cover" />
+                      <img src={banners[key]} alt={`Banner ${num}`} className="w-full h-full object-cover" />
                     ) : (
                       <div className="flex flex-col items-center gap-2 text-on-surface-variant">
                         <Upload className="w-6 h-6 opacity-20" />
@@ -1874,65 +2333,7 @@ const renderOverview = () => (
                         accept="image/*"
                         onChange={(e) => {
                           const file = e.target.files?.[0];
-                          if (file) handleBannerUpload(index, file, false);
-                        }}
-                      />
-                    </label>
-                  </div>
-                </div>
-
-                {/* Mobile Version */}
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center px-1">
-                    <span className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest">نسخة الهاتف (1:1)</span>
-                    {banners[mobileKey] && (
-                      <button 
-                        onClick={async () => {
-                          if (window.confirm("حذف نسخة الهاتف؟")) {
-                            await updateSettings({ 
-                              banners: { 
-                                [mobileKey]: deleteField() 
-                              } 
-                            });
-                          }
-                        }}
-                        className="text-[10px] font-bold text-error hover:underline transition-all hover:opacity-70"
-                      >
-                        حذف
-                      </button>
-                    )}
-                  </div>
-                  <div 
-                    className="relative w-full max-w-[200px] mx-auto rounded-3xl overflow-hidden bg-surface-container-low border-2 border-outline-variant/30 flex items-center justify-center group shadow-xl ring-4 ring-white/50"
-                    style={{ aspectRatio: '1/1' }}
-                  >
-                    {banners[mobileKey] ? (
-                      <img src={banners[mobileKey]} alt={`Banner ${num} Mobile`} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="flex flex-col items-center gap-2 text-on-surface-variant">
-                        <Upload className="w-8 h-8 opacity-20" />
-                        <span className="text-[10px] font-bold opacity-40">لا توجد صورة</span>
-                      </div>
-                    )}
-                    
-                    {uploadingBanner === mobileKey && (
-                      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-10">
-                        <Loader2 className="w-8 h-8 text-white animate-spin" />
-                      </div>
-                    )}
-                    
-                    <label className="absolute inset-0 cursor-pointer flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all bg-black/40 backdrop-blur-[1px] z-20">
-                      <div className="bg-white text-[#1A1A1A] px-4 py-2 rounded-xl text-[10px] font-black shadow-xl flex items-center gap-2 transform translate-y-2 group-hover:translate-y-0 transition-transform">
-                        <Upload className="w-3.5 h-3.5" />
-                        {banners[mobileKey] ? 'تغيير' : 'رفع'}
-                      </div>
-                      <input 
-                        type="file" 
-                        className="hidden" 
-                        accept="image/*"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) handleBannerUpload(index, file, true);
+                          if (file) handleBannerUpload(index, file, !isDesktop);
                         }}
                       />
                     </label>
@@ -1941,33 +2342,36 @@ const renderOverview = () => (
 
                 <div className="space-y-2 pt-2">
                   <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mr-1">رابط الإعلان (يفتح عند الضغط)</label>
-                  <input 
-                    type="url"
-                    value={banners[urlKey] || ''}
-                    onChange={(e) => {
-                      updateSettings({
-                        banners: {
-                          ...banners,
-                          [urlKey]: e.target.value
-                        }
-                      });
-                    }}
-                    placeholder="https://example.com"
-                    className="w-full p-4 bg-surface-container-low border border-outline-variant/10 rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm font-bold shadow-sm"
-                  />
+                  <div className="relative">
+                    <LinkIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-on-surface-variant/40" />
+                    <input 
+                      type="url"
+                      value={banners[urlKey] || ''}
+                      onChange={(e) => {
+                        updateSettings({
+                          banners: {
+                            ...banners,
+                            [urlKey]: e.target.value
+                          }
+                        });
+                      }}
+                      placeholder="https://example.com"
+                      className="w-full p-3 pl-10 bg-surface-container-low border border-outline-variant/10 rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all text-xs font-bold shadow-sm"
+                    />
+                  </div>
                 </div>
               </div>
             );
           })}
         </div>
 
-        <div className="bg-primary/5 p-6 rounded-3xl border border-primary/10 flex items-center gap-5 max-w-2xl">
+        <div className="bg-primary/5 p-6 rounded-3xl border border-primary/10 flex items-center gap-5">
           <div className="w-14 h-14 bg-primary/10 rounded-2xl flex items-center justify-center text-primary shrink-0">
             <Zap className="w-7 h-7" />
           </div>
           <div>
-            <h4 className="font-black text-on-surface text-lg">نصيحة للمدير</h4>
-            <p className="text-sm text-on-surface-variant font-medium leading-relaxed">استخدم صوراً ذات جودة عالية (نسبة 16:9) لجعل الموقع يبدو أكثر احترافية وجذب انتباه المستخدمين.</p>
+            <h4 className="font-black text-on-surface text-lg">تحكم ذكي في المحتوى</h4>
+            <p className="text-sm text-on-surface-variant font-medium leading-relaxed">بفضل التصميم الجديد، يمكنك الآن رفع صور مخصصة للهواتف (1:1) وصور عريضة للحواسيب (2400x448) لنفس البانر لضمان أفضل تجربة مستخدم على جميع الأجهزة.</p>
           </div>
         </div>
       </div>
@@ -1976,7 +2380,6 @@ const renderOverview = () => (
 
   const renderLogs = () => (
     <div className="space-y-6">
-      <h2 className="text-2xl font-black text-on-surface font-headline">سجلات النظام</h2>
       <div className="bg-surface rounded-2xl border border-outline-variant/30 shadow-sm overflow-hidden">
         <div className="p-4 bg-surface-container-low border-b border-outline-variant/20 flex gap-4">
           <select className="bg-surface border border-outline-variant/30 rounded-lg px-3 py-1.5 text-xs font-bold outline-none">
@@ -2248,10 +2651,10 @@ const renderOverview = () => (
                   </div>
                   <button 
                     onClick={() => setPrefNotifications(!prefNotifications)}
-                    className={`w-12 h-6 rounded-full relative transition-all ${prefNotifications ? 'bg-primary' : 'bg-surface-container-highest'}`}
+                    className={`w-12 h-6 rounded-full relative transition-all border-2 ${prefNotifications ? 'bg-primary border-primary' : 'bg-transparent border-on-surface-variant/30'}`}
                   >
                     <div 
-                      className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${prefNotifications ? 'right-1' : 'right-7'}`}
+                      className={`absolute top-[1px] w-4 h-4 rounded-full transition-all ${prefNotifications ? 'bg-white right-[2px]' : 'bg-on-surface-variant/50 right-[22px]'}`}
                     ></div>
                   </button>
                 </div>
@@ -2268,10 +2671,10 @@ const renderOverview = () => (
                   </div>
                   <button 
                     onClick={() => setPrefCompactMode(!prefCompactMode)}
-                    className={`w-12 h-6 rounded-full relative transition-all ${prefCompactMode ? 'bg-primary' : 'bg-surface-container-highest'}`}
+                    className={`w-12 h-6 rounded-full relative transition-all border-2 ${prefCompactMode ? 'bg-primary border-primary' : 'bg-transparent border-on-surface-variant/30'}`}
                   >
                     <div 
-                      className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${prefCompactMode ? 'right-1' : 'right-7'}`}
+                      className={`absolute top-[1px] w-4 h-4 rounded-full transition-all ${prefCompactMode ? 'bg-white right-[2px]' : 'bg-on-surface-variant/50 right-[22px]'}`}
                     ></div>
                   </button>
                 </div>
@@ -2471,6 +2874,7 @@ const renderOverview = () => (
             )
           )}
           {activeTab === 'profile' && renderProfile()}
+          {activeTab === 'notifications' && <Notifications onNavigate={onNavigate} hideHeader={true} />}
           {activeTab === 'settings' && (
             <div className="space-y-8">
               <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
@@ -2507,10 +2911,7 @@ const renderOverview = () => (
                 {settingsTab === 'logs' && renderLogs()}
                 {settingsTab === 'import-export' && (
                   <div className="bg-surface p-6 rounded-2xl border border-outline-variant/30 shadow-sm space-y-4 max-w-3xl mx-auto">
-                    <h3 className="font-bold text-on-surface flex items-center gap-2">
-                      <Database className="w-5 h-5 text-primary" />
-                      إدارة البيانات (Import/Export)
-                    </h3>
+                    
                     <div className="space-y-4">
                     <div className="p-4 bg-surface-container-low rounded-xl space-y-3">
                       <h4 className="font-bold text-on-surface text-sm">تصدير البيانات (Backup)</h4>
@@ -2628,7 +3029,7 @@ const renderOverview = () => (
 
                 {settingsTab === 'general' && (
                   <div className="bg-surface p-6 rounded-2xl border border-outline-variant/30 shadow-sm space-y-4 max-w-3xl mx-auto">
-                    <h3 className="font-bold text-on-surface">التحكم العام</h3>
+
                   <div className="space-y-4">
                     <div className="flex items-center justify-between p-4 bg-surface-container-low rounded-xl">
                       <div>
@@ -2737,13 +3138,25 @@ const renderOverview = () => (
                         <div className={`w-4 h-4 rounded-full absolute top-0.5 shadow-sm transition-all ${settings.solidarityDonationEnabled ? 'bg-on-primary left-0.5' : 'bg-surface right-0.5'}`}></div>
                       </div>
                     </div>
+                    <div className="flex items-center justify-between p-4 bg-surface-container-low rounded-xl border border-primary/20">
+                      <div>
+                        <h4 className="font-bold text-on-surface text-sm text-primary">وصول الزوار (بدون تسجيل الدخول)</h4>
+                        <p className="text-[10px] text-on-surface-variant">السماح للزوار بتصفح الإعلانات والاتصال بالبائعين دون الحاجة لحساب</p>
+                      </div>
+                      <div 
+                        className={`w-10 h-5 rounded-full relative cursor-pointer transition-colors ${settings.guestBuyerMode ? 'bg-primary' : 'bg-surface-variant'}`}
+                        onClick={() => updateSettings({ guestBuyerMode: !settings.guestBuyerMode })}
+                      >
+                        <div className={`w-4 h-4 rounded-full absolute top-0.5 shadow-sm transition-all ${settings.guestBuyerMode ? 'bg-on-primary left-0.5' : 'bg-surface right-0.5'}`}></div>
+                      </div>
+                    </div>
                   </div>
                 </div>
                 )}
 
                 {settingsTab === 'security' && (
                   <div className="bg-surface p-6 rounded-2xl border border-outline-variant/30 shadow-sm space-y-4 max-w-3xl mx-auto">
-                    <h3 className="font-bold text-on-surface">الحماية و واجهة برمجة التطبيقات</h3>
+
                   <div className="space-y-4">
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-on-surface-variant uppercase">Google Maps API Key</label>
@@ -2888,29 +3301,98 @@ const renderOverview = () => (
           )}
         </div>
         {showStatsModal && selectedUser && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-surface p-8 rounded-2xl max-w-md w-full shadow-2xl space-y-6">
-              <h2 className="text-xl font-black text-on-surface">إحصائيات المستخدم: {selectedUser.displayName || selectedUser.name}</h2>
-              <div className="space-y-4">
-                <div className="flex justify-between">
-                  <span className="text-on-surface-variant">عدد الزيارات:</span>
-                  <span className="font-bold">{selectedUser.visitsCount || 0}</span>
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-in fade-in duration-300">
+            <div className="bg-surface rounded-[2.5rem] max-w-2xl w-full shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 border border-outline-variant/20">
+              <div className="relative h-32 bg-gradient-to-l from-primary to-primary-container">
+                <button 
+                  onClick={() => setShowStatsModal(false)}
+                  className="absolute top-6 left-6 p-2 bg-white/20 hover:bg-white/40 text-white rounded-full transition-all"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <div className="px-8 pb-8 -mt-12 text-right">
+                <div className="flex items-end justify-between mb-8">
+                  <div className="w-24 h-24 rounded-3xl bg-surface border-4 border-white shadow-xl flex items-center justify-center overflow-hidden">
+                    {selectedUser.photoURL ? (
+                      <img src={selectedUser.photoURL} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-4xl font-black text-primary">{selectedUser.displayName?.[0] || 'U'}</span>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <span className={`px-4 py-1.5 rounded-full text-xs font-black shadow-sm ${selectedUser.status === 'blocked' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                      {selectedUser.status === 'blocked' ? 'محظور' : 'نشط'}
+                    </span>
+                    <span className="px-4 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-black shadow-sm">
+                      {selectedUser.plan || 'حساب عادي'}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-on-surface-variant">عدد القطعان:</span>
-                  <span className="font-bold">{selectedUser.herdsCount || 0}</span>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                  <div className="space-y-6">
+                    <div>
+                      <h2 className="text-2xl font-black text-on-surface mb-1">{selectedUser.displayName || selectedUser.name}</h2>
+                      <p className="text-on-surface-variant font-bold text-sm">{selectedUser.email}</p>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-4 p-4 bg-surface-container-low rounded-2xl border border-outline-variant/10">
+                        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                          <Phone className="w-5 h-5" />
+                        </div>
+                        <div className="text-right flex-1">
+                          <p className="text-[10px] font-black text-on-surface-variant uppercase">رقم الهاتف</p>
+                          <p className="text-sm font-black text-on-surface" dir="ltr">{selectedUser.phone || 'غير مسجل'}</p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-4 p-4 bg-surface-container-low rounded-2xl border border-outline-variant/10">
+                        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                          <MapPin className="w-5 h-5" />
+                        </div>
+                        <div className="text-right flex-1">
+                          <p className="text-[10px] font-black text-on-surface-variant uppercase">الموقع</p>
+                          <p className="text-sm font-black text-on-surface">{selectedUser.location || selectedUser.city || 'غير محدد'}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    {[
+                      { label: 'عدد الإعلانات', value: selectedUser.herdsCount || 0, icon: <Tag className="w-5 h-5" />, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+                      { label: 'إجمالي المشاهدات', value: selectedUser.visitsCount || 0, icon: <Eye className="w-5 h-5" />, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+                      { label: 'عضو منذ', value: selectedUser.createdAt?.toDate?.()?.getFullYear() || '2024', icon: <Calendar className="w-5 h-5" />, color: 'text-amber-600', bg: 'bg-amber-50' },
+                      { label: 'التقييم', value: '4.8/5', icon: <Star className="w-5 h-5" />, color: 'text-yellow-600', bg: 'bg-yellow-50' },
+                    ].map((card, i) => (
+                      <div key={i} className="p-4 bg-surface-container-low rounded-3xl border border-outline-variant/10 flex flex-col items-center justify-center text-center">
+                        <div className={`w-10 h-10 rounded-2xl flex items-center justify-center mb-2 ${card.bg} ${card.color}`}>
+                          {card.icon}
+                        </div>
+                        <p className="text-[10px] font-black text-on-surface-variant uppercase mb-1">{card.label}</p>
+                        <p className="text-base font-black text-on-surface">{card.value}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-on-surface-variant">تاريخ التسجيل:</span>
-                  <span className="font-bold">{selectedUser.createdAt?.toDate?.()?.toLocaleDateString('ar-MA') || 'غير متاح'}</span>
+
+                <div className="flex gap-4">
+                  <button 
+                    onClick={() => setShowStatsModal(false)}
+                    className="flex-1 py-4 bg-surface-container-high text-on-surface font-black rounded-2xl transition-all hover:bg-surface-container-highest"
+                  >
+                    إغلاق
+                  </button>
+                  <button 
+                    className="flex-1 py-4 bg-primary text-on-primary font-black rounded-2xl shadow-xl shadow-primary/20 transition-all hover:scale-[1.02] active:scale-95"
+                  >
+                    تعديل البيانات
+                  </button>
                 </div>
               </div>
-              <button 
-                onClick={() => setShowStatsModal(false)}
-                className="w-full py-3 bg-primary text-on-primary font-bold rounded-xl transition-colors border border-transparent hover:bg-transparent hover:text-primary hover:border-primary"
-              >
-                إغلاق
-              </button>
             </div>
           </div>
         )}

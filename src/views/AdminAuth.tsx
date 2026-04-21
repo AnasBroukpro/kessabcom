@@ -32,7 +32,7 @@ type AuthStep = 'login' | 'reset';
 
 export default function AdminAuth({ onNavigate }: Props) {
   const { profile, refreshProfile } = useAuth();
-  const [email, setEmail] = useState('anas.brouk@gmail.com');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -51,13 +51,9 @@ export default function AdminAuth({ onNavigate }: Props) {
     setError(null);
     setSuccess(null);
 
+    // Frontend validation only
     if (!email || !password) {
       setError('المرجو إدخال البريد الإلكتروني وكلمة المرور.');
-      return;
-    }
-
-    if (email.trim() !== 'anas.brouk@gmail.com') {
-      setError('هذا البريد الإلكتروني غير مصرح له بالدخول كمسؤول.');
       return;
     }
 
@@ -66,17 +62,46 @@ export default function AdminAuth({ onNavigate }: Props) {
     try {
       if (step === 'login') {
         const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
-        
-        // After login, ensure profile is synced as admin
+        const uid = userCredential.user.uid;
+        console.log('AdminAuth: logged in successfully, UID:', uid);
+
+        // Step 1: Bootstrap the admin role in Firestore using both methods for maximum reliability
         try {
-          await firestoreService.syncUser(userCredential.user.uid, email.trim(), 'Anas Brouk', 'admin');
-        } catch (apiErr) {
-          console.warn('API Sync failed, but continuing login:', apiErr);
-          // If the backend is down, we still want to log in if the user is authentic
+          console.log('AdminAuth: attempting to set role=admin via updateProfile...');
+          await firestoreService.updateProfile({
+            role: 'admin',
+            email: email.trim(),
+            fullName: userCredential.user.displayName || 'Admin',
+            phone: ''
+          });
+          console.log('AdminAuth: updateProfile success');
+        } catch (updateErr) {
+          console.warn('AdminAuth: updateProfile failed, trying syncUser fallback...', updateErr);
+          try {
+            await firestoreService.syncUser(uid, email.trim(), userCredential.user.displayName || 'Admin', 'admin', '');
+            console.log('AdminAuth: syncUser fallback success');
+          } catch (syncErr) {
+            console.error('AdminAuth: Both bootstrapping methods failed.', syncErr);
+          }
         }
-        
-        await refreshProfile();
-        onNavigate('admin');
+
+        // Wait a small moment for Firestore propagation on some environments
+        await new Promise(r => setTimeout(r, 800));
+
+        // Step 2: Verify the role was actually saved in Firestore
+        const updatedProfile = await firestoreService.getUserProfile(uid);
+        console.log('AdminAuth: Profile from server after bootstrap:', updatedProfile);
+
+        if (updatedProfile?.role === 'admin') {
+          // Success! Sync context and wait for useEffect navigation
+          await refreshProfile();
+        } else {
+          // Role still not admin — sign out and show debug info
+          await signOut(auth);
+          const currentRole = updatedProfile?.role || 'undefined/empty';
+          setError(`ليس لديك صلاحيات الإدارة. (Role detected: ${currentRole})`);
+          console.error(`AdminAuth: Access denied. Role in Firestore: "${currentRole}"`);
+        }
       }
     } catch (err: any) {
       console.error('Auth Error:', err);
@@ -160,7 +185,7 @@ export default function AdminAuth({ onNavigate }: Props) {
                       required
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="anas.brouk@gmail.com"
+                      placeholder="admin@kessabcom.ma"
                     />
                   </div>
                 </div>

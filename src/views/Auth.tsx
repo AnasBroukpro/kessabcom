@@ -41,7 +41,10 @@ export default function Auth({ onNavigate, intendedView }: Props) {
             const data = await res.json();
             const city = data.address?.city || data.address?.town || data.address?.state || '';
             if (city) {
-              setRegistrationData(prev => ({ ...prev, city: city }));
+              setRegistrationData(prev => {
+                if (prev.city) return prev;
+                return { ...prev, city: city };
+              });
             }
           } catch (error) {
             console.error("Error detecting city:", error);
@@ -85,17 +88,24 @@ export default function Auth({ onNavigate, intendedView }: Props) {
     
     // Create fresh instance
     try {
-      recaptchaVerifierRef.current = new RecaptchaVerifier(auth, 'recaptcha-container', {
+      const verifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
         size: 'invisible',
-        callback: () => {},
+        callback: () => {
+          console.log('🛡️ reCAPTCHA verified successfully');
+        },
         'expired-callback': () => {
+          console.log('🛡️ reCAPTCHA expired');
+          if (recaptchaVerifierRef.current) {
+            recaptchaVerifierRef.current.clear();
+          }
           recaptchaVerifierRef.current = null;
         }
       });
-      return recaptchaVerifierRef.current;
+      recaptchaVerifierRef.current = verifier;
+      return verifier;
     } catch (err) {
       console.error('reCAPTCHA initialization error:', err);
-      setError('حدث خطأ في التحقق. يرجى تحديث الصفحة والمحاولة مرة أخرى.');
+      setError('حدث خطأ في نظام الحماية. يرجى تحديث الصفحة والمحاولة مرة أخرى.');
       return null;
     }
   };
@@ -232,14 +242,38 @@ export default function Auth({ onNavigate, intendedView }: Props) {
   };
 
   const onRegisterSubmit = async (role: 'buyer' | 'seller', data: any) => {
-    setSelectedRole(role);
-    setRegistrationData({
-      fullName: data.fullName,
-      city: data.city,
-      termsAccepted: true
-    });
-    setPhoneNumber(data.phone);
-    await onSignInSubmit(undefined, data.phone); // ✅ await ajouté
+    setLoading(true);
+    setError(null);
+    try {
+      let cleanPhone = data.phone.replace(/\D/g, '');
+      if (cleanPhone.startsWith('212')) cleanPhone = cleanPhone.substring(3);
+      if (cleanPhone.startsWith('0')) cleanPhone = cleanPhone.substring(1);
+      const formattedPhone = `+212${cleanPhone}`;
+
+      // Check if phone exists (Fix #11: Prevent duplicate accounts)
+      const { exists } = await firestoreService.checkPhoneExists(formattedPhone);
+      if (exists) {
+        setError('هاد الرقم مسجل ديجا. دخل نيشان بحسابك.');
+        setMode('login');
+        setStep('phone');
+        setLoading(false);
+        return;
+      }
+
+      setSelectedRole(role);
+      setRegistrationData({
+        fullName: data.fullName,
+        city: data.city,
+        termsAccepted: true
+      });
+      setPhoneNumber(data.phone);
+      await onSignInSubmit(undefined, data.phone);
+    } catch (err) {
+      console.error('Registration check error:', err);
+      setError('مشكل فالتسجيل. عاود جرب.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const onVerifyCodeSubmit = async (e: React.FormEvent) => {
@@ -274,8 +308,12 @@ export default function Auth({ onNavigate, intendedView }: Props) {
         if (needsUpdate) {
           console.log('Test account role mismatch. Updating...');
           await firestoreService.updateProfile({ role });
-          await refreshProfile();
         }
+
+        // Sync local profile state to the global context before navigating
+        // to prevent App.tsx from redirecting the user back to LOGIN 
+        // due to a "lagging" profile state.
+        await refreshProfile();
 
         if (intendedView) {
           console.log('Redirecting to intended view:', intendedView);
@@ -380,9 +418,19 @@ export default function Auth({ onNavigate, intendedView }: Props) {
   return (
     <div className="min-h-screen flex flex-col" dir="rtl">
       {/* reCAPTCHA invisible container.
-        IMPORTANT: Must NOT use z-index:-1 — iOS Safari WebKit may block the callback.
-        Use zero-size absolute positioning instead (Bug #27 fix). */}
-      <div id="recaptcha-container" style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden' }} />
+         Ajusté pour être "visible" pour le navigateur mais invisible pour l'œil (Bug #27 fix) */}
+      <div 
+        id="recaptcha-container" 
+        className="grecaptcha-container"
+        style={{ 
+          position: 'fixed', 
+          bottom: '20px', 
+          right: '20px', 
+          opacity: 0.01, 
+          pointerEvents: 'none',
+          zIndex: -1 
+        }} 
+      />
       
       {mode === 'login' ? (
         <div className="min-h-screen flex flex-col md:flex-row overflow-hidden">

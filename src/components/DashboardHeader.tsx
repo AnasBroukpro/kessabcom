@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Bell, User, MapPin, Search, Navigation, ChevronDown, LogOut, LayoutDashboard, ShoppingBag, List, PlusCircle, Users, Settings, ArrowLeft, Menu, X } from 'lucide-react';
+import { Bell, User, MapPin, Search, Navigation, ChevronDown, LogOut, LayoutDashboard, ShoppingBag, List, PlusCircle, Users, Settings, ArrowLeft, Menu, X, LocateFixed } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useAuth } from '../contexts/AuthContext';
 import { firestoreService } from '../services/firestoreService';
-import { cityMapping } from '../constants/cityMapping';
+import { cityMapping, cityCoords, getClosestCity } from '../constants/cityMapping';
 import MobileSidebar from './MobileSidebar';
 import NotificationSidebar from './NotificationSidebar';
 
@@ -13,10 +13,10 @@ interface Props {
   location?: string;
   showSearch?: boolean;
   onSearch?: (city: string, distance: string) => void;
-  onNavigate?: (view: any, listingId?: string, city?: string, radius?: string, subView?: string) => void;
+  onNavigate?: (view: any, listingId?: string, city?: string, radius?: string, subView?: string, breed?: string) => void;
 }
 
-const cities = ["سطات", "برشيد", "خريبكة", "الدار البيضاء", "الرباط", "مراكش", "أزرو", "خنيفرة", "وجدة", "الراشيدية", "طنجة"];
+const cities = Object.keys(cityCoords).sort();
 
 export default function DashboardHeader({ title, subtitle, location, showSearch = true, onSearch, onNavigate }: Props) {
   const { user, profile, notifications, unreadCount, signOut } = useAuth();
@@ -25,6 +25,7 @@ export default function DashboardHeader({ title, subtitle, location, showSearch 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isNotificationSidebarOpen, setIsNotificationSidebarOpen] = useState(false);
   const [citySearch, setCitySearch] = useState('');
+  const [isLocating, setIsLocating] = useState(false);
   const [distance, setDistance] = useState('10');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const notificationsRef = useRef<HTMLDivElement>(null);
@@ -60,6 +61,31 @@ export default function DashboardHeader({ title, subtitle, location, showSearch 
   const handleSignOut = async () => {
     await signOut();
     if (onNavigate) onNavigate('home');
+  };
+  
+  const handleLocateMe = () => {
+    setIsLocating(true);
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const closest = getClosestCity(position.coords.latitude, position.coords.longitude);
+          if (closest) {
+            setCitySearch(closest);
+            onSearch?.(closest, distance);
+          } else {
+            setCitySearch('');
+            alert("نتوما خارج المغرب، خاصكم تختارو المدينة يدوياً من القائمة");
+          }
+          setIsLocating(false);
+        },
+        (error) => {
+          console.error("Geolocation error:", error);
+          setIsLocating(false);
+        }
+      );
+    } else {
+      setIsLocating(false);
+    }
   };
 
   const handleMarkNotificationAsRead = async (id: string) => {
@@ -192,11 +218,19 @@ export default function DashboardHeader({ title, subtitle, location, showSearch 
             <div className="p-8 text-center text-gray-400 font-bold">لا توجد تنبيهات حالياً</div>
           )}
         </div>
-        {notifications.length > 0 && (
-          <button className="w-full p-4 text-sm font-bold text-[#2E7D32] hover:bg-green-50 transition-colors border-t border-gray-50">
+          <button 
+            onClick={() => {
+              const role = profile?.role;
+              if (role === 'admin') onNavigate?.('admin', undefined, undefined, undefined, 'notifications');
+              else if (role === 'seller') onNavigate?.('seller', undefined, undefined, undefined, 'notifications');
+              else if (role === 'buyer') onNavigate?.('buyer', undefined, undefined, undefined, 'notifications');
+              else onNavigate?.('notifications');
+              setShowNotifications(false);
+            }}
+            className="w-full p-4 text-sm font-bold text-[#2E7D32] hover:bg-green-50 transition-colors border-t border-gray-50"
+          >
             مشاهدة جميع التنبيهات
           </button>
-        )}
       </div>
     );
   };
@@ -254,25 +288,27 @@ export default function DashboardHeader({ title, subtitle, location, showSearch 
         </div>
 
         {/* Desktop Title & Centered Welcome Message / Logo */}
-        <div className="hidden md:flex items-center justify-center flex-1 relative h-full">
-          {profile?.role === 'admin' ? (
-            <div className="text-center animate-in fade-in slide-in-from-top-2 duration-700">
-              <h2 className="text-lg font-black text-[#1A1A1A] font-headline">
-                مرحبا بك {profile?.fullName?.split(' ')[0] || 'أنس'}، هاهي نظرة عامة ...
+        <div className="hidden md:flex items-center justify-start flex-1 relative h-full">
+          {profile?.role && (
+            <div className="flex flex-col items-start animate-in fade-in slide-in-from-top-1 duration-700">
+              <span className="text-[10px] font-black text-primary/70 uppercase tracking-wider mb-0.5">
+                {profile.role === 'admin' ? 'لوحة تحكم المسؤول' : 
+                 profile.role === 'seller' ? 'لوحة تحكم الكساب' : 'لوحة تحكم المشتري'}
+              </span>
+              <h2 className="text-sm font-bold text-[#1A1A1A] font-headline tracking-tight">
+                مرحبا بك <span className="text-primary">
+                  {(() => {
+                    const name = profile?.fullName || profile?.displayName;
+                    if (!name || name.toLowerCase() === 'user') return 'أنس';
+                    return name;
+                  })()}
+                </span>، 
+                <span className="text-on-surface-variant/70 text-xs font-medium mr-1">
+                  {profile.role === 'admin' ? 'المدير العام' : 
+                   profile.role === 'seller' ? 'فخورون بعملك وتفانيك' : 'اكتشف أفضل العروض اليوم'}
+                </span>
               </h2>
             </div>
-          ) : (
-            <button 
-              onClick={() => onNavigate?.('home')} 
-              className="flex items-center justify-center group"
-            >
-              <img 
-                src="https://i.ibb.co/Psdn5FfW/logo-removebg-preview.png" 
-                alt="كسابكوم" 
-                className="h-10 w-auto object-contain transition-transform group-hover:scale-105"
-                referrerPolicy="no-referrer"
-              />
-            </button>
           )}
         </div>
 
@@ -280,39 +316,34 @@ export default function DashboardHeader({ title, subtitle, location, showSearch 
         {showSearch && (
           <div className="flex-1 lg:max-w-xl flex flex-col sm:flex-row items-stretch sm:items-center gap-2 bg-[#F9F9F6] border border-outline-variant/20 rounded-xl p-1.5 shadow-sm hover:shadow-md transition-shadow">
             <div className="flex flex-1 items-center divide-x divide-x-reverse divide-outline-variant/30">
-              <div className="flex-1 relative" ref={suggestionsRef}>
-                <div className="flex items-center px-3 gap-2">
+              <div className="flex-1 relative">
+                <div className="flex items-center px-3 gap-2 group">
                   <MapPin className="w-4 h-4 text-[#2E7D32] shrink-0" />
-                  <input 
-                    type="text" 
-                    className="bg-transparent border-none outline-none w-full py-2.5 sm:py-2 text-sm font-bold text-[#1A1A1A] placeholder:text-[#757575]/60" 
-                    placeholder="فين كتقلب؟"
+                  <select 
                     value={citySearch}
                     onChange={(e) => {
                       setCitySearch(e.target.value);
-                      setShowSuggestions(true);
+                      onSearch?.(e.target.value, distance);
                     }}
-                    onFocus={() => setShowSuggestions(true)}
-                  />
-                </div>
-                {showSuggestions && citySearch && filteredCities.length > 0 && (
-                  <div className="absolute top-full right-0 left-0 mt-2 bg-white rounded-xl shadow-2xl border border-outline-variant/20 max-h-48 overflow-y-auto z-50 text-right">
-                    {filteredCities.map((city, idx) => (
-                      <button
-                        key={idx}
-                        className="w-full text-right px-4 py-2 hover:bg-[#F9F9F6] text-[#1A1A1A] font-medium transition-colors text-sm"
-                        onClick={() => {
-                          const mappedCity = getMappedCity(citySearch);
-                          setCitySearch(mappedCity);
-                          setShowSuggestions(false);
-                          onSearch?.(mappedCity, '10');
-                        }}
-                      >
-                        {city}
-                      </button>
+                    className="bg-transparent border-none outline-none w-full py-2.5 sm:py-2 text-sm font-bold text-[#1A1A1A] appearance-none cursor-pointer focus:text-[#2E7D32] transition-colors"
+                    style={{ direction: 'rtl' }}
+                  >
+                    <option value="">فين كتقلب؟</option>
+                    {cities.map(city => (
+                      <option key={city} value={city}>{city}</option>
                     ))}
-                  </div>
-                )}
+                  </select>
+                  <ChevronDown className="w-3 h-3 text-[#757575] absolute left-10 pointer-events-none" />
+                  
+                  <button 
+                    onClick={handleLocateMe}
+                    disabled={isLocating}
+                    title="موقعي الحالي"
+                    className={`p-1.5 rounded-lg hover:bg-[#E8F5E9] transition-colors ${isLocating ? 'animate-pulse text-[#2E7D32]' : 'text-[#757575]'}`}
+                  >
+                    <LocateFixed className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
               
               <div className="flex-1 flex items-center px-3 gap-2 group relative">

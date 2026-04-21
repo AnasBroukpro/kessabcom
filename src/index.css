@@ -71,3 +71,8 @@
 .animate-marquee {
   animation: marquee 20s linear infinite;
 }
+
+/* Hide reCAPTCHA badge */
+.grecaptcha-badge { 
+  visibility: hidden !important; 
+}

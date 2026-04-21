@@ -53,3 +53,10 @@ npm run dev
 
 * **Firebase Auth Errors:** If login/register endpoints fail, ensure you have correctly set up your Firebase credentials (ADC or \`GOOGLE_APPLICATION_CREDENTIALS\`).
 * **Port in Use:** If port 3000 or 5173 is in use, kill the existing process or change the port in \`server.ts\` / \`vite.config.ts\`.
+
+
+## Local Setup (Extra)
+```bash
+# Setup local
+cp .env.example .env
+```

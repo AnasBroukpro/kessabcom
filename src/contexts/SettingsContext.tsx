@@ -32,14 +32,23 @@ export interface AppSettings {
     banner1Desc?: string;
     banner1Mobile?: string;
     banner1Url?: string;
+    banner1Enabled?: boolean;
+    banner1DesktopEnabled?: boolean;
+    banner1MobileEnabled?: boolean;
     banner2?: string;
     banner2Desc?: string;
     banner2Mobile?: string;
     banner2Url?: string;
+    banner2Enabled?: boolean;
+    banner2DesktopEnabled?: boolean;
+    banner2MobileEnabled?: boolean;
     banner3?: string;
     banner3Desc?: string;
     banner3Mobile?: string;
     banner3Url?: string;
+    banner3Enabled?: boolean;
+    banner3DesktopEnabled?: boolean;
+    banner3MobileEnabled?: boolean;
   };
 }
 

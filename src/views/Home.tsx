@@ -4,7 +4,8 @@ import { Search, MapPin, Navigation, ArrowLeft, BadgeCheck, Scale, BookOpen, Use
 import { motion } from 'motion/react';
 import { useAuth } from '../contexts/AuthContext';
 import { firestoreService } from '../services/firestoreService';
-import { cityMapping, cityCoords, getDisplayCity } from '../constants/cityMapping';
+import { getCachedData, setCachedData } from '../lib/cache';
+import { cityMapping, cityCoords, getDisplayCity, getClosestCity } from '../constants/cityMapping';
 
 import { useSettings } from '../hooks/useSettings';
 import ContactSellerModal from '../components/ContactSellerModal';
@@ -12,12 +13,10 @@ import LoginRequiredModal from '../components/LoginRequiredModal';
 import NewsTicker from '../components/NewsTicker';
 
 interface Props {
-  onNavigate: (view: ViewType, listingId?: string, city?: string, radius?: string, subView?: string) => void;
+  onNavigate: (view: ViewType, listingId?: string, city?: string, radius?: string, subView?: string, breed?: string) => void;
 }
 
-const moroccanCities = [
-  "الدار البيضاء", "الرباط", "فاس", "مراكش", "أكادير", "طنجة", "مكناس", "وجدة", "القنيطرة", "تطوان", "خريبكة", "بني ملال", "الجديدة", "آسفي", "سطات", "برشيد", "الخميسات", "الناظور", "تازة", "المحمدية", "سلا", "تمارة", "العرائش", "كلميم", "بركان", "الفقيه بن صالح", "تاوريرت", "بوسكورة", "ورزازات", "العيون", "الداخلة", "تارودانت", "قلعة السراغنة", "سيدي سليمان", "سيدي قاسم", "تيزنيت", "طانطان", "شفشاون", "الحسيمة", "تيفلت", "وزان", "جرسيف", "المضيق", "الفنيدق", "سوق الأربعاء", "بوجدور", "تنغير", "زاكورة", "ميدلت", "اليوسفية", "بن جرير"
-];
+const moroccanCities = Object.keys(cityCoords);
 
 export default function Home({ onNavigate }: Props) {
   const { settings } = useSettings();
@@ -42,6 +41,7 @@ export default function Home({ onNavigate }: Props) {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [selectedBreed, setSelectedBreed] = useState<string | null>(null);
   
 
 
@@ -74,8 +74,16 @@ export default function Home({ onNavigate }: Props) {
 
   useEffect(() => {
     const fetchAnnouncements = async () => {
-      const anns = await firestoreService.getAnnouncements();
-      if (anns) setAnnouncements(anns);
+      const cached = getCachedData('home_announcements');
+      if (cached) {
+        setAnnouncements(cached);
+      }
+      
+      const response = await firestoreService.getAnnouncements();
+      if (response && response.data) {
+        setCachedData('home_announcements', response.data);
+        setAnnouncements(response.data);
+      }
     };
     fetchAnnouncements();
   }, []);
@@ -101,41 +109,37 @@ export default function Home({ onNavigate }: Props) {
     onNavigate('auth');
   };
 
-  const handleSearchNearMe = async () => {
-    if (citySearch) {
-      onNavigate('search-results', undefined, citySearch, radiusSearch);
-      return;
-    }
-
+  const handleLocateMe = () => {
     setIsLocating(true);
     if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(async (position) => {
-        try {
-          const { latitude, longitude } = position.coords;
-          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&accept-language=ar`);
-          const data = await res.json();
-          const city = data.address?.city || data.address?.town || data.address?.state || data.address?.province || '';
-          
-          if (city) {
-            onNavigate('search-results', undefined, city, radiusSearch);
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const closest = cityCoords ? getClosestCity(position.coords.latitude, position.coords.longitude) : null;
+          if (closest) {
+            setCitySearch(closest);
           } else {
-            onNavigate('search-results', undefined, undefined, radiusSearch);
+            // Outside Morocco logic
+            setCitySearch('');
+            alert("نتوما خارج المغرب، خاصكم تختارو المدينة يدوياً من القائمة");
           }
-        } catch (error) {
-          console.error("Error detecting city:", error);
-          onNavigate('search-results', undefined, undefined, radiusSearch);
-        } finally {
+          setIsLocating(false);
+        },
+        (error) => {
+          console.error("Geolocation error:", error);
           setIsLocating(false);
         }
-      }, (error) => {
-        console.error("Geolocation error:", error);
-        setIsLocating(false);
-        onNavigate('search-results', undefined, undefined, radiusSearch);
-      });
+      );
     } else {
       setIsLocating(false);
-      onNavigate('search-results', undefined, undefined, radiusSearch);
     }
+  };
+
+  const handleSearchNearMe = async () => {
+    if (!citySearch) {
+      alert("عافاك اختار المدينة فين كتقلب أولا");
+      return;
+    }
+    onNavigate('search-results', undefined, citySearch, radiusSearch, undefined, selectedBreed || undefined);
   };
 
   const getRoleBadge = (role: string) => {
@@ -378,75 +382,90 @@ export default function Home({ onNavigate }: Props) {
               بلاما تضرب تمارة فالسواق، كسابكوم كايوريك الكسابة لي قراب ليك. قلب على المدينة، وشوف الكسيبة بعينيك فبلاصتها.
             </p>
 
-            {/* Filter Box */}
-            <div className="bg-white p-6 md:p-8 rounded-2xl shadow-xl border border-outline-variant/20">
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
-                <div className="flex flex-col text-right gap-2 relative col-span-1 md:col-span-1" ref={suggestionsRef}>
-                  <label className="text-[10px] md:text-xs font-bold text-[#4A4A4A] px-1 md:px-2">المدينة فين نتا؟</label>
-                  <div className="relative">
-                    <input 
-                      className="w-full bg-[#F9F9F6] border border-transparent rounded-lg py-3 md:py-4 px-3 md:px-4 pl-8 md:pl-10 text-xs md:text-base focus:ring-2 focus:ring-[#2E7D32] focus:bg-white transition-all outline-none" 
-                      placeholder="مثلا: سطات..." 
-                      type="text" 
-                      value={citySearch}
-                      onChange={(e) => {
-                        setCitySearch(e.target.value);
-                        setShowSuggestions(true);
-                      }}
-                      onFocus={() => setShowSuggestions(true)}
-                    />
-                    <MapPin className="absolute left-2 md:left-3 top-3 md:top-4 text-[#757575] w-4 h-4 md:w-5 md:h-5" />
-                  </div>
-                  {showSuggestions && citySearch && filteredCities.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-2xl border border-outline-variant/20 max-h-48 overflow-y-auto z-50">
-                      {filteredCities.map((city, idx) => (
-                        <button
-                          key={idx}
-                          className="w-full text-right px-4 py-3 hover:bg-[#F9F9F6] text-[#1A1A1A] font-medium transition-colors border-b border-outline-variant/10 last:border-0"
-                          onClick={() => {
-                            setCitySearch(city);
-                            setShowSuggestions(false);
-                          }}
-                        >
-                          {city}
-                        </button>
-                      ))}
+            {/* Modern Expert Search Bar */}
+            <motion.div 
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.5, duration: 0.8 }}
+              className="mt-12 max-w-5xl mx-auto"
+            >
+              <div className="bg-white/80 backdrop-blur-xl p-2 rounded-[2.5rem] shadow-[0_20px_50px_rgba(46,125,50,0.15)] border border-white/40">
+                <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2">
+                  
+                  {/* City Selector */}
+                  <div className="flex-1 flex items-center px-6 py-4 md:py-0 border-b md:border-b-0 md:border-l border-outline-variant/10 relative group">
+                    <MapPin className="w-6 h-6 text-[#2E7D32] shrink-0" />
+                    <div className="flex flex-col text-right mr-4 flex-1">
+                      <span className="text-[10px] font-black text-[#2E7D32] uppercase tracking-wider mb-0.5">المدينة</span>
+                      <select 
+                        value={citySearch}
+                        onChange={(e) => setCitySearch(e.target.value)}
+                        className="bg-transparent border-none outline-none w-full text-lg font-black text-[#1A1A1A] appearance-none cursor-pointer focus:text-[#2E7D32] transition-colors"
+                        style={{ direction: 'rtl' }}
+                      >
+                        <option value="">فين كتقلب؟</option>
+                        {moroccanCities.sort().map(city => (
+                          <option key={city} value={city}>{city}</option>
+                        ))}
+                      </select>
                     </div>
-                  )}
-                </div>
-                <div className="flex flex-col text-right gap-2 col-span-1 md:col-span-1">
-                  <label className="text-[10px] md:text-xs font-bold text-[#4A4A4A] px-1 md:px-2">شحال بعيد عليك؟</label>
-                  <div className="relative group">
-                    <select 
-                      value={radiusSearch}
-                      onChange={(e) => setRadiusSearch(e.target.value)}
-                      className="w-full bg-[#F9F9F6] border border-transparent rounded-lg py-3 md:py-4 px-3 md:px-4 pl-8 md:pl-10 text-xs md:text-base appearance-none focus:ring-2 focus:ring-[#2E7D32] focus:bg-white transition-all outline-none cursor-pointer font-bold text-[#1A1A1A]"
+                    <ChevronDown className="w-4 h-4 text-[#757575] absolute left-14 md:left-16 pointer-events-none" />
+                    
+                    <button 
+                      onClick={handleLocateMe}
+                      disabled={isLocating}
+                      title="موقعي الحالي"
+                      className={`p-2 rounded-full hover:bg-[#E8F5E9] transition-all transform hover:scale-110 active:scale-95 ${isLocating ? 'animate-pulse text-[#2E7D32]' : 'text-[#757575]'}`}
                     >
-                      <option value="10">10 كلم</option>
-                      <option value="20">20 كلم</option>
-                      <option value="50">50 كلم</option>
-                      <option value="all">كاع</option>
-                    </select>
-                    <Navigation className="absolute left-7 md:left-10 top-3 md:top-4 text-[#2E7D32] w-4 h-4 md:w-5 md:h-5 pointer-events-none group-hover:scale-110 transition-transform" />
-                    <ChevronDown className="absolute left-2 md:left-3 top-3.5 md:top-5 text-[#757575] w-3 h-3 md:w-4 md:h-4 pointer-events-none" />
+                      {isLocating ? <Loader2 className="w-5 h-5 animate-spin" /> : <Navigation className="w-5 h-5" />}
+                    </button>
                   </div>
-                </div>
-                <div className="flex items-end col-span-2 md:col-span-1">
+
+                  {/* Distance Selector */}
+                  <div className="flex-1 flex items-center px-6 py-4 md:py-0 relative group">
+                    <TrendingUp className="w-6 h-6 text-[#2E7D32] shrink-0" />
+                    <div className="flex flex-col text-right mr-4 flex-1">
+                      <span className="text-[10px] font-black text-[#2E7D32] uppercase tracking-wider mb-0.5">المسافة</span>
+                      <select 
+                        value={radiusSearch}
+                        onChange={(e) => setRadiusSearch(e.target.value)}
+                        className="bg-transparent border-none outline-none w-full text-lg font-black text-[#1A1A1A] appearance-none cursor-pointer focus:text-[#2E7D32] transition-colors"
+                        style={{ direction: 'rtl' }}
+                      >
+                        <option value="10">10 كلم دايرة بيك</option>
+                        <option value="20">20 كلم دايرة بيك</option>
+                        <option value="50">50 كلم دايرة بيك</option>
+                        <option value="all">كاع المغرب</option>
+                      </select>
+                    </div>
+                    <ChevronDown className="w-4 h-4 text-[#757575] absolute left-6 pointer-events-none" />
+                  </div>
+
+                  {/* Search Button */}
                   <button 
-                    onClick={handleSearchNearMe} 
-                    disabled={isLocating}
-                    className="w-full bg-[#2E7D32] text-white py-3 md:py-4 px-6 rounded-lg font-bold flex items-center justify-center gap-2 border border-transparent hover:bg-white hover:text-[#2E7D32] hover:border-[#2E7D32] transition-colors disabled:opacity-70 shadow-lg group"
+                    onClick={handleSearchNearMe}
+                    className="bg-[#2E7D32] text-white py-5 md:py-6 px-12 rounded-[2rem] font-black text-lg flex items-center justify-center gap-3 shadow-[0_10px_20px_rgba(46,125,50,0.3)] hover:shadow-[0_15px_30px_rgba(46,125,50,0.4)] transform hover:-translate-y-1 active:translate-y-0 transition-all duration-300"
                   >
-                    {isLocating ? (
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                    ) : (
-                      <Search className="w-4 h-4 md:w-5 md:h-5 transition-transform" />
-                    )}
-                    <span className="text-sm md:text-base">{isLocating ? 'جاري...' : 'قلب حدايا'}</span>
+                    <Search className="w-6 h-6" />
+                    <span>قلب دابا</span>
                   </button>
+
                 </div>
               </div>
-            </div>
+
+              {/* Quick Tags */}
+              <div className="flex flex-wrap justify-center gap-3 mt-6">
+                {['سردي', 'بركي', 'مستورد'].map((tag) => (
+                  <button 
+                    key={tag}
+                    onClick={() => setSelectedBreed(selectedBreed === tag ? null : tag)}
+                    className={`px-4 py-2 rounded-full text-xs font-bold transition-all shadow-sm ${selectedBreed === tag ? 'bg-[#2E7D32] text-white' : 'bg-white/50 backdrop-blur-sm border border-white/50 text-[#1A1A1A] hover:bg-[#2E7D32] hover:text-white'}`}
+                  >
+                    #{tag}
+                  </button>
+                ))}
+              </div>
+            </motion.div>
           </div>
         </section>
 
@@ -488,30 +507,33 @@ export default function Home({ onNavigate }: Props) {
         )}
 
         {/* Banner 1 */}
-        <div className="max-w-7xl mx-auto px-6 py-10">
-          {settings.banners?.banner1 ? (
-            <div 
-              onClick={() => settings.banners?.banner1Url && window.open(settings.banners.banner1Url, '_blank')}
-              className={`relative rounded-3xl overflow-hidden shadow-md group cursor-pointer border border-outline-variant/10 ${settings.banners?.banner1Url ? 'hover:opacity-90 transition-opacity' : ''} ${settings.banners?.banner1Mobile ? 'aspect-square' : 'aspect-video'} md:aspect-[24/4.5]`}
-            >
-              <picture className="w-full h-full">
-                {settings.banners?.banner1Mobile && (
-                  <source media="(max-width: 767px)" srcSet={settings.banners.banner1Mobile} />
-                )}
-                <img 
-                  src={settings.banners.banner1} 
-                  alt="Ad Banner 1" 
-                  className="w-full h-full object-cover"
-                  referrerPolicy="no-referrer"
-                />
-              </picture>
-            </div>
-          ) : (
-            <div className="bg-gradient-to-r from-[#2E7D32] to-[#43A047] rounded-3xl p-8 text-white text-center shadow-md border border-outline-variant/10">
-              <p className="opacity-90 font-medium">استفد من عروض خاصة بمناسبة عيد الأضحى</p>
-            </div>
-          )}
-        </div>
+        {(settings.banners?.banner1DesktopEnabled !== false || settings.banners?.banner1MobileEnabled !== false) && (
+          <div className={`max-w-7xl mx-auto px-6 py-10 ${settings.banners?.banner1DesktopEnabled === false ? 'md:hidden' : ''} ${settings.banners?.banner1MobileEnabled === false ? 'hidden md:block' : ''}`}>
+            {settings.banners?.banner1 ? (
+              <div 
+                onClick={() => settings.banners?.banner1Url && window.open(settings.banners.banner1Url, '_blank')}
+                className={`relative rounded-3xl overflow-hidden shadow-md group cursor-pointer border border-outline-variant/10 ${settings.banners?.banner1Url ? 'hover:opacity-90 transition-opacity' : ''} ${settings.banners?.banner1Mobile ? 'aspect-square' : 'aspect-video'} md:aspect-[24/4.5]`}
+              >
+                <picture className="w-full h-full">
+                  {settings.banners?.banner1Mobile && (
+                    <source media="(max-width: 767px)" srcSet={settings.banners.banner1Mobile} />
+                  )}
+                  <img 
+                    src={settings.banners.banner1} 
+                    alt="Ad Banner 1" 
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                </picture>
+              </div>
+            ) : (
+              <div className="bg-gradient-to-r from-[#2E7D32] to-[#43A047] rounded-3xl p-8 text-white text-center shadow-md border border-outline-variant/10">
+                <p className="opacity-90 font-medium mb-4">استفد من عروض خاصة بمناسبة عيد الأضحى</p>
+                <a href="http://localhost:3000/contact" target="_blank" rel="noreferrer" className="inline-block bg-white text-[#2E7D32] px-6 py-2 rounded-xl font-bold hover:bg-opacity-90 transition-colors shadow-sm">اتصل بنا لحجز هذه المساحة</a>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Featured Listings Section */}
         <section className="max-w-7xl mx-auto px-6 py-20">
@@ -520,14 +542,15 @@ export default function Home({ onNavigate }: Props) {
               <span className="text-[#2E7D32] font-bold text-sm tracking-widest uppercase mb-2 block">كسيبة قريبة ليك</span>
               <h2 className="text-3xl font-black text-[#1A1A1A] font-headline">أحدث العروض فمنطقتك</h2>
             </div>
-            <button onClick={() => onNavigate('buyer')} className="text-[#2E7D32] font-bold flex items-center gap-2 hover:gap-3 transition-all">
+            <button onClick={() => onNavigate('search-results')} className="text-[#2E7D32] font-bold flex items-center gap-2 hover:gap-3 transition-all">
               <span>شوف كلشي</span>
               <ArrowLeft className="w-5 h-5" />
             </button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {announcements.slice(0, 6).map((listing) => (
+            {Array.isArray(announcements) && announcements.slice(0, 6).map((listing) => (
+
               <div key={listing.id} className="bg-white rounded-2xl overflow-hidden shadow-sm border border-outline-variant/20 hover:shadow-xl transition-all duration-300 group cursor-pointer" onClick={() => onNavigate('listing-details', listing.id)}>
                 <div className="relative h-64 overflow-hidden">
                   <img alt={listing.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" src={listing.images?.[0] || 'https://i.ytimg.com/vi/RrkkshRUttw/hq720.jpg?sqp=-oaymwEhCK4FEIIDSFryq4qpAxMIARUAAAAAGAElAADIQj0AgKJD&rs=AOn4CLD92lI4Kxe5liKSwWZaJuLAFopNeA'} referrerPolicy="no-referrer" />
@@ -657,30 +680,33 @@ export default function Home({ onNavigate }: Props) {
         </section>
 
         {/* Banner 2 */}
-        <div className="max-w-7xl mx-auto px-6 py-10">
-          {settings.banners?.banner2 ? (
-            <div 
-              onClick={() => settings.banners?.banner2Url && window.open(settings.banners.banner2Url, '_blank')}
-              className={`relative rounded-3xl overflow-hidden shadow-md group cursor-pointer border border-outline-variant/10 ${settings.banners?.banner2Url ? 'hover:opacity-90 transition-opacity' : ''} ${settings.banners?.banner2Mobile ? 'aspect-square' : 'aspect-video'} md:aspect-[24/4.5]`}
-            >
-              <picture className="w-full h-full">
-                {settings.banners?.banner2Mobile && (
-                  <source media="(max-width: 767px)" srcSet={settings.banners.banner2Mobile} />
-                )}
-                <img 
-                  src={settings.banners.banner2} 
-                  alt="Ad Banner 2" 
-                  className="w-full h-full object-cover"
-                  referrerPolicy="no-referrer"
-                />
-              </picture>
-            </div>
-          ) : (
-            <div className="bg-gradient-to-r from-[#FF9800] to-[#F57C00] rounded-3xl p-8 text-white text-center shadow-md border border-outline-variant/10">
-              <p className="opacity-90 font-medium">اكتشف أفضل السلالات المغربية</p>
-            </div>
-          )}
-        </div>
+        {(settings.banners?.banner2DesktopEnabled !== false || settings.banners?.banner2MobileEnabled !== false) && (
+          <div className={`max-w-7xl mx-auto px-6 py-10 ${settings.banners?.banner2DesktopEnabled === false ? 'md:hidden' : ''} ${settings.banners?.banner2MobileEnabled === false ? 'hidden md:block' : ''}`}>
+            {settings.banners?.banner2 ? (
+              <div 
+                onClick={() => settings.banners?.banner2Url && window.open(settings.banners.banner2Url, '_blank')}
+                className={`relative rounded-3xl overflow-hidden shadow-md group cursor-pointer border border-outline-variant/10 ${settings.banners?.banner2Url ? 'hover:opacity-90 transition-opacity' : ''} ${settings.banners?.banner2Mobile ? 'aspect-square' : 'aspect-video'} md:aspect-[24/4.5]`}
+              >
+                <picture className="w-full h-full">
+                  {settings.banners?.banner2Mobile && (
+                    <source media="(max-width: 767px)" srcSet={settings.banners.banner2Mobile} />
+                  )}
+                  <img 
+                    src={settings.banners.banner2} 
+                    alt="Ad Banner 2" 
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                </picture>
+              </div>
+            ) : (
+              <div className="bg-gradient-to-r from-[#FF9800] to-[#F57C00] rounded-3xl p-8 text-white text-center shadow-md border border-outline-variant/10">
+                <p className="opacity-90 font-medium mb-4">اكتشف أفضل السلالات المغربية</p>
+                <a href="http://localhost:3000/contact" target="_blank" rel="noreferrer" className="inline-block bg-white text-[#FF9800] px-6 py-2 rounded-xl font-bold hover:bg-opacity-90 transition-colors shadow-sm">اتصل بنا لحجز هذه المساحة</a>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Sales Phases Section */}
         <section className="bg-white py-20 border-y border-outline-variant/10">
@@ -752,30 +778,33 @@ export default function Home({ onNavigate }: Props) {
         </section>
 
         {/* Banner 3 */}
-        <div className="max-w-7xl mx-auto px-6 py-10">
-          {settings.banners?.banner3 ? (
-            <div 
-              onClick={() => settings.banners?.banner3Url && window.open(settings.banners.banner3Url, '_blank')}
-              className={`relative rounded-3xl overflow-hidden shadow-md group cursor-pointer border border-outline-variant/10 ${settings.banners?.banner3Url ? 'hover:opacity-90 transition-opacity' : ''} ${settings.banners?.banner3Mobile ? 'aspect-square' : 'aspect-video'} md:aspect-[24/4.5]`}
-            >
-              <picture className="w-full h-full">
-                {settings.banners?.banner3Mobile && (
-                  <source media="(max-width: 767px)" srcSet={settings.banners.banner3Mobile} />
-                )}
-                <img 
-                  src={settings.banners.banner3} 
-                  alt="Ad Banner 3" 
-                  className="w-full h-full object-cover"
-                  referrerPolicy="no-referrer"
-                />
-              </picture>
-            </div>
-          ) : (
-            <div className="bg-gradient-to-r from-[#2196F3] to-[#1976D2] rounded-3xl p-8 text-white text-center shadow-md border border-outline-variant/10">
-              <p className="opacity-90 font-medium">خدمات النقل متوفرة الآن</p>
-            </div>
-          )}
-        </div>
+        {(settings.banners?.banner3DesktopEnabled !== false || settings.banners?.banner3MobileEnabled !== false) && (
+          <div className={`max-w-7xl mx-auto px-6 py-10 ${settings.banners?.banner3DesktopEnabled === false ? 'md:hidden' : ''} ${settings.banners?.banner3MobileEnabled === false ? 'hidden md:block' : ''}`}>
+            {settings.banners?.banner3 ? (
+              <div 
+                onClick={() => settings.banners?.banner3Url && window.open(settings.banners.banner3Url, '_blank')}
+                className={`relative rounded-3xl overflow-hidden shadow-md group cursor-pointer border border-outline-variant/10 ${settings.banners?.banner3Url ? 'hover:opacity-90 transition-opacity' : ''} ${settings.banners?.banner3Mobile ? 'aspect-square' : 'aspect-video'} md:aspect-[24/4.5]`}
+              >
+                <picture className="w-full h-full">
+                  {settings.banners?.banner3Mobile && (
+                    <source media="(max-width: 767px)" srcSet={settings.banners.banner3Mobile} />
+                  )}
+                  <img 
+                    src={settings.banners.banner3} 
+                    alt="Ad Banner 3" 
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                </picture>
+              </div>
+            ) : (
+              <div className="bg-gradient-to-r from-[#2196F3] to-[#1976D2] rounded-3xl p-8 text-white text-center shadow-md border border-outline-variant/10">
+                <p className="opacity-90 font-medium mb-4">خدمات النقل متوفرة الآن</p>
+                <a href="http://localhost:3000/contact" target="_blank" rel="noreferrer" className="inline-block bg-white text-[#2196F3] px-6 py-2 rounded-xl font-bold hover:bg-opacity-90 transition-colors shadow-sm">اتصل بنا لحجز هذه المساحة</a>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Seller CTA Section */}
         <section className="max-w-7xl mx-auto px-6 py-20">

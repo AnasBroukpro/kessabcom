@@ -1,24 +1,24 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Search, MapPin, Navigation, Bell, User, LogOut, LayoutDashboard, ShoppingBag, PlusCircle, Settings, Users, List, ChevronDown, Menu, X } from 'lucide-react';
+import { Search, MapPin, Navigation, Bell, User, LogOut, LayoutDashboard, ShoppingBag, PlusCircle, Settings, Users, List, ChevronDown, Menu, X, LocateFixed } from 'lucide-react';
 import { motion } from 'motion/react';
 import { ViewType } from '../App';
 import { useAuth } from '../contexts/AuthContext';
 import MobileSidebar from './MobileSidebar';
 import { firestoreService } from '../services/firestoreService';
+import { cityCoords, getClosestCity } from '../constants/cityMapping';
 
 interface Props {
-  onNavigate: (view: ViewType, listingId?: string, city?: string, radius?: string, subView?: string) => void;
+  onNavigate: (view: ViewType, listingId?: string, city?: string, radius?: string, subView?: string, breed?: string) => void;
   initialCity?: string;
   initialRadius?: string;
 }
 
-const moroccanCities = [
-  "الدار البيضاء", "الرباط", "فاس", "مراكش", "أكادير", "طنجة", "مكناس", "وجدة", "القنيطرة", "تطوان", "خريبكة", "بني ملال", "الجديدة", "آسفي", "سطات", "برشيد", "الخميسات", "الناظور", "تازة", "المحمدية"
-];
+const moroccanCities = Object.keys(cityCoords).sort();
 
 export default function SearchHeader({ onNavigate, initialCity = '', initialRadius = '10' }: Props) {
   const { user, profile, signOut } = useAuth();
   const [citySearch, setCitySearch] = useState(initialCity);
+  const [isLocating, setIsLocating] = useState(false);
   const [radiusSearch, setRadiusSearch] = useState(initialRadius);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -65,6 +65,30 @@ export default function SearchHeader({ onNavigate, initialCity = '', initialRadi
   const handleSignOut = async () => {
     await signOut();
     onNavigate('home');
+  };
+
+  const handleLocateMe = () => {
+    setIsLocating(true);
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const closest = getClosestCity(position.coords.latitude, position.coords.longitude);
+          if (closest) {
+            setCitySearch(closest);
+          } else {
+            setCitySearch('');
+            alert("نتوما خارج المغرب، خاصكم تختارو المدينة يدوياً من القائمة");
+          }
+          setIsLocating(false);
+        },
+        (error) => {
+          console.error("Geolocation error:", error);
+          setIsLocating(false);
+        }
+      );
+    } else {
+      setIsLocating(false);
+    }
   };
 
   const getRoleBadge = (role: string) => {
@@ -287,37 +311,31 @@ export default function SearchHeader({ onNavigate, initialCity = '', initialRadi
         {/* Search Bar - Centered on Desktop, Full width on Mobile */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 bg-[#F9F9F6] border border-outline-variant/20 rounded-xl p-1.5 shadow-sm hover:shadow-md transition-shadow">
           <div className="flex flex-1 items-center divide-x divide-x-reverse divide-outline-variant/30">
-            <div className="flex-1 relative" ref={suggestionsRef}>
-              <div className="flex items-center px-3 gap-2">
+            <div className="flex-1 relative">
+              <div className="flex items-center px-3 gap-2 group">
                 <MapPin className="w-4 h-4 text-[#2E7D32] shrink-0" />
-                <input 
-                  type="text" 
-                  className="bg-transparent border-none outline-none w-full py-2.5 sm:py-2 text-sm font-bold text-[#1A1A1A] placeholder:text-[#757575]/60" 
-                  placeholder="فين كتقلب؟"
+                <select 
                   value={citySearch}
-                  onChange={(e) => {
-                    setCitySearch(e.target.value);
-                    setShowSuggestions(true);
-                  }}
-                  onFocus={() => setShowSuggestions(true)}
-                />
-              </div>
-              {showSuggestions && citySearch && filteredCities.length > 0 && (
-                <div className="absolute top-full right-0 left-0 mt-2 bg-white rounded-xl shadow-2xl border border-outline-variant/20 max-h-48 overflow-y-auto z-50">
-                  {filteredCities.map((city, idx) => (
-                    <button
-                      key={idx}
-                      className="w-full text-right px-4 py-2 hover:bg-[#F9F9F6] text-[#1A1A1A] font-medium transition-colors text-sm"
-                      onClick={() => {
-                        setCitySearch(city);
-                        setShowSuggestions(false);
-                      }}
-                    >
-                      {city}
-                    </button>
+                  onChange={(e) => setCitySearch(e.target.value)}
+                  className="bg-transparent border-none outline-none w-full py-2.5 sm:py-2 text-sm font-bold text-[#1A1A1A] appearance-none cursor-pointer focus:text-[#2E7D32] transition-colors"
+                  style={{ direction: 'rtl' }}
+                >
+                  <option value="">فين كتقلب؟</option>
+                  {moroccanCities.map(city => (
+                    <option key={city} value={city}>{city}</option>
                   ))}
-                </div>
-              )}
+                </select>
+                <ChevronDown className="w-3 h-3 text-[#757575] absolute left-10 pointer-events-none" />
+                
+                <button 
+                  onClick={handleLocateMe}
+                  disabled={isLocating}
+                  title="موقعي الحالي"
+                  className={`p-1.5 rounded-lg hover:bg-[#E8F5E9] transition-colors ${isLocating ? 'animate-pulse text-[#2E7D32]' : 'text-[#757575]'}`}
+                >
+                  <LocateFixed className="w-4 h-4" />
+                </button>
+              </div>
             </div>
             
             <div className="flex-1 flex items-center px-3 gap-2 group relative">
@@ -337,7 +355,13 @@ export default function SearchHeader({ onNavigate, initialCity = '', initialRadi
             </div>
           </div>
           
-          <button onClick={() => onNavigate('search-results', undefined, citySearch, radiusSearch)} className="bg-[#2E7D32] text-white p-3 sm:p-2.5 rounded-lg transition-colors border border-transparent hover:bg-transparent hover:text-[#2E7D32] hover:border-[#2E7D32] shadow-sm flex items-center justify-center shrink-0">
+          <button onClick={() => {
+            if (!citySearch) {
+              alert("عافاك اختار المدينة فين كتقلب أولا");
+              return;
+            }
+            onNavigate('search-results', undefined, citySearch, radiusSearch);
+          }} className="bg-[#2E7D32] text-white p-3 sm:p-2.5 rounded-lg transition-colors border border-transparent hover:bg-transparent hover:text-[#2E7D32] hover:border-[#2E7D32] shadow-sm flex items-center justify-center shrink-0">
             <Search className="w-4 h-4 sm:w-4 sm:h-4" />
           </button>
         </div>

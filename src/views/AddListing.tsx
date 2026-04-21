@@ -5,9 +5,9 @@ import { useAuth } from '../contexts/AuthContext';
 import { firestoreService } from '../services/firestoreService';
 import { useSettings } from '../hooks/useSettings';
 import { compressImage, checkPayloadSize } from '../lib/imageUtils';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase';
 import LocationMap from '../components/LocationMap';
+import { cityCoords } from '../constants/cityMapping';
+import { ChevronDown } from 'lucide-react';
 
 interface Props {
   onNavigate: (view: ViewType, listingId?: string, city?: string, radius?: string, subView?: string) => void;
@@ -226,9 +226,9 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
         return;
       }
 
-      // Generate reCAPTCHA Enterprise token for server-side verification
+      // Generate reCAPTCHA Enterprise token for server-side verification 
       let recaptchaToken = '';
-      if (typeof window !== 'undefined' && (window as any).grecaptcha?.enterprise) {
+      if (import.meta.env.PROD && typeof window !== 'undefined' && (window as any).grecaptcha?.enterprise) {
         try {
           const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
           if (siteKey) {
@@ -368,13 +368,19 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
             استعمل موقعي الحالي (GPS)
           </button>
           <div className="flex-1 relative">
-            <input
-              type="text"
-              placeholder="أو أدخل العنوان يدوياً..."
-              className="w-full h-full min-h-[48px] px-4 bg-surface-container-high border-none rounded-xl text-on-surface focus:ring-2 focus:ring-primary transition-all text-right"
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-            />
+            <div className="relative group">
+              <select 
+                className="w-full h-12 px-4 bg-surface-container-high border-none rounded-xl text-on-surface focus:ring-2 focus:ring-primary transition-all text-right outline-none font-bold appearance-none cursor-pointer"
+                value={address || profile?.location || ''}
+                onChange={(e) => setAddress(e.target.value)}
+              >
+                <option value="" disabled>اختار المدينة...</option>
+                {Object.keys(cityCoords).sort().map(city => (
+                  <option key={city} value={city}>{city}</option>
+                ))}
+              </select>
+              <ChevronDown className="w-4 h-4 text-on-surface-variant absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none group-hover:scale-110 transition-transform" />
+            </div>
           </div>
         </div>
         {coordinates && (

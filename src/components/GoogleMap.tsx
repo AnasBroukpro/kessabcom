@@ -1,12 +1,12 @@
 import React, { useMemo, useCallback } from 'react';
-import { GoogleMap, useJsApiLoader, OverlayView, InfoWindowF } from '@react-google-maps/api';
+import { GoogleMap, useJsApiLoader, OverlayView, InfoWindowF, Circle } from '@react-google-maps/api';
 import { MapPin, Star } from 'lucide-react';
 import { cityMapping } from '../constants/cityMapping';
 
 import { useSettings } from '../hooks/useSettings';
 
 interface Listing {
-  id: number;
+  id: string;
   title: string;
   breed: string;
   location: string;
@@ -16,13 +16,16 @@ interface Listing {
   image: string;
   lat: number;
   lng: number;
+  phone?: string;
+  whatsapp?: string;
 }
 
 interface Props {
   listings: Listing[];
   onListingClick: (listing: Listing) => void;
-  hoveredListingId: number | null;
-  setHoveredListingId: (id: number | null) => void;
+  onContactClick?: (listing: Listing) => void;
+  hoveredListingId: string | null;
+  setHoveredListingId: (id: string | null) => void;
 }
 
 interface MapContentProps extends Props {
@@ -56,6 +59,16 @@ const MapContent: React.FC<MapContentProps> = ({ listings, onListingClick, hover
     id: 'google-map-script',
     googleMapsApiKey: apiKey,
   });
+
+  const mapCenter = useMemo(() => {
+    if (listings.length > 0) {
+      // Calculate average center
+      const lat = listings.reduce((sum, l) => sum + l.lat, 0) / listings.length;
+      const lng = listings.reduce((sum, l) => sum + l.lng, 0) / listings.length;
+      return { lat, lng };
+    }
+    return center;
+  }, [listings]);
 
   const renderStars = (rating: number) => {
     return (
@@ -95,55 +108,94 @@ const MapContent: React.FC<MapContentProps> = ({ listings, onListingClick, hover
   return (
     <GoogleMap
       mapContainerStyle={mapContainerStyle}
-      center={center}
-      zoom={11}
+      center={mapCenter}
+      zoom={listings.length > 0 ? 10 : 6}
       options={mapOptions}
     >
       {listings.map((listing) => (
         <React.Fragment key={listing.id}>
+          {/* Hotspot Circle with Pulse Effect */}
+          <Circle
+            center={{ lat: listing.lat, lng: listing.lng }}
+            radius={2000}
+            options={{
+              fillColor: '#2E7D32',
+              fillOpacity: 0.08,
+              strokeColor: '#2E7D32',
+              strokeOpacity: 0.15,
+              strokeWeight: 1,
+              clickable: false,
+            }}
+          />
+          
           <OverlayView
             position={{ lat: listing.lat, lng: listing.lng }}
             mapPaneName="overlayMouseTarget"
           >
             <div 
-              className={`relative -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-all duration-300 ${hoveredListingId === listing.id ? 'scale-125 z-50' : 'scale-100 z-10'}`}
+              className={`relative -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-all duration-500 ${hoveredListingId === listing.id ? 'scale-110 z-[100]' : 'scale-100 z-10'}`}
               onClick={() => onListingClick(listing)}
               onMouseEnter={() => setHoveredListingId(listing.id)}
               onMouseLeave={() => setHoveredListingId(null)}
             >
-              <div className={`w-12 h-12 rounded-full border-4 shadow-lg overflow-hidden transition-colors ${hoveredListingId === listing.id ? 'border-primary' : 'border-white'}`}>
-                <img src={listing.image} className="w-full h-full object-cover" alt="" referrerPolicy="no-referrer" />
+              {/* Marker Container */}
+              <div className="relative group">
+                {/* Glow Background */}
+                <div className={`absolute inset-0 rounded-full blur-md transition-all duration-500 ${hoveredListingId === listing.id ? 'bg-[#2E7D32]/40 scale-125' : 'bg-black/10'}`}></div>
+                
+                {/* Image Circle */}
+                <div className={`relative w-14 h-14 rounded-full border-[3px] shadow-2xl overflow-hidden transition-all duration-300 ${hoveredListingId === listing.id ? 'border-[#2E7D32] ring-4 ring-[#2E7D32]/10' : 'border-white hover:border-[#2E7D32]/50'}`}>
+                  <img 
+                    src={listing.image} 
+                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
+                    alt="" 
+                    referrerPolicy="no-referrer" 
+                  />
+                  {/* Verified Badge Mini */}
+                  {listing.verified && (
+                    <div className="absolute bottom-0 right-0 bg-white rounded-full p-0.5 shadow-md">
+                      <div className="bg-[#2E7D32] rounded-full p-0.5">
+                        <Star className="w-2 h-2 text-white fill-white" />
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Pointing Triangle */}
+                <div className={`absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-4 h-4 rotate-45 shadow-xl transition-colors duration-300 ${hoveredListingId === listing.id ? 'bg-[#2E7D32]' : 'bg-white'}`}></div>
               </div>
-              <div className={`absolute -bottom-1 left-1/2 -translate-x-1/2 w-3 h-3 rotate-45 shadow-lg transition-colors ${hoveredListingId === listing.id ? 'bg-primary' : 'bg-white'}`}></div>
             </div>
           </OverlayView>
 
-          {hoveredListingId === listing.id && (
-            <InfoWindowF
+          {(hoveredListingId === listing.id || (window as any).activeListingId === listing.id) && (
+            <OverlayView
               position={{ lat: listing.lat, lng: listing.lng }}
-              options={{ 
-                pixelOffset: window.google ? new window.google.maps.Size(0, -40) : undefined 
-              }}
+              mapPaneName="floatPane"
+              getPixelPositionOffset={(width, height) => ({ x: -(width / 2), y: -(height + 45) })}
             >
-              <div className="w-48 bg-white rounded-xl overflow-hidden shadow-xl" dir="rtl">
-                <img src={listing.image} className="w-full h-24 object-cover" alt={listing.title} referrerPolicy="no-referrer" />
-                <div className="p-3 text-right">
-                  <h4 className="font-bold text-xs text-gray-900 mb-1 truncate">{listing.title}</h4>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1 text-[10px] text-gray-500">
-                      <MapPin className="w-2 h-2" />
-                      <span>
-                        {(() => {
-                          const rawCity = (listing.location || 'غير محدد').split(' ')[0];
-                          return cityMapping[rawCity.toLowerCase()] || rawCity;
-                        })()}
-                      </span>
-                    </div>
-                    {renderStars(listing.rating)}
+              <div 
+                className="w-48 bg-white rounded-2xl overflow-hidden shadow-2xl border border-outline-variant/10 cursor-pointer transition-transform hover:scale-105 pointer-events-auto" 
+                dir="rtl"
+                onClick={() => onListingClick(listing)}
+              >
+                <div className="relative h-24">
+                  <img src={listing.image} className="w-full h-full object-cover" alt={listing.title} referrerPolicy="no-referrer" />
+                </div>
+                <div className="p-3">
+                  <h4 className="font-black text-xs text-[#1A1A1A] mb-1">ضيعة {listing.title.includes('ضيعة') ? listing.title.split('ضيعة')[1].trim() : listing.title}</h4>
+                  
+                  <div className="flex items-center gap-1 text-[9px] text-[#757575] font-bold mb-2">
+                    <MapPin className="w-2.5 h-2.5 text-[#2E7D32]" />
+                    <span className="truncate">موقع الضيعة: {listing.location}</span>
+                  </div>
+
+                  <div className="flex items-center gap-1">
+                    <Star className="w-3 h-3 fill-[#FFC107] text-[#FFC107]" />
+                    <span className="text-[10px] font-black text-[#1A1A1A]">{(listing.rating || 5).toFixed(1)}</span>
                   </div>
                 </div>
               </div>
-            </InfoWindowF>
+            </OverlayView>
           )}
         </React.Fragment>
       ))}
