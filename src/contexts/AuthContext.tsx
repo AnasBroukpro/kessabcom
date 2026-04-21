@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { onAuthStateChanged, User } from 'firebase/auth';
+import { onIdTokenChanged, User } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 import { firestoreService } from '../services/firestoreService';
 
@@ -37,7 +37,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
+    // Bug 3.3 fix: onIdTokenChanged fires on login, logout, AND token refresh (every ~1h).
+    // onAuthStateChanged would only fire on login/logout, leaving the app with an expired
+    // token after 1 hour, causing silent failures on all authenticated API calls.
+    const unsubscribeAuth = onIdTokenChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser);
       
       if (firebaseUser) {

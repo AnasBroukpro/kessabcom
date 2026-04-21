@@ -101,5 +101,20 @@ service cloud.firestore {
       allow read: if isAdmin();
       allow create: if request.auth != null;
     }
+
+    // Settings (Bug 1.2 fix)
+    // Public-facing config (stockMarket prices, banners, etc.) readable by all.
+    // Write is admin-only. The googleMapsApiKey should be restricted in Google Cloud
+    // Console by HTTP referer instead of relying solely on Firestore rules.
+    match /settings/{doc} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Donations
+    match /donations/{donationId} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn();
+    }
   }
 }
