@@ -759,5 +759,6 @@ export default function Auth({ onNavigate, intendedView }: Props) {
           </main>
         </>
       )}
+    </div>
   );
 }
