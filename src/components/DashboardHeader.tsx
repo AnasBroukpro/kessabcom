@@ -60,7 +60,7 @@ export default function DashboardHeader({ title, subtitle, location, showSearch 
 
   const handleSignOut = async () => {
     await signOut();
-    if (onNavigate) onNavigate('home');
+    if (onNavigate) onNavigate('auth');
   };
   
   const handleLocateMe = () => {

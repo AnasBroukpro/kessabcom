@@ -65,7 +65,7 @@ export default function MobileSidebar({ isOpen, onClose, onNavigate }: Props) {
 
   const handleSignOut = async () => {
     await signOut();
-    onNavigate('home');
+    onNavigate('auth');
     onClose();
   };
 

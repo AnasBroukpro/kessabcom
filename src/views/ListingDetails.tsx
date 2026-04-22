@@ -289,7 +289,7 @@ export default function ListingDetails({ onNavigate, listingId }: Props) {
                     </h3>
                     {sellerProfile?.isCertified ? (
                       <p className="text-[10px] text-[#2E7D32] font-bold mb-1">
-                        كساب معتمد فـ كسابكوم
+                        كساب معتمد فـ KESSABCOM
                       </p>
                     ) : (
                       <p className="text-sm text-[#2E7D32] font-bold mb-1">كساب</p>

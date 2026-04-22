@@ -42,6 +42,22 @@ export default function Home({ onNavigate }: Props) {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [selectedBreed, setSelectedBreed] = useState<string | null>(null);
+  const [showCityModal, setShowCityModal] = useState(false);
+  const [isOpenCity, setIsOpenCity] = useState(false);
+  const [isOpenRadius, setIsOpenRadius] = useState(false);
+  const [openUpwards, setOpenUpwards] = useState(false);
+  const searchBarRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isOpenCity || isOpenRadius) {
+      const rect = searchBarRef.current?.getBoundingClientRect();
+      if (rect) {
+        const windowHeight = window.innerHeight;
+        // On mobile, if the bar is in the bottom half, open upwards
+        setOpenUpwards(rect.bottom > windowHeight * 0.6);
+      }
+    }
+  }, [isOpenCity, isOpenRadius]);
   
 
 
@@ -136,7 +152,7 @@ export default function Home({ onNavigate }: Props) {
 
   const handleSearchNearMe = async () => {
     if (!citySearch) {
-      alert("عافاك اختار المدينة فين كتقلب أولا");
+      setShowCityModal(true);
       return;
     }
     onNavigate('search-results', undefined, citySearch, radiusSearch, undefined, selectedBreed || undefined);
@@ -243,7 +259,7 @@ export default function Home({ onNavigate }: Props) {
             <button onClick={() => onNavigate('home')} className="flex items-center group">
               <img 
                 src="https://i.ibb.co/Psdn5FfW/logo-removebg-preview.png" 
-                alt="كسابكوم" 
+                alt="KESSABCOM" 
                 className="h-8 md:h-10 w-auto object-contain transition-transform group-hover:scale-105"
                 referrerPolicy="no-referrer"
               />
@@ -333,13 +349,14 @@ export default function Home({ onNavigate }: Props) {
 
       <main className="pt-16">
         {/* Hero & Search Section */}
-        <section className="relative min-h-[650px] flex items-center justify-center overflow-hidden bg-[#FDFCF8] px-4 py-20">
-          <div className="absolute inset-0 opacity-50">
-            <img alt="مرعى في جبال الأطلس المغربية" className="w-full h-full object-cover" src="https://i.ibb.co/hxCgrSY7/generated-image.jpg" referrerPolicy="no-referrer" />
-          </div>
+        <section className="relative min-h-[650px] flex items-center justify-center bg-[#FDFCF8] px-4 py-20 z-20">
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            <div className="absolute inset-0 opacity-50">
+              <img alt="مرعى في جبال الأطلس المغربية" className="w-full h-full object-cover" src="https://i.ibb.co/hxCgrSY7/generated-image.jpg" referrerPolicy="no-referrer" />
+            </div>
 
-          {/* Floating Elements */}
-          <div className="absolute inset-0 pointer-events-none overflow-hidden">
+            {/* Floating Elements */}
+            <div className="absolute inset-0 pointer-events-none">
             <motion.div 
               animate={{ y: [0, -20, 0], rotate: [0, 5, 0] }}
               transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
@@ -362,8 +379,9 @@ export default function Home({ onNavigate }: Props) {
               <div className="w-full h-full bg-[#2E7D32] rounded-full blur-3xl"></div>
             </motion.div>
           </div>
+        </div>
 
-          <div className="relative z-10 max-w-4xl w-full text-center">
+        <div className="relative z-10 max-w-4xl w-full text-center">
             {/* News Ticker moved to top on mobile */}
             <div className="md:hidden mb-6">
               <NewsTicker isMobile={true} />
@@ -378,8 +396,8 @@ export default function Home({ onNavigate }: Props) {
               شوف الحولي <span className="text-[#2E7D32]">حداك</span> <br /> وزورو فالضيعة
             </h1>
             <p className="text-[#2E7D32] font-black tracking-[0.2em] text-sm md:text-base mb-8 uppercase font-headline">منكم وإليكم</p>
-            <p className="text-[11px] md:text-lg text-[#4A4A4A] mb-12 max-w-2xl mx-auto font-medium leading-relaxed md:leading-normal">
-              بلاما تضرب تمارة فالسواق، كسابكوم كايوريك الكسابة لي قراب ليك. قلب على المدينة، وشوف الكسيبة بعينيك فبلاصتها.
+            <p className="text-base md:text-lg text-[#4A4A4A] mb-12 max-w-2xl mx-auto font-medium leading-relaxed md:leading-normal px-4">
+              بلاما تضرب تمارة فالسواق، KESSABCOM كايوريك الكسابة لي قراب ليك. قلب على المدينة، وشوف الكسيبة بعينيك فبلاصتها.
             </p>
 
             {/* Modern Expert Search Bar */}
@@ -389,7 +407,10 @@ export default function Home({ onNavigate }: Props) {
               transition={{ delay: 0.5, duration: 0.8 }}
               className="mt-12 max-w-5xl mx-auto"
             >
-              <div className="bg-white/80 backdrop-blur-xl p-2 rounded-[2.5rem] shadow-[0_20px_50px_rgba(46,125,50,0.15)] border border-white/40">
+              <div 
+                ref={searchBarRef}
+                className="bg-white/80 backdrop-blur-xl p-2 rounded-[2.5rem] shadow-[0_20px_50px_rgba(46,125,50,0.15)] border border-white/40 z-[60] relative"
+              >
                 <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2">
                   
                   {/* City Selector */}
@@ -397,19 +418,36 @@ export default function Home({ onNavigate }: Props) {
                     <MapPin className="w-6 h-6 text-[#2E7D32] shrink-0" />
                     <div className="flex flex-col text-right mr-4 flex-1">
                       <span className="text-[10px] font-black text-[#2E7D32] uppercase tracking-wider mb-0.5">المدينة</span>
-                      <select 
-                        value={citySearch}
-                        onChange={(e) => setCitySearch(e.target.value)}
-                        className="bg-transparent border-none outline-none w-full text-lg font-black text-[#1A1A1A] appearance-none cursor-pointer focus:text-[#2E7D32] transition-colors"
-                        style={{ direction: 'rtl' }}
+                      <button 
+                        onClick={() => { setIsOpenCity(!isOpenCity); setIsOpenRadius(false); }}
+                        className="bg-transparent border-none outline-none w-full text-lg font-black text-[#1A1A1A] text-right flex items-center justify-between"
                       >
-                        <option value="">فين كتقلب؟</option>
-                        {moroccanCities.sort().map(city => (
-                          <option key={city} value={city}>{city}</option>
-                        ))}
-                      </select>
+                        <span className="truncate">{citySearch || 'فين كتقلب؟'}</span>
+                      </button>
+                      
+                      {isOpenCity && (
+                        <div className={`absolute ${openUpwards ? 'bottom-full mb-4' : 'top-full mt-4'} left-0 right-0 bg-white rounded-3xl shadow-2xl border border-outline-variant/10 max-h-80 overflow-y-auto z-[100] p-4 animate-in ${openUpwards ? 'slide-in-from-bottom-2' : 'slide-in-from-top-2'} duration-200`}>
+                          <div className="grid grid-cols-1 gap-1">
+                            <button 
+                              onClick={() => { setCitySearch(''); setIsOpenCity(false); }}
+                              className={`w-full text-right px-4 py-3 rounded-xl text-sm font-bold transition-colors ${!citySearch ? 'bg-[#2E7D32] text-white' : 'hover:bg-[#F9F9F6] text-[#4A4A4A]'}`}
+                            >
+                              الكل
+                            </button>
+                            {moroccanCities.sort().map(city => (
+                              <button 
+                                key={city}
+                                onClick={() => { setCitySearch(city); setIsOpenCity(false); }}
+                                className={`w-full text-right px-4 py-3 rounded-xl text-sm font-bold transition-colors ${citySearch === city ? 'bg-[#2E7D32] text-white' : 'hover:bg-[#F9F9F6] text-[#4A4A4A]'}`}
+                              >
+                                {city}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <ChevronDown className="w-4 h-4 text-[#757575] absolute left-14 md:left-16 pointer-events-none" />
+                    <ChevronDown className={`w-4 h-4 text-[#757575] absolute left-14 md:left-16 pointer-events-none transition-transform ${isOpenCity ? 'rotate-180' : ''}`} />
                     
                     <button 
                       onClick={handleLocateMe}
@@ -426,19 +464,39 @@ export default function Home({ onNavigate }: Props) {
                     <TrendingUp className="w-6 h-6 text-[#2E7D32] shrink-0" />
                     <div className="flex flex-col text-right mr-4 flex-1">
                       <span className="text-[10px] font-black text-[#2E7D32] uppercase tracking-wider mb-0.5">المسافة</span>
-                      <select 
-                        value={radiusSearch}
-                        onChange={(e) => setRadiusSearch(e.target.value)}
-                        className="bg-transparent border-none outline-none w-full text-lg font-black text-[#1A1A1A] appearance-none cursor-pointer focus:text-[#2E7D32] transition-colors"
-                        style={{ direction: 'rtl' }}
+                      <button 
+                        onClick={() => { setIsOpenRadius(!isOpenRadius); setIsOpenCity(false); }}
+                        className="bg-transparent border-none outline-none w-full text-lg font-black text-[#1A1A1A] text-right flex items-center justify-between"
                       >
-                        <option value="10">10 كلم دايرة بيك</option>
-                        <option value="20">20 كلم دايرة بيك</option>
-                        <option value="50">50 كلم دايرة بيك</option>
-                        <option value="all">كاع المغرب</option>
-                      </select>
+                        <span className="truncate">
+                          {radiusSearch === '10' ? '10 كلم دايرة بيك' : 
+                           radiusSearch === '20' ? '20 كلم دايرة بيك' : 
+                           radiusSearch === '50' ? '50 كلم دايرة بيك' : 'كاع المغرب'}
+                        </span>
+                      </button>
+
+                      {isOpenRadius && (
+                        <div className={`absolute ${openUpwards ? 'bottom-full mb-4' : 'top-full mt-4'} left-0 right-0 bg-white rounded-3xl shadow-2xl border border-outline-variant/10 z-[100] p-4 animate-in ${openUpwards ? 'slide-in-from-bottom-2' : 'slide-in-from-top-2'} duration-200`}>
+                          <div className="grid grid-cols-1 gap-1">
+                            {[
+                              { val: '10', label: '10 كلم دايرة بيك' },
+                              { val: '20', label: '20 كلم دايرة بيك' },
+                              { val: '50', label: '50 كلم دايرة بيك' },
+                              { val: 'all', label: 'كاع المغرب' }
+                            ].map(dist => (
+                              <button 
+                                key={dist.val}
+                                onClick={() => { setRadiusSearch(dist.val); setIsOpenRadius(false); }}
+                                className={`w-full text-right px-4 py-3 rounded-xl text-sm font-bold transition-colors ${radiusSearch === dist.val ? 'bg-[#2E7D32] text-white' : 'hover:bg-[#F9F9F6] text-[#4A4A4A]'}`}
+                              >
+                                {dist.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <ChevronDown className="w-4 h-4 text-[#757575] absolute left-6 pointer-events-none" />
+                    <ChevronDown className={`w-4 h-4 text-[#757575] absolute left-6 pointer-events-none transition-transform ${isOpenRadius ? 'rotate-180' : ''}`} />
                   </div>
 
                   {/* Search Button */}
@@ -486,7 +544,7 @@ export default function Home({ onNavigate }: Props) {
                     <span className="text-sm font-bold">فضاء التضامن</span>
                   </div>
                   <h2 className="text-4xl font-black mb-6 font-headline leading-tight">عيد مبارك للجميع <br /> <span className="text-[#A5D6A7]">تضامن معانا</span></h2>
-                  <p className="text-[#E8F5E9] text-lg mb-10 font-medium">كسابكوم كايفتح الباب للمحسنين لي بغاو يتبرعو بأضحية العيد، وللناس لي فوضعية صعبة وبغاو يستافدو من المبادرة.</p>
+                  <p className="text-[#E8F5E9] text-lg mb-10 font-medium">KESSABCOM كايفتح الباب للمحسنين لي بغاو يتبرعو بأضحية العيد، وللناس لي فوضعية صعبة وبغاو يستافدو من المبادرة.</p>
                   <div className="flex flex-wrap gap-4 justify-end">
                     <button onClick={() => onNavigate('solidarity-request')} className="bg-white text-[#1B5E20] px-8 py-4 rounded-xl font-bold border border-transparent hover:bg-transparent hover:text-white hover:border-white transition-colors shadow-xl">أنا محتاج مساعدة</button>
                     <button onClick={() => onNavigate('solidarity-donate')} className="bg-[#A5D6A7] text-[#1B5E20] px-8 py-4 rounded-xl font-bold border border-transparent hover:bg-transparent hover:text-[#A5D6A7] hover:border-[#A5D6A7] transition-colors shadow-xl">بغيت نتبرع</button>
@@ -713,7 +771,7 @@ export default function Home({ onNavigate }: Props) {
           <div className="max-w-7xl mx-auto px-6">
             <div className="text-center mb-16">
               <span className="text-[#2E7D32] font-bold text-sm tracking-widest uppercase mb-2 block">كيفاش تبيع؟</span>
-              <h2 className="text-3xl md:text-4xl font-black text-[#1A1A1A] font-headline">مراحل البيع فـ كسابكوم</h2>
+              <h2 className="text-3xl md:text-4xl font-black text-[#1A1A1A] font-headline">مراحل البيع فـ KESSABCOM</h2>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-12 relative">
@@ -807,39 +865,44 @@ export default function Home({ onNavigate }: Props) {
         )}
 
         {/* Seller CTA Section */}
-        <section className="max-w-7xl mx-auto px-6 py-20">
-          <div className="relative bg-[#2E7D32] overflow-hidden rounded-3xl p-12 md:p-20 flex flex-col md:flex-row items-center gap-12">
-            <div className="absolute top-0 right-0 w-1/2 h-full bg-white/5 skew-x-12 translate-x-20"></div>
-            <div className="relative z-10 w-full md:w-1/2 text-right">
-              <h2 className="text-4xl font-black text-white mb-6 font-headline leading-tight">عندك كسيبة وبغيتي <br /> تجيب الناس <span className="text-[#A5D6A7]">للضيعة؟</span></h2>
-              <p className="text-[#E8F5E9] text-lg mb-10 max-w-md font-medium">كسابكوم كايسهل على المشتري يلقاك فخريطة المدينة. حط إعلانك وجيب الكليان حتى لدارك.</p>
-              <button onClick={() => onNavigate('auth')} className="bg-white text-[#2E7D32] px-10 py-5 rounded-xl font-black text-lg flex items-center justify-center gap-3 border border-transparent hover:bg-transparent hover:text-white hover:border-white transition-colors shadow-xl w-fit ml-auto">
-                <MapPin className="w-6 h-6" />
+        <section className="max-w-7xl mx-auto px-6 py-12 md:py-20">
+          <div className="relative bg-[#2E7D32] overflow-hidden rounded-[2.5rem] p-8 md:p-20 flex flex-col md:flex-row items-center gap-8 md:gap-16 shadow-2xl">
+            {/* Design Elements */}
+            <div className="absolute top-0 right-0 w-full md:w-1/2 h-1/2 md:h-full bg-white/5 skew-x-0 md:skew-x-12 translate-y-0 md:translate-x-20 pointer-events-none"></div>
+            <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-white/5 rounded-full blur-3xl pointer-events-none"></div>
+
+            <div className="relative z-10 w-full md:w-1/2 text-center md:text-right">
+              <span className="inline-block bg-white/20 backdrop-blur-md px-4 py-2 rounded-full text-xs font-black text-white mb-6 uppercase tracking-widest">مساحة الكساب</span>
+              <h2 className="text-3xl md:text-5xl font-black text-white mb-6 font-headline leading-tight">
+                عندك كسيبة وبغيتي <br /> 
+                <span className="text-[#A5D6A7]">تجيب الناس للضيعة؟</span>
+              </h2>
+              <p className="text-[#E8F5E9] text-base md:text-xl mb-10 max-w-md mx-auto md:mr-0 md:ml-0 font-medium leading-relaxed">
+                KESSABCOM كايسهل على المشتري يلقاك فخريطة المدينة. حط إعلانك وجيب الكليان حتى لدارك.
+              </p>
+              <button 
+                onClick={() => onNavigate('auth')} 
+                className="w-full md:w-auto bg-white text-[#2E7D32] px-10 py-5 rounded-2xl font-black text-lg flex items-center justify-center gap-3 border-2 border-transparent hover:bg-transparent hover:text-white hover:border-white transition-all duration-300 shadow-2xl hover:scale-105 active:scale-95"
+              >
+                <PlusCircle className="w-6 h-6" />
                 <span>زيد الضيعة ديالك دابا</span>
               </button>
             </div>
+
             <div className="relative z-10 w-full md:w-1/2">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-white/10 backdrop-blur-md p-6 rounded-xl border border-white/20 text-right">
-                  <MapPin className="text-white w-8 h-8 mb-3 ml-auto" />
-                  <p className="text-white font-bold">موقع محدد</p>
-                  <p className="text-white/70 text-xs">كايعرفو بلاصتك بالتدقيق</p>
-                </div>
-                <div className="bg-white/10 backdrop-blur-md p-6 rounded-xl border border-white/20 text-right">
-                  <User className="text-white w-8 h-8 mb-3 ml-auto" />
-                  <p className="text-white font-bold">زوار بزاف</p>
-                  <p className="text-white/70 text-xs">كولشي كايقلب حداه</p>
-                </div>
-                <div className="bg-white/10 backdrop-blur-md p-6 rounded-xl border border-white/20 text-right">
-                  <BadgeCheck className="text-white w-8 h-8 mb-3 ml-auto" />
-                  <p className="text-white font-bold">بيع مباشر</p>
-                  <p className="text-white/70 text-xs">بلا وسيط بلا سمسار</p>
-                </div>
-                <div className="bg-white/10 backdrop-blur-md p-6 rounded-xl border border-white/20 text-right">
-                  <ShieldCheck className="text-white w-8 h-8 mb-3 ml-auto" />
-                  <p className="text-white font-bold">ثقة الكليان</p>
-                  <p className="text-white/70 text-xs">كايزورو الضيعة بعينيهم</p>
-                </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {[
+                  { icon: MapPin, title: 'موقع محدد', desc: 'كايعرفو بلاصتك بالتدقيق' },
+                  { icon: User, title: 'كليان حقيقي', desc: 'تواصل مباشر مع الشاري' },
+                  { icon: BadgeCheck, title: 'ثقة ومصداقية', desc: 'حساب كساب موثق' },
+                  { icon: TrendingUp, title: 'بيع أسرع', desc: 'وصل لأكبر عدد من الناس' }
+                ].map((item, idx) => (
+                  <div key={idx} className="bg-white/10 backdrop-blur-md p-6 rounded-2xl border border-white/10 text-right group hover:bg-white/20 transition-colors">
+                    <item.icon className="text-[#A5D6A7] w-8 h-8 mb-4 ml-auto group-hover:scale-110 transition-transform" />
+                    <p className="text-white font-black text-lg mb-1">{item.title}</p>
+                    <p className="text-white/60 text-xs font-bold">{item.desc}</p>
+                  </div>
+                ))}
               </div>
             </div>
           </div>

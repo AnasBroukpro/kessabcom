@@ -162,9 +162,20 @@ function AppContent() {
       // Bug Fix: Auto-redirect logged-in users who land on auth pages
       if (profile?.role && (currentView === 'auth' || currentView === 'admin-auth')) {
         console.log(`🚀 App: Auto-redirecting ${profile.role} to dashboard`);
-        if (profile.role === 'admin') handleNavigate('admin');
-        else if (profile.role === 'seller') handleNavigate('seller');
-        else if (profile.role === 'buyer') handleNavigate('buyer');
+        
+        if (profile.role === 'admin') {
+          handleNavigate('admin');
+        } else if (profile.role === 'seller') {
+          // Pure "Found -> Dashboard" logic, but don't interrupt if already on add-listing
+          if (currentView !== 'add-listing') {
+            console.log("🏠 Seller found in database, sending to dashboard");
+            handleNavigate('seller');
+          } else {
+            console.log("✨ Seller is completing their first listing, staying put");
+          }
+        } else if (profile.role === 'buyer') {
+          handleNavigate('buyer');
+        }
       }
     }
   }, [profile, currentView, authLoading, intendedView, settings.guestBuyerMode]);
@@ -174,9 +185,14 @@ function AppContent() {
   }
 
   const renderView = () => {
-    // BUG FIX: Removed (user && !profile) which was trapping new users on a permanent loading screen
-    if (authLoading || !isAppReady) {
+    // Only show global loading for initial App Readiness (essential settings)
+    if (!isAppReady) {
       return <LoadingScreen />;
+    }
+
+    // Set first-time loading flag once auth is determined
+    if (!authLoading && !sessionStorage.getItem('hasSeenLoading')) {
+      sessionStorage.setItem('hasSeenLoading', 'true');
     }
 
     if (settings.maintenanceMode && profile?.role !== 'admin' && currentView !== 'admin-auth') {
@@ -186,27 +202,32 @@ function AppContent() {
     return (
       <Suspense fallback={<LoadingScreen />}>
         <Routes>
-          <Route path="/" element={<Home onNavigate={handleNavigate} />} />
+          <Route path="/" element={
+          (authLoading && !sessionStorage.getItem('hasSeenLoading')) ? <LoadingScreen /> : <Home onNavigate={handleNavigate} />
+        } />
           <Route path="/login" element={<Auth onNavigate={handleNavigate} intendedView={intendedView} />} />
           <Route path="/panelaccess" element={<AdminAuth onNavigate={handleNavigate} />} />
           
           {/* Protected Routes */}
           <Route path="/buyer" element={
+            authLoading ? <LoadingScreen /> :
             profile?.role === 'buyer' || profile?.role === 'admin' ? (
               <BuyerDashboard onNavigate={handleNavigate} activeSubView={new URLSearchParams(location.search).get('sub') || undefined} />
-            ) : <Navigate to="/login" />
+            ) : user ? <LoadingScreen /> : <Navigate to="/login" />
           } />
           
           <Route path="/seller" element={
+            authLoading ? <LoadingScreen /> :
             profile?.role === 'seller' || profile?.role === 'admin' ? (
               <SellerDashboard onNavigate={handleNavigate} activeSubView={new URLSearchParams(location.search).get('sub') || undefined} />
-            ) : <Navigate to="/login" />
+            ) : user ? <LoadingScreen /> : <Navigate to="/login" />
           } />
           
           <Route path="/add-listing" element={
+            authLoading ? <LoadingScreen /> :
             profile?.role === 'seller' || profile?.role === 'admin' ? (
               <AddListing onNavigate={handleNavigate} listingId={new URLSearchParams(location.search).get('id') || undefined} />
-            ) : <Navigate to="/login" />
+            ) : user ? <LoadingScreen /> : <Navigate to="/login" />
           } />
           
           <Route path="/admin" element={

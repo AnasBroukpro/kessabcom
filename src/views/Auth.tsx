@@ -1,812 +1,625 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ViewType } from '../App';
-import { MapPin, User, BadgeCheck, ShieldCheck, ArrowLeft, Lock, Eye, UserPlus, Globe, Phone, MessageCircle, Loader2 } from 'lucide-react';
-import { auth } from '../lib/firebase';
-import { ConfirmationResult, RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
+import { MapPin, Loader2, Eye, EyeOff, CheckCircle2, ArrowRight } from 'lucide-react';
+import { auth, db } from '../lib/firebase';
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword
+} from 'firebase/auth';
+import {
+  collection, query, where, limit, getDocs, doc, setDoc, serverTimestamp
+} from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import { firestoreService } from '../services/firestoreService';
+import { cityCoords } from '../constants/cityMapping';
+
+// Import marketing images
+import img1 from '../assets/marketing/branding/sheep_1.webp';
+import img2 from '../assets/marketing/branding/aid_al_adha.webp';
+import img3 from '../assets/marketing/branding/arton.webp';
+import img4 from '../assets/marketing/branding/sheep_2.jpg';
+import img5 from '../assets/marketing/branding/images_1.jfif';
+import img6 from '../assets/marketing/branding/images_2.jfif';
+
+const marketingImages = [img1, img2, img3, img4, img5, img6];
 
 interface Props {
   onNavigate: (view: ViewType, listingId?: string, city?: string, radius?: string, subView?: string) => void;
-  intendedView?: {view: ViewType, listingId?: string} | null;
+  intendedView?: { view: ViewType; listingId?: string } | null;
 }
 
 export default function Auth({ onNavigate, intendedView }: Props) {
-  const { user, profile, refreshProfile } = useAuth();
-  const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
-  const [mode, setMode] = useState<'register' | 'login'>('login');
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [verificationCode, setVerificationCode] = useState('');
-  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
+  const { refreshProfile, updateProfileState } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [step, setStep] = useState<'phone' | 'confirm-register' | 'role' | 'otp' | 'details'>('phone');
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  const [phoneChecked, setPhoneChecked] = useState(false);
+  const [isNewUser, setIsNewUser] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<{ phone?: string; password?: string; general?: string }>({});
+  const [showSupportSuccess, setShowSupportSuccess] = useState(false);
+
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(true);
+  const [fullName, setFullName] = useState('');
+  const [city, setCity] = useState('');
   const [selectedRole, setSelectedRole] = useState<'buyer' | 'seller' | null>(null);
-  const [registrationData, setRegistrationData] = useState({
-    fullName: '',
-    city: '',
-    termsAccepted: false
-  });
-
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
-
-  useEffect(() => {
-    if (step === 'details') {
-      if ('geolocation' in navigator) {
-        setIsDetectingLocation(true);
-        navigator.geolocation.getCurrentPosition(async (position) => {
-          try {
-            const { latitude, longitude } = position.coords;
-            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&accept-language=ar`);
-            const data = await res.json();
-            const city = data.address?.city || data.address?.town || data.address?.state || '';
-            if (city) {
-              setRegistrationData(prev => {
-                if (prev.city) return prev;
-                return { ...prev, city: city };
-              });
-            }
-          } catch (error) {
-            console.error("Error detecting city:", error);
-          } finally {
-            setIsDetectingLocation(false);
-          }
-        }, (error) => {
-          console.error("Geolocation error:", error);
-          setIsDetectingLocation(false);
-        });
-      }
-    }
-  }, [step]);
-
-  useEffect(() => {
-    return () => {
-      if (recaptchaVerifierRef.current) {
-        try {
-          recaptchaVerifierRef.current.clear();
-        } catch (e) {
-          console.error('Error clearing recaptcha:', e);
-        }
-        recaptchaVerifierRef.current = null;
-      }
-    };
-  }, []);
-
-  const initRecaptcha = () => {
-    // Destroy previous instance
-    if (recaptchaVerifierRef.current) {
-      try {
-        recaptchaVerifierRef.current.clear();
-      } catch (e) {
-        console.log('recaptcha clear error:', e);
-      }
-      recaptchaVerifierRef.current = null;
-    }
-    // Clear the DOM element
-    const container = document.getElementById('recaptcha-container');
-    if (container) container.innerHTML = '';
-    
-    // Create fresh instance
-    try {
-      const verifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-        size: 'invisible',
-        callback: () => {
-          console.log('🛡️ reCAPTCHA verified successfully');
-        },
-        'expired-callback': () => {
-          console.log('🛡️ reCAPTCHA expired');
-          if (recaptchaVerifierRef.current) {
-            recaptchaVerifierRef.current.clear();
-          }
-          recaptchaVerifierRef.current = null;
-        }
-      });
-      recaptchaVerifierRef.current = verifier;
-      return verifier;
-    } catch (err) {
-      console.error('reCAPTCHA initialization error:', err);
-      setError('حدث خطأ في نظام الحماية. يرجى تحديث الصفحة والمحاولة مرة أخرى.');
-      return null;
-    }
-  };
-
   
-  const onSignInSubmit = async (e?: React.FormEvent, phoneToUse?: string) => {
-    if (e) e.preventDefault();
-    const phone = phoneToUse || phoneNumber;
-    if (!phone) return false;
+  // 10-digit phone input logic
+  const [phoneDigits, setPhoneDigits] = useState(['0', '', '', '', '', '', '', '', '', '']);
+  const digitRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-    setError(null);
-    setLoading(true);
+  useEffect(() => {
+    const fullPhone = phoneDigits.join('');
+    setPhoneNumber(fullPhone);
+  }, [phoneDigits]);
 
-    // Reset registration data if we are coming from a plain sign-in (not a pre-filled registration)
-    if (!registrationData.fullName) {
-      console.log('Auth: Resetting registration data, no default role set');
-      setRegistrationData({ fullName: '', city: registrationData.city || '', termsAccepted: false });
-      setSelectedRole(null); // Don't default to buyer
-    }
-
-    try {
-      const appVerifier = initRecaptcha();
-      if (!appVerifier) {
-        throw new Error('مشكل فإعداد نظام الحماية (reCAPTCHA). جرب تعاود تحميل الصفحة.');
-      }
-      
-      // Explicitly render the verifier
-      await appVerifier.render();
-      
-      // Small delay to ensure reCAPTCHA is fully ready
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Robust phone number formatting (Fix #7: Unified formatting)
-      let cleanPhone = phone.replace(/\D/g, ''); 
-      if (cleanPhone.startsWith('212')) cleanPhone = cleanPhone.substring(3);
-      if (cleanPhone.startsWith('0')) cleanPhone = cleanPhone.substring(1);
-      
-      // Validation: Must be 9 digits after country code (e.g., 612345678)
-      if (!/^[67]\d{8}$/.test(cleanPhone)) {
-        throw new Error('رقم الهاتف غير صحيح. خاصو يكون فيه 10 دالأرقام ويبدا بـ 06 ولا 07');
-      }
-      
-      const formattedPhone = `+212${cleanPhone}`;
-
-      const confirmation = await signInWithPhoneNumber(auth, formattedPhone, appVerifier);
-      setConfirmationResult(confirmation);
-      setStep('otp');
-      return true;
-    } catch (err: any) {
-      console.error('Phone Sign-In Detailed Error:', err);
-      
-      // Handle specific error codes
-      if (err.message?.includes('auth/error-code:-39')) {
-        setError('رقم الهاتف غير مدعوم أو محظور. يرجى استخدام رقم آخر أو التواصل مع الدعم.');
-      } else if (err.code === 'auth/internal-error') {
-        setError('خطأ داخلي في Firebase. تأكد من إعدادات "Authorized Domains" و "SMS Region Policy" في واجهة مشغل البرمجيات.');
-      } else if (err.message?.includes('503')) {
-        setError('خدمة الرسائل القصيرة غير متاحة مؤقتاً. يرجى المحاولة لاحقاً.');
-      } else if (err.code === 'auth/captcha-check-failed' || err.code === 'auth/invalid-app-credential') {
-        setError('فشل التحقق من الحماية (reCAPTCHA). يرجى المحاولة مرة أخرى أو تحديث الصفحة. تأكد من أنك لست روبوت.');
-      } else if (err.code === 'auth/operation-not-allowed') {
-        if (err.message?.includes('SMS unable to be sent until this region enabled')) {
-          setError('يجب تفعيل منطقة المغرب (+212) في إعدادات SMS في Firebase Console. اذهب إلى Authentication > Settings > SMS Region Policy.');
-        } else {
-          setError('خدمة الهاتف غير مفعلة في إعدادات Firebase. يرجى تفعيلها من لوحة التحكم.');
-        }
-      } else if (err.code === 'auth/billing-not-enabled') {
-        setError('يجب تفعيل الدفع (Billing) في Firebase لاستخدام خدمة الرسائل النصية. اذهب إلى Firebase Console وقم بترقية المشروع إلى خطة Blaze.');
-      } else if (err.code === 'auth/invalid-phone-number') {
-        setError('رقم الهاتف غير صحيح. تأكد من الرقم وعاود.');
-      } else if (err.code === 'auth/too-many-requests') {
-        setError('بزاف ديال المحاولات. جرب من بعد شوية، أو استعمل رقم تجريبي (Test Number) فلوحة تحكم Firebase.');
-      } else {
-        setError(err.message || 'وقع مشكل فإرسال الكود. تأكد من الرقم وعاود.');
-      }
-      
-      // Clear recaptcha on error to allow retry
-      if (recaptchaVerifierRef.current) {
-        try {
-          recaptchaVerifierRef.current.clear();
-        } catch (e) {
-          console.error('Error clearing recaptcha:', e);
-        }
-        recaptchaVerifierRef.current = null;
-      }
-      return false;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const onPhoneSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!phoneNumber) return;
+  const handleDigitChange = (index: number, value: string) => {
+    if (index === 0) return; // '0' is fixed
+    if (!/^\d*$/.test(value)) return;
     
-    setLoading(true);
-    setError(null);
-    
-    // Reset registration data if starting from specific login mode
-    if (mode === 'login') {
-      console.log('Auth: Resetting registration data for login mode');
-      setRegistrationData({ fullName: '', city: '', termsAccepted: false });
-      // No default role, user will be prompted if new
-    }
-    try {
-      // Format phone number to match storage format (e.g., +2126...)
-      let cleanPhone = phoneNumber.replace(/\D/g, '');
-      if (cleanPhone.startsWith('212')) {
-        cleanPhone = cleanPhone.substring(3);
-      } else if (cleanPhone.startsWith('0')) {
-        cleanPhone = cleanPhone.substring(1);
-      }
-      const formattedPhone = `+212${cleanPhone}`;
-      const isTestKessab = formattedPhone === '+212600880088';
-      const isTestAcheteur = formattedPhone === '+212700770077';
+    const newDigits = [...phoneDigits];
+    newDigits[index] = value.slice(-1);
+    setPhoneDigits(newDigits);
 
-      // Check if phone exists via API
-      const { exists } = await firestoreService.checkPhoneExists(formattedPhone);
-
-      // Always proceed to OTP. Pass the formatted phone to ensure consistent behavior.
-      console.log('Auth: Proceeding to OTP for phone:', formattedPhone);
-      await onSignInSubmit(undefined, formattedPhone);
-    } catch (err) {
-      console.error('onPhoneSubmit Error:', err);
-      setError('وقع مشكل فالتأكد من الحساب. عاود جرب.');
-    } finally {
-      setLoading(false);
+    // Auto-focus next
+    if (value && index < 9) {
+      digitRefs.current[index + 1]?.focus();
     }
   };
 
-  const onRoleSelect = (role: 'buyer' | 'seller') => {
-    setSelectedRole(role);
-    setStep('details');
-  };
-
-  const onRegisterSubmit = async (role: 'buyer' | 'seller', data: any) => {
-    setLoading(true);
-    setError(null);
-    try {
-      let cleanPhone = data.phone.replace(/\D/g, '');
-      if (cleanPhone.startsWith('212')) cleanPhone = cleanPhone.substring(3);
-      if (cleanPhone.startsWith('0')) cleanPhone = cleanPhone.substring(1);
-      const formattedPhone = `+212${cleanPhone}`;
-
-      // Check if phone exists (Fix #11: Prevent duplicate accounts)
-      const { exists } = await firestoreService.checkPhoneExists(formattedPhone);
-      if (exists) {
-        setError('هاد الرقم مسجل ديجا. دخل نيشان بحسابك.');
-        setMode('login');
-        setStep('phone');
-        setLoading(false);
-        return;
-      }
-
-      setSelectedRole(role);
-      setRegistrationData({
-        fullName: data.fullName,
-        city: data.city,
-        termsAccepted: true
-      });
-      setPhoneNumber(data.phone);
-      await onSignInSubmit(undefined, data.phone);
-    } catch (err) {
-      console.error('Registration check error:', err);
-      setError('مشكل فالتسجيل. عاود جرب.');
-    } finally {
-      setLoading(false);
+  const handleDigitKeyDown = (index: number, e: React.KeyboardEvent) => {
+    if (e.key === 'Backspace' && !phoneDigits[index] && index > 1) {
+      digitRefs.current[index - 1]?.focus();
     }
   };
 
-  const onVerifyCodeSubmit = async (e: React.FormEvent) => {
+  const handlePaste = (e: React.ClipboardEvent) => {
     e.preventDefault();
-    if (!confirmationResult) return;
-    setError(null);
-    setLoading(true);
-
-    try {
-      const result = await confirmationResult.confirm(verificationCode);
-      const user = result.user;
-
-      const profileData = await firestoreService.getUserProfile(user.uid);
-      console.log('User Profile Data:', profileData);
-      const isTestKessab = user.phoneNumber === '+212600880088';
-      const isTestAcheteur = user.phoneNumber === '+212700770077';
-
-      // Check if profile exists AND has both fullName and role
-      if (profileData && profileData.fullName && profileData.role) {
-        let role = profileData.role;
-        console.log('Existing user detected. Role:', role);
-        let needsUpdate = false;
-
-        if (isTestKessab && role !== 'seller') {
-          role = 'seller';
-          needsUpdate = true;
-        } else if (isTestAcheteur && role !== 'buyer') {
-          role = 'buyer';
-          needsUpdate = true;
-        }
-
-        if (needsUpdate) {
-          console.log('Test account role mismatch. Updating...');
-          await firestoreService.updateProfile({ role });
-        }
-
-        // Sync local profile state to the global context before navigating
-        // to prevent App.tsx from redirecting the user back to LOGIN 
-        // due to a "lagging" profile state.
-        await refreshProfile();
-
-        if (intendedView) {
-          console.log('Redirecting to intended view:', intendedView);
-          onNavigate(intendedView.view, intendedView.listingId);
-        } else if (role === 'seller') {
-          onNavigate('seller');
-        } else if (role === 'admin') {
-          onNavigate('admin');
-        } else if (role === 'buyer') {
-          onNavigate('buyer');
-        } else {
-          console.log('Role found but not recognized or empty. Prompting for role selection.');
-          setStep('role');
-        }
-      } else {
-        // No profile or missing data
-        console.log('New or incomplete user. Registration data:', registrationData);
-        if (registrationData.fullName && registrationData.city) {
-          console.log('Data found in registration state, submitting details...');
-          await onDetailsSubmit();
-        } else if (isTestKessab || isTestAcheteur) {
-          console.log('Test account detected, going to details step');
-          setStep('details');
-        } else {
-          // New user detected after OTP. Prompting for confirmation.
-          console.log('New user detected after OTP. Prompting for confirmation.');
-          setStep('confirm-register');
-        }
+    const pastedData = e.clipboardData.getData('text').replace(/\D/g, '');
+    if (pastedData) {
+      const newDigits = [...phoneDigits];
+      // Skip the first '0' if the pasted data already starts with 0 or just fill from index 1
+      const startIdx = pastedData.startsWith('0') ? 0 : 1;
+      const dataToFill = pastedData.startsWith('0') ? pastedData : pastedData;
+      
+      let dataIdx = 0;
+      for (let i = startIdx; i < 10 && dataIdx < dataToFill.length; i++) {
+        newDigits[i] = dataToFill[dataIdx];
+        dataIdx++;
       }
-    } catch (err: any) {
-      console.error('Verify Code Error:', err);
-      if (err.message && (err.message.includes('Quota') || err.message.includes('quota'))) {
-        setError('تم استهلاك حصة قاعدة البيانات لهذا اليوم. يرجى المحاولة غداً.');
-      } else if (err.code === 'auth/invalid-verification-code') {
-        setError('الكود لي دخلتي ماشي صحيح. عاود جرب.');
-      } else {
-        setError(err.message || 'وقع مشكل في التحقق. عاود جرب.');
-      }
-    } finally {
-      setLoading(false);
+      setPhoneDigits(newDigits);
     }
   };
 
-  const onDetailsSubmit = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!registrationData.fullName || !registrationData.city) {
-      console.error('onDetailsSubmit: Missing name or city', registrationData);
+  const getInternalEmail = (phone: string) => {
+    let clean = phone.replace(/\D/g, '');
+    if (clean.startsWith('212')) clean = clean.substring(3);
+    if (clean.startsWith('0')) clean = clean.substring(1);
+    return `${clean}@kessabcom.ma`;
+  };
+
+  const getFormattedPhone = (phone: string) => {
+    let clean = phone.replace(/\D/g, '');
+    if (clean.startsWith('212')) clean = clean.substring(3);
+    if (clean.startsWith('0')) clean = clean.substring(1);
+    return `+212${clean}`;
+  };
+
+  // ─── STEP 1: Login or detect new user ───────────────────────────────────────
+  const handleInitialSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFieldErrors({});
+    
+    // 1. Validate Moroccan Format
+    const fullPhone = phoneDigits.join('');
+    const moroccanRegex = /^0(5|6|7)\d{8}$/;
+    
+    if (!fullPhone || fullPhone.length < 10) {
+      setFieldErrors({ phone: 'يرجى إدخال رقم الهاتف كاملاً' });
       return;
     }
     
+    if (!moroccanRegex.test(fullPhone)) {
+      setFieldErrors({ phone: 'رقم الهاتف غير صحيح. يجب أن يبدأ بـ 05 أو 06 أو 07' });
+      return;
+    }
+
+    if (!password) {
+      setFieldErrors({ password: 'يرجى إدخال كلمة المرور' });
+      return;
+    }
+
     setLoading(true);
+    setError(null);
+
     try {
-      const fbUser = auth.currentUser;
-      if (!fbUser) throw new Error('User not found');
-
-      // Format phone number
-      let cleanPhone = (phoneNumber || fbUser.phoneNumber || '').replace(/\D/g, '');
-      if (cleanPhone.startsWith('212')) {
-        cleanPhone = cleanPhone.substring(3);
-      } else if (cleanPhone.startsWith('0')) {
-        cleanPhone = cleanPhone.substring(1);
-      }
-      const formattedPhone = `+212${cleanPhone}`;
-
-      const isTestKessab = formattedPhone === '+212600880088';
-      const isTestAcheteur = formattedPhone === '+212700770077';
-      const finalRole = isTestKessab ? 'seller' : (isTestAcheteur ? 'buyer' : selectedRole);
-
-      console.log(`onDetailsSubmit: Syncing user ${fbUser.uid} with role ${finalRole}`);
-
-      await firestoreService.syncUser(
-        fbUser.uid,
-        fbUser.email || '',
-        registrationData.fullName,
-        finalRole,
-        formattedPhone
+      // Try to sign in directly — avoids depending on check-phone endpoint entirely
+      const result = await signInWithEmailAndPassword(
+        auth,
+        getInternalEmail(phoneNumber),
+        password
       );
 
-      // Force profile update in context before navigating
+      // Force-refresh token then fetch profile
+      await result.user.getIdToken(true);
       await refreshProfile();
+      const profileData = await firestoreService.getUserProfile(result.user.uid);
 
-      if (intendedView) {
-        console.log('onDetailsSubmit: Navigating to intended view', intendedView);
-        onNavigate(intendedView.view, intendedView.listingId);
-      } else if (finalRole === 'admin') {
-        onNavigate('admin');
-      } else if (finalRole === 'seller' || selectedRole === 'seller') {
-        console.log('onDetailsSubmit: Navigating to seller dashboard');
-        onNavigate('seller');
+      if (profileData?.role) {
+        let targetView = profileData.role as ViewType;
+        if (profileData.role === 'seller') {
+          const hasListings = await firestoreService.hasUserListings(result.user.uid);
+          targetView = hasListings ? 'seller' : 'add-listing';
+        }
+        onNavigate(intendedView ? intendedView.view : targetView, intendedView?.listingId);
+        return;
       } else {
-        console.log('onDetailsSubmit: Navigating to buyer dashboard');
-        onNavigate('buyer');
+        // Auth exists but no Firestore profile → let them complete registration
+        setIsNewUser(true);
+        setPhoneChecked(true);
       }
-    } catch (err) {
-      console.error('onDetailsSubmit error:', err);
-      setError('وقع مشكل فإتمام التسجيل. عاود جرب.');
+    } catch (loginErr: any) {
+      const code: string = loginErr?.code || '';
+
+      if (code === 'auth/wrong-password') {
+        setFieldErrors({ password: 'كلمة المرور غير صحيحة.' });
+      } else if (code === 'auth/invalid-credential') {
+        // Firebase v10+ returns 'invalid-credential' for BOTH wrong password AND user not found.
+        // We must check Firestore to distinguish.
+        try {
+          const { exists } = await firestoreService.checkPhoneExists(getFormattedPhone(phoneNumber));
+          if (exists) {
+            setFieldErrors({ password: 'كلمة المرور غير صحيحة.' });
+          } else {
+            setIsNewUser(true);
+            setPhoneChecked(true);
+          }
+        } catch {
+          // Fallback to registration if API fails
+          setIsNewUser(true);
+          setPhoneChecked(true);
+        }
+      } else if (code === 'auth/user-not-found' || code === 'auth/invalid-email') {
+        // Account doesn't exist in Auth → new user
+        setIsNewUser(true);
+        setPhoneChecked(true);
+      } else if (code === 'auth/too-many-requests') {
+        setError('تم حظر الحساب مؤقتاً بسبب كثرة المحاولات. حاول لاحقاً.');
+      } else {
+        // Fallback: check phone in Firestore
+        try {
+          const { exists } = await firestoreService.checkPhoneExists(getFormattedPhone(phoneNumber));
+          if (!exists) {
+            setIsNewUser(true);
+            setPhoneChecked(true);
+          } else {
+            setError('وقع خطأ أثناء تسجيل الدخول. حاول مرة أخرى.');
+          }
+        } catch {
+          setError('وقع خطأ. حاول مرة أخرى.');
+        }
+      }
     } finally {
       setLoading(false);
     }
   };
 
+  // ─── STEP 2: Register new user ───────────────────────────────────────────────
+  const handleRegister = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setFieldErrors({});
+    
+    if (!selectedRole) { 
+      setFieldErrors({ general: 'يرجى اختيار نوع الحساب (كساب أو مشتري)' }); 
+      return; 
+    }
+    if (!fullName.trim()) { setFieldErrors({ general: 'يرجى إدخال اسمك الكامل' }); return; }
+    if (!city) { setFieldErrors({ general: 'يرجى اختيار مدينتك' }); return; }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const email = getInternalEmail(phoneNumber);
+      const formattedPhone = getFormattedPhone(phoneNumber);
+      console.log('📝 Registering:', email, '| role:', selectedRole);
+
+      // 1. Create Firebase Auth user
+      const result = await createUserWithEmailAndPassword(auth, email, password);
+      const { uid } = result.user;
+
+      // 2. Force-refresh token so subsequent API calls have a valid Bearer token
+      const token = await result.user.getIdToken(true);
+      console.log('✅ Auth user created:', uid);
+
+      // 3. Write Firestore profile directly from the client (fail-safe)
+      //    This guarantees data exists even if the server-side API call fails.
+      const profileData = {
+        uid,
+        email,
+        fullName: fullName.trim(),
+        displayName: fullName.trim(),
+        phoneNumber: formattedPhone,
+        role: selectedRole,
+        city,
+        location: city,
+        status: 'active',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      await setDoc(doc(db, 'users', uid), profileData, { merge: true });
+      console.log('✅ Firestore profile written (client-side)');
+
+      // 4. Best-effort server sync — does NOT block navigation on failure
+      fetch('/api/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          uid,
+          email,
+          fullName: fullName.trim(),
+          role: selectedRole,
+          phone: formattedPhone,
+          city,
+        }),
+      }).catch((err) =>
+        console.warn('⚠️ Server sync failed (profile already in Firestore):', err)
+      );
+
+      // Final step: Navigation logic based on role and listings
+      if (selectedRole === 'seller') {
+        console.log('✨ New Seller registered, sending to add-listing for their first time');
+        onNavigate('add-listing');
+      } else {
+        console.log('✨ New Buyer registered, sending to buyer dashboard');
+        onNavigate('buyer');
+      }
+      updateProfileState(profileData as any);
+    } catch (err: any) {
+      console.error('❌ Register error:', err.code, err.message);
+      if (err.code === 'auth/operation-not-allowed') {
+        setError('خدمة التسجيل غير مفعلة. يرجى التواصل مع المسؤول.');
+      } else if (err.code === 'auth/email-already-in-use') {
+        setError('هذا الرقم مسجل بالفعل. حاول تسجيل الدخول بكلمة المرور الصحيحة.');
+        setIsNewUser(false);
+        setPhoneChecked(false);
+      } else if (err.code === 'auth/weak-password') {
+        setError('كلمة المرور ضعيفة. يجب أن تكون 6 أحرف على الأقل.');
+      } else {
+        setError(`وقع خطأ أثناء إنشاء الحساب. (${err.code || 'unknown'})`);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ─── Forgot password ─────────────────────────────────────────────────────────
+  const handleForgotPassword = async () => {
+    if (!phoneNumber) { setError('أدخل رقم هاتفك أولاً'); return; }
+    setLoading(true);
+    try {
+      let userName = 'غير معروف';
+      try {
+        const formatted = getFormattedPhone(phoneNumber);
+        const q = query(collection(db, 'users'), where('phoneNumber', '==', formatted), limit(1));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          const data = snap.docs[0].data();
+          userName = data.fullName || data.displayName || 'غير معروف';
+        }
+      } catch { /* ignore */ }
+
+      await firestoreService.createSupportRequest('password_reset', {
+        phone: getFormattedPhone(phoneNumber),
+        name: userName,
+      });
+      setShowSupportSuccess(true);
+      setFieldErrors({});
+    } catch {
+      setError('وقع خطأ في إرسال الطلب.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Detect location for new users
+  useEffect(() => {
+    if (isNewUser && phoneChecked && 'geolocation' in navigator) {
+      setIsDetectingLocation(true);
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          try {
+            const { latitude, longitude } = position.coords;
+            const res = await fetch(
+              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&accept-language=ar`
+            );
+            const data = await res.json();
+            const detectedCity =
+              data.address?.city || data.address?.town || data.address?.state || '';
+            if (detectedCity) setCity(detectedCity);
+          } catch { /* ignore */ } finally {
+            setIsDetectingLocation(false);
+          }
+        },
+        () => setIsDetectingLocation(false)
+      );
+    }
+  }, [isNewUser, phoneChecked]);
+
   return (
-    <div className="min-h-screen flex flex-col" dir="rtl">
-      {/* reCAPTCHA invisible container.
-         Ajusté pour être "visible" pour le navigateur mais invisible pour l'œil (Bug #27 fix) */}
-      <div 
-        id="recaptcha-container" 
-        className="grecaptcha-container"
-        style={{ 
-          position: 'fixed', 
-          bottom: '20px', 
-          right: '20px', 
-          opacity: 0.01, 
-          pointerEvents: 'none',
-          zIndex: -1 
-        }} 
-      />
-      
-      {mode === 'login' ? (
-        <div className="min-h-screen flex flex-col md:flex-row overflow-hidden">
-          {/* Left Side: Login Form */}
-          <div className="w-full md:w-[40%] min-h-screen relative flex items-center justify-center p-8 lg:p-12 overflow-hidden bg-gradient-to-br from-[#E8F5E9] via-[#C8E6C9] to-[#A5D6A7]">
-            {/* Decorative blurred circles */}
-            <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[40%] rounded-full bg-primary/20 blur-[80px]"></div>
-            <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[40%] rounded-full bg-secondary/20 blur-[80px]"></div>
-            
-            <div className="w-full max-w-md z-10">
-              <div className="mb-10 text-right">
-                <button 
-                  onClick={() => onNavigate('home')} 
-                  className="text-3xl font-black text-[#1B5E20] tracking-tight font-headline mb-6 block border border-transparent hover:border-[#1B5E20] px-2 py-1 rounded-lg transition-colors"
-                >
-                  Kessabcom
-                </button>
-                <h1 className="text-4xl font-black text-[#1B5E20] font-headline leading-tight mb-2">
-                  {step === 'phone' ? 'تسجيل الدخول' : 'تأكيد الحساب'}
-                </h1>
-                <p className="text-[#2E7D32] text-lg font-medium">
-                  {step === 'phone' ? 'على سلامتك، توحشناك في السوق' : 'دخل الكود لي وصلك فالميساج'}
-                </p>
-              </div>
+    <div className="h-screen w-full flex bg-white font-sans overflow-hidden" dir="rtl">
+      {/* BACK TO HOME BUTTON */}
+      <button 
+        onClick={() => onNavigate('home')}
+        className="fixed top-6 right-6 z-50 flex items-center gap-2 bg-white/80 backdrop-blur border border-outline-variant/20 px-6 py-3 rounded-full text-base font-black shadow-xl hover:bg-white transition-all transform hover:scale-105 active:scale-95 group"
+      >
+        <ArrowRight className="w-5 h-5 text-primary group-hover:translate-x-1 transition-transform" />
+        <span>الرئيسية</span>
+      </button>
 
-              {error && (
-                <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm font-bold">
-                  {error}
-                </div>
-              )}
+      {/* LEFT: AUTH FORM */}
+      <div className="flex-[1.2] lg:flex-1 flex flex-col justify-center items-center p-8 lg:p-12 relative">
+        <div className="w-full max-w-[360px] animate-in fade-in slide-in-from-bottom-4 duration-700">
 
-              {step === 'phone' && (
-                <form className="space-y-8" onSubmit={onPhoneSubmit}>
-                  <div className="space-y-2">
-                    <div className="relative flex items-center">
-                      <span className="absolute left-4 font-bold text-[#1B5E20] border-r border-[#1B5E20]/20 pr-3">+212</span>
-                      <input 
-                        className="w-full h-16 pl-20 pr-4 bg-white/40 backdrop-blur-md border border-white/50 rounded-2xl text-[#1B5E20] font-bold focus:ring-2 focus:ring-[#2E7D32] focus:bg-white/60 transition-all text-left" 
-                        dir="ltr" 
-                        placeholder="6 00 00 00 00" 
-                        required 
-                        type="tel"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        autoComplete="tel-national"
-                        value={phoneNumber}
-                        onChange={(e) => setPhoneNumber(e.target.value)}
-                      />
-                    </div>
-                  </div>
+          <div className="text-center mb-10">
+            <div className="w-40 h-40 mx-auto mb-6 flex items-center justify-center">
+              <img 
+                src="https://i.ibb.co/Psdn5FfW/logo-removebg-preview.png" 
+                alt="KESSABCOM" 
+                className="w-full h-auto"
+              />
+            </div>
+            <h1 className="text-4xl font-black text-on-surface mb-2 font-headline">تسجيل الدخول</h1>
+            <p className="text-on-surface-variant text-base font-medium">
+              على سلامتك، توحشناك في السوق
+            </p>
+          </div>
 
-                  <button 
-                    type="submit" 
-                    className="w-full h-16 bg-[#1B5E20] text-white font-black text-xl rounded-2xl shadow-xl shadow-[#1B5E20]/30 border border-transparent hover:bg-transparent hover:text-[#1B5E20] hover:border-[#1B5E20] transition-colors flex items-center justify-center gap-4 group"
-                  >
-                    دخول
-                    <ArrowLeft className="w-6 h-6 group-hover:-translate-x-1 transition-transform" />
-                  </button>
-                </form>
-              )}
+          {error && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-100 text-red-600 rounded-xl text-xs font-bold text-center">
+              {error}
+            </div>
+          )}
+          {successMsg && (
+            <div className="mb-6 p-4 bg-green-50 border border-green-100 text-green-700 rounded-xl text-xs font-bold text-center flex items-center justify-center gap-2">
+              <CheckCircle2 size={16} /> {successMsg}
+            </div>
+          )}
 
-              {step === 'confirm-register' && (
-                <div className="space-y-6">
-                  <div className="text-right">
-                    <p className="text-[#1B5E20] text-lg font-bold mb-6">
-                      هاد الرقم ما مسجلش عندنا. واش بغيتي تفتح حساب جديد؟
-                    </p>
-                  </div>
-                  <div className="space-y-4">
-                    <button 
-                      onClick={(e) => {
-                        e.preventDefault();
-                        console.log('Auth: User confirmed new account, going to role selection');
-                        setStep('role');
-                      }} 
-                      className="w-full h-16 bg-[#1B5E20] text-white font-black text-xl rounded-2xl shadow-xl shadow-[#1B5E20]/30 border border-transparent hover:bg-transparent hover:text-[#1B5E20] hover:border-[#1B5E20] transition-colors flex items-center justify-center gap-4 group"
-                    >
-                      نعم، بغيت نسجل
-                    </button>
-                    <button 
-                      onClick={() => setStep('phone')} 
-                      className="w-full h-16 bg-white/40 backdrop-blur-md border border-white/50 rounded-2xl text-[#1B5E20] font-bold text-xl hover:bg-transparent hover:text-[#1B5E20] hover:border-[#1B5E20] transition-colors"
-                    >
-                      لا، نرجع نتأكد من الرقم
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {step === 'role' && (
-                <div className="space-y-4">
-                  <button onClick={() => onRoleSelect('buyer')} className="w-full p-6 bg-white rounded-2xl border-2 border-[#1B5E20] text-[#1B5E20] font-bold text-xl transition-colors hover:bg-[#1B5E20] hover:text-white">أنا مشتري</button>
-                  <button onClick={() => onRoleSelect('seller')} className="w-full p-6 bg-white rounded-2xl border-2 border-[#1B5E20] text-[#1B5E20] font-bold text-xl transition-colors hover:bg-[#1B5E20] hover:text-white">أنا كساب</button>
-                </div>
-              )}
-
-              {step === 'otp' && (
-                <form className="space-y-8" onSubmit={onVerifyCodeSubmit}>
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <label className="block text-sm font-bold text-[#1B5E20] mr-1">كود التأكيد</label>
-                      <button 
-                        type="button" 
-                        onClick={() => setStep('phone')} 
-                        className="text-sm text-primary font-bold hover:underline"
-                      >
-                        تغيير الرقم؟
-                      </button>
-                    </div>
-                    <input 
-                      className="w-full h-16 px-4 bg-white/40 backdrop-blur-md border border-white/50 rounded-2xl text-[#1B5E20] font-bold text-center text-2xl tracking-[1em] focus:ring-2 focus:ring-[#2E7D32] focus:bg-white/60 transition-all" 
-                      placeholder="000000" 
-                      required 
-                      maxLength={6}
+          <form
+            onSubmit={
+              phoneChecked
+                ? isNewUser
+                  ? handleRegister
+                  : handleInitialSubmit
+                : handleInitialSubmit
+            }
+            className="space-y-4"
+          >
+            {/* Phone & Password */}
+            {/* Phone Input with Inline Error */}
+            <div className="space-y-6">
+              <div className="space-y-3">
+                <label className="block text-sm font-black text-on-surface uppercase text-right px-1">رقم الهاتف</label>
+                <div className={`flex w-full overflow-hidden rounded-xl border-2 transition-all ${fieldErrors.phone ? 'border-red-500 shadow-sm shadow-red-100' : 'border-outline-variant/30'}`} dir="ltr" onPaste={handlePaste}>
+                  {phoneDigits.map((digit, idx) => (
+                    <input
+                      key={idx}
+                      ref={el => digitRefs.current[idx] = el}
                       type="text"
                       inputMode="numeric"
-                      autoComplete="one-time-code"
-                      pattern="[0-9]{6}"
-                      value={verificationCode}
-                      onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      maxLength={1}
+                      value={digit}
+                      readOnly={idx === 0}
+                      disabled={phoneChecked}
+                      onChange={(e) => handleDigitChange(idx, e.target.value)}
+                      onKeyDown={(e) => handleDigitKeyDown(idx, e)}
+                      placeholder="-"
+                      className={`w-full h-20 text-center font-black text-4xl transition-all outline-none border-r border-outline-variant/20 last:border-r-0
+                        ${idx === 0 ? 'bg-surface-container-high text-primary' : 'bg-white focus:bg-primary/5 text-on-surface'}
+                        ${phoneChecked ? 'opacity-50' : ''}`}
                     />
-                  </div>
-
-                  <button 
-                    type="submit" 
-                    disabled={loading}
-                    className="w-full h-16 bg-[#1B5E20] text-white font-black text-xl rounded-2xl shadow-xl shadow-[#1B5E20]/30 border border-transparent hover:bg-transparent hover:text-[#1B5E20] hover:border-[#1B5E20] transition-colors flex items-center justify-center gap-4 group disabled:opacity-70"
-                  >
-                    {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : (
-                      <>
-                        تأكيد
-                        <ArrowLeft className="w-6 h-6 group-hover:-translate-x-1 transition-transform" />
-                      </>
-                    )}
-                  </button>
-                </form>
-              )}
-
-              {step === 'details' && (
-                <form className="space-y-8" onSubmit={onDetailsSubmit}>
-                  <div className="space-y-4">
-                    <input 
-                      className="w-full h-16 px-4 bg-white/40 backdrop-blur-md border border-white/50 rounded-2xl text-[#1B5E20] font-bold focus:ring-2 focus:ring-[#2E7D32] focus:bg-white/60 transition-all" 
-                      placeholder="الاسم الكامل" 
-                      required 
-                      type="text"
-                      autoComplete="name"
-                      value={registrationData.fullName}
-                      onChange={(e) => setRegistrationData({...registrationData, fullName: e.target.value})}
-                    />
-                    
-                    <div className="relative">
-                      <select
-                        required
-                        value={registrationData.city}
-                        onChange={(e) => setRegistrationData({...registrationData, city: e.target.value})}
-                        className="w-full h-16 px-4 bg-white/40 backdrop-blur-md border border-white/50 rounded-2xl text-[#1B5E20] font-bold focus:ring-2 focus:ring-[#2E7D32] focus:bg-white/60 transition-all appearance-none"
-                      >
-                        <option value="">اختر المدينة...</option>
-                        {['الدار البيضاء', 'الرباط', 'فاس', 'مراكش', 'أكادير', 'طنجة', 'مكناس', 'وجدة', 'القنيطرة', 'تطوان', 'خريبكة', 'بني ملال', 'الجديدة', 'آسفي', 'سطات', 'برشيد', 'الخميسات', 'الناظور', 'تازة', 'المحمدية', 'سلا', 'تمارة', 'العرائش', 'كلميم', 'بركان', 'الفقيه بن صالح', 'تاوريرت', 'بوسكورة', 'ورزازات', 'العيون', 'الداخلة', 'تارودانت', 'قلعة السراغنة', 'سيدي سليمان', 'سيدي قاسم', 'تيزنيت', 'طانطان', 'شفشاون', 'الحسيمة', 'تيفلت', 'وزان', 'جرسيف', 'المضيق', 'الفنيدق', 'سوق الأربعاء', 'بوجدور', 'تنغير', 'زاكورة', 'ميدلت', 'اليوسفية', 'بن جرير'].map(c => (
-                          <option key={c} value={c}>{c}</option>
-                        ))}
-                        {registrationData.city && !['الدار البيضاء', 'الرباط', 'فاس', 'مراكش', 'أكادير', 'طنجة', 'مكناس', 'وجدة', 'القنيطرة', 'تطوان', 'خريبكة', 'بني ملال', 'الجديدة', 'آسفي', 'سطات', 'برشيد', 'الخميسات', 'الناظور', 'تازة', 'المحمدية', 'سلا', 'تمارة', 'العرائش', 'كلميم', 'بركان', 'الفقيه بن صالح', 'تاوريرت', 'بوسكورة', 'ورزازات', 'العيون', 'الداخلة', 'تارودانت', 'قلعة السراغنة', 'سيدي سليمان', 'سيدي قاسم', 'تيزنيت', 'طانطان', 'شفشاون', 'الحسيمة', 'تيفلت', 'وزان', 'جرسيف', 'المضيق', 'الفنيدق', 'سوق الأربعاء', 'بوجدور', 'تنغير', 'زاكورة', 'ميدلت', 'اليوسفية', 'بن جرير'].includes(registrationData.city) && (
-                          <option value={registrationData.city}>{registrationData.city}</option>
-                        )}
-                      </select>
-                      <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-[#1B5E20] w-6 h-6" />
-                      {isDetectingLocation && (
-                        <Loader2 className="absolute left-12 top-1/2 -translate-y-1/2 text-[#1B5E20] w-5 h-5 animate-spin" />
-                      )}
-                    </div>
-
-                    {selectedRole === 'buyer' && (
-                      <div className="flex items-center gap-3 py-2">
-                        <input 
-                          className="w-5 h-5 rounded text-primary border-outline-variant focus:ring-primary" 
-                          id="terms" 
-                          type="checkbox"
-                          checked={registrationData.termsAccepted}
-                          onChange={(e) => setRegistrationData({...registrationData, termsAccepted: e.target.checked})}
-                          required
-                        />
-                        <label className="text-sm text-[#1B5E20] font-bold" htmlFor="terms">أنا موافق على الشروط والأحكام</label>
-                      </div>
-                    )}
-                  </div>
-
-                  <button 
-                    type="submit" 
-                    disabled={loading}
-                    className="w-full h-16 bg-[#1B5E20] text-white font-black text-xl rounded-2xl shadow-xl shadow-[#1B5E20]/30 border border-transparent hover:bg-transparent hover:text-[#1B5E20] hover:border-[#1B5E20] transition-colors flex items-center justify-center gap-4 group disabled:opacity-70"
-                  >
-                    {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : (
-                      selectedRole === 'seller' ? 'أضف قطيع جديد' : 'تسجيل'
-                    )}
-                  </button>
-                </form>
-              )}
-            </div>
-          </div>
-
-          {/* Right Side: Hero Image */}
-          <div className="hidden md:block flex-1 relative">
-            <img 
-              src="https://i.ibb.co/hxCgrSY7/generated-image.jpg" 
-              alt="خروف في جبال الأطلس" 
-              className="absolute inset-0 w-full h-full object-cover"
-              referrerPolicy="no-referrer"
-            />
-            <div className="absolute inset-0 bg-gradient-to-l from-black/20 via-transparent to-transparent"></div>
-            
-            <div className="absolute inset-0 flex flex-col items-center justify-center text-white p-12 text-center">
-              <h2 className="text-7xl lg:text-8xl font-black tracking-tighter mb-4 drop-shadow-2xl uppercase">سوق كسابكوم</h2>
-              <p className="text-2xl lg:text-3xl font-bold max-w-xl leading-snug drop-shadow-lg">
-                تميز المنتجات المغربية الأصيلة، <br /> من الكساب حتى لعندك للدار.
-              </p>
-              
-              <div className="mt-12 bg-white/10 backdrop-blur-md border border-white/20 p-6 rounded-3xl flex items-center gap-4 shadow-2xl">
-                <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center">
-                  <BadgeCheck className="w-8 h-8 text-[#1B5E20]" />
+                  ))}
                 </div>
-                <div className="text-right">
-                  <p className="font-black text-xl">تربية مضمونة</p>
-                  <p className="text-sm opacity-80">أصالة وجودة عالية</p>
+                {fieldErrors.phone && (
+                  <p className="text-right text-xs font-black text-red-500 pr-1 animate-in slide-in-from-top-1">
+                    {fieldErrors.phone}
+                  </p>
+                )}
+              </div>
+
+              {/* Password Input with Inline Error */}
+              <div className="space-y-3">
+                <label className="block text-sm font-black text-on-surface uppercase text-right px-1">كلمة المرور</label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="كلمة المرور"
+                    value={password}
+                    disabled={phoneChecked && !isNewUser}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className={`w-full h-14 bg-surface-container-low border-2 rounded-2xl px-4 text-sm text-center font-black focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all 
+                      ${fieldErrors.password ? 'border-red-500 bg-red-50/30' : 'border-outline-variant/20'}
+                      ${phoneChecked && !isNewUser ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute left-4 top-1/2 -translate-y-1/2 text-black/20 hover:text-black/50"
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
                 </div>
+                {fieldErrors.password && (
+                  <p className="text-right text-xs font-black text-red-500 pr-1 animate-in slide-in-from-top-1">
+                    {fieldErrors.password}
+                  </p>
+                )}
               </div>
             </div>
+
+            {/* Registration extra fields */}
+            {phoneChecked && isNewUser && (
+              <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedRole('seller')}
+                    className={`h-14 rounded-2xl text-base font-black border-2 transition-all ${selectedRole === 'seller' ? 'border-primary bg-primary text-on-primary shadow-lg shadow-primary/20' : 'border-outline-variant/30 bg-surface-container-low text-on-surface-variant hover:border-primary/50'}`}
+                  >
+                    أنا كساب
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedRole('buyer')}
+                    className={`h-14 rounded-2xl text-base font-black border-2 transition-all ${selectedRole === 'buyer' ? 'border-primary bg-primary text-on-primary shadow-lg shadow-primary/20' : 'border-outline-variant/30 bg-surface-container-low text-on-surface-variant hover:border-primary/50'}`}
+                  >
+                    أنا مشتري
+                  </button>
+                </div>
+                {fieldErrors.general && !selectedRole && (
+                  <p className="text-center text-xs font-black text-red-500 animate-pulse">
+                    {fieldErrors.general}
+                  </p>
+                )}
+                <input
+                  type="text"
+                  placeholder="الاسم الكامل"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  className="w-full h-12 bg-black/5 border-0 rounded-xl px-4 text-sm text-center font-bold"
+                  required
+                />
+                <div className="relative">
+                  <select
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    className="w-full h-12 bg-black/5 border-0 rounded-xl px-4 text-sm text-center font-bold appearance-none"
+                    required
+                  >
+                    <option value="">
+                      {isDetectingLocation ? 'جاري الكشف عن موقعك...' : 'اختر المدينة...'}
+                    </option>
+                    {Object.keys(cityCoords).sort().map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                  <MapPin className="absolute right-4 top-1/2 -translate-y-1/2 text-black/20 w-4 h-4" />
+                </div>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full h-16 bg-primary text-on-primary rounded-2xl font-black text-xl hover:shadow-xl hover:shadow-primary/20 transition-all flex items-center justify-center active:scale-95"
+            >
+              {loading ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : !phoneChecked ? (
+                'دخول'
+              ) : isNewUser ? (
+                'إنشاء الحساب'
+              ) : (
+                'دخول'
+              )}
+            </button>
+
+            {!phoneChecked && (
+              <button
+                type="button"
+                onClick={handleForgotPassword}
+                className="w-full text-center text-lg text-primary font-black hover:underline mt-4"
+              >
+                نسيت كلمة المرور؟
+              </button>
+            )}
+
+            {phoneChecked && (
+              <button
+                type="button"
+                onClick={() => { setPhoneChecked(false); setIsNewUser(false); setError(null); }}
+                className="w-full text-center text-[10px] text-black/30 font-bold hover:text-black/60"
+              >
+                رجوع
+              </button>
+            )}
+          </form>
+        </div>
+      </div>
+
+      {/* RIGHT: VISUAL MARQUEE (DESKTOP) */}
+      <div className="hidden lg:flex flex-1 bg-neutral-50 border-r border-black/5 relative overflow-hidden">
+        <div className="absolute inset-0 z-10 pointer-events-none bg-gradient-to-b from-neutral-50 via-transparent to-neutral-50"></div>
+        <div className="grid grid-cols-2 gap-8 w-full h-full p-8">
+          <div className="flex flex-col gap-8 animate-marquee-up">
+            {[...marketingImages, ...marketingImages].map((img, idx) => (
+              <div key={idx} className="bg-white rounded-3xl p-2 shadow-sm border border-black/5">
+                <div className="aspect-[4/3] rounded-2xl overflow-hidden bg-neutral-100">
+                  <img
+                    src={img}
+                    className="w-full h-full object-cover"
+                    alt=""
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="flex flex-col gap-8 animate-marquee-down">
+            {[...marketingImages, ...marketingImages].reverse().map((img, idx) => (
+              <div key={idx} className="bg-white rounded-3xl p-2 shadow-sm border border-black/5">
+                <div className="aspect-[4/3] rounded-2xl overflow-hidden bg-neutral-100">
+                  <img
+                    src={img}
+                    className="w-full h-full object-cover grayscale-[0.2]"
+                    alt=""
+                  />
+                </div>
+              </div>
+            ))}
           </div>
         </div>
-      ) : (
-        <>
-          {/* Header / Logo Area */}
-          <header className="fixed top-0 w-full z-50 bg-surface/80 backdrop-blur-md px-6 py-4 flex justify-between items-center">
-              <button onClick={() => onNavigate('home')} className="text-2xl font-black text-primary tracking-tight font-headline transition-colors border border-transparent hover:border-primary px-2 py-1 rounded-lg">
-                Kessabcom
-              </button>
-            <div className="flex items-center gap-4">
-              <button 
-                onClick={() => setMode('login')}
-                className="text-primary font-bold hover:underline"
-              >
-                تسجيل الدخول
-              </button>
-              <button className="text-on-surface-variant hover:text-primary transition-colors flex items-center gap-2">
-                <Globe className="w-5 h-5" />
-                <span className="font-medium">العربية</span>
-              </button>
+      </div>
+
+      {/* SUCCESS POPUP */}
+      {showSupportSuccess && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl border border-primary/10 animate-in zoom-in-95 duration-300 text-center">
+            <div className="w-24 h-24 bg-primary/10 text-primary rounded-full flex items-center justify-center mx-auto mb-8">
+              <CheckCircle2 className="w-12 h-12" />
             </div>
-          </header>
-
-          <main className="flex-grow flex flex-col md:flex-row pt-16">
-            {/* Left Side: Kessaba (Sellers) */}
-            <section className="w-full md:w-1/2 min-h-[600px] flex items-center justify-center p-8 lg:p-16 relative overflow-hidden bg-surface-container-low">
-              {/* Subtle Decorative Elements */}
-              <div className="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-primary/5 blur-3xl"></div>
-              <div className="absolute -bottom-24 -right-24 w-96 h-96 rounded-full bg-secondary/5 blur-3xl"></div>
-              
-              <div className="w-full max-w-md z-10">
-                <div className="mb-10 text-center md:text-right">
-                  <span className="bg-primary-fixed text-on-primary-fixed px-4 py-1.5 rounded-full text-xs font-bold mb-4 inline-block">
-                    انضم للمجتمع ديالنا
-                  </span>
-                  <h1 className="text-4xl font-black text-on-surface font-headline leading-tight mb-4">
-                    حساب الكساب
-                  </h1>
-                  <p className="text-on-surface-variant text-lg leading-relaxed">
-                    انضم لأكبر تجمع للكسابة فالمغرب وبدا تبيع الغنم ديالك اليوم.
-                  </p>
-                  <div className="mt-6 p-4 bg-primary-fixed/20 rounded-xl border border-primary/10 flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center">
-                       <BadgeCheck className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <p className="font-bold text-primary">2 إعلانات فابور</p>
-                      <p className="text-sm text-on-surface-variant">بدا تجربتك بلا ما تخلص والو فاللول</p>
-                    </div>
-                  </div>
-                </div>
-
-                <form className="space-y-6" onSubmit={(e) => { 
-                  e.preventDefault(); 
-                  const formData = new FormData(e.currentTarget);
-                  onRegisterSubmit('seller', {
-                    fullName: formData.get('fullName'),
-                    city: formData.get('city'),
-                    phone: formData.get('phone')
-                  });
-                }}>
-                  <div className="space-y-2">
-                    <label className="block text-sm font-bold text-on-surface-variant mr-1">الاسم الكامل</label>
-                    <input name="fullName" autoComplete="name" className="w-full h-16 px-4 bg-surface-container-highest border-none rounded-xl text-on-surface focus:ring-2 focus:ring-primary transition-all" placeholder="كتب سميتك الكاملة" required type="text" />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="block text-sm font-bold text-on-surface-variant mr-1">المدينة</label>
-                    {/* Bug #24 fix: expanded to full 51-city list, same as buyer/details forms */}
-                    <select name="city" className="w-full h-16 px-4 bg-surface-container-highest border-none rounded-xl text-on-surface focus:ring-2 focus:ring-primary transition-all" required>
-                      <option value="">ختار المدينة ديالك</option>
-                      {['الدار البيضاء', 'الرباط', 'فاس', 'مراكش', 'أكادير', 'طنجة', 'مكناس', 'وجدة', 'القنيطرة', 'تطوان', 'خريبكة', 'بني ملال', 'الجديدة', 'آسفي', 'سطات', 'برشيد', 'الخميسات', 'الناظور', 'تازة', 'المحمدية', 'سلا', 'تمارة', 'العرائش', 'كلميم', 'بركان', 'الفقيه بن صالح', 'تاوريرت', 'بوسكورة', 'ورزازات', 'العيون', 'الداخلة', 'تارودانت', 'قلعة السراغنة', 'سيدي سليمان', 'سيدي قاسم', 'تيزنيت', 'طانطان', 'شفشاون', 'الحسيمة', 'تيفلت', 'وزان', 'جرسيف', 'المضيق', 'الفنيدق', 'سوق الأربعاء', 'بوجدور', 'تنغير', 'زاكورة', 'ميدلت', 'اليوسفية', 'بن جرير'].map(c => (
-                        <option key={c} value={c}>{c}</option>
-                      ))}
-                    </select>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <label className="block text-sm font-bold text-on-surface-variant mr-1">رقم الهاتف</label>
-                    <div className="relative flex items-center">
-                      <span className="absolute left-3 text-[10px] font-bold text-on-surface-variant border-r border-outline-variant pr-2">+212</span>
-                      <input name="phone" autoComplete="tel-national" inputMode="numeric" pattern="[0-9]*" className="w-full h-16 pl-12 pr-4 bg-surface-container-highest border-none rounded-xl text-on-surface focus:ring-2 focus:ring-primary transition-all text-left text-sm" dir="ltr" placeholder="6 XX XX XX XX" required type="tel" />
-                    </div>
-                  </div>
-
-                  <button type="submit" className="w-full h-16 hero-gradient text-on-primary font-bold text-lg rounded-xl shadow-lg shadow-primary/20 border border-transparent hover:bg-transparent hover:text-primary hover:border-primary transition-colors flex items-center justify-center gap-3">
-                    سجل دابا <ArrowLeft className="w-5 h-5" />
-                  </button>
-                </form>
-              </div>
-            </section>
-
-            {/* Right Side: Buyer (Mouchtari) */}
-            <section className="w-full md:w-1/2 min-h-[600px] flex items-center justify-center p-8 lg:p-16 bg-surface-container-lowest border-r border-outline-variant/10">
-              <div className="w-full max-w-md">
-                <div className="mb-10 text-center md:text-right">
-                  <h2 className="text-4xl font-black text-on-surface font-headline leading-tight mb-4">
-                    حساب المشتري
-                  </h2>
-                  <p className="text-on-surface-variant text-lg">
-                    قلب على أحسن السلالات المغربية واشري الأضحية ديالك بكل سهولة وأمان.
-                  </p>
-                </div>
-                
-                <form className="space-y-6" onSubmit={(e) => { 
-                  e.preventDefault(); 
-                  const formData = new FormData(e.currentTarget);
-                  onRegisterSubmit('buyer', {
-                    fullName: formData.get('fullName'),
-                    phone: formData.get('phone'),
-                    city: formData.get('city')
-                  });
-                }}>
-                  <div className="space-y-2">
-                    <label className="block text-sm font-bold text-on-surface-variant mr-1">الاسم الكامل</label>
-                    <input name="fullName" autoComplete="name" className="w-full h-16 px-4 bg-surface-container-low border-none rounded-xl text-on-surface focus:ring-2 focus:ring-primary transition-all" placeholder="كتب سميتك الكاملة" required type="text" />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="block text-sm font-bold text-on-surface-variant mr-1">رقم الهاتف</label>
-                    <div className="relative flex items-center">
-                      <span className="absolute left-4 font-bold text-on-surface-variant border-r border-outline-variant pr-3">+212</span>
-                      <input name="phone" autoComplete="tel-national" inputMode="numeric" pattern="[0-9]*" className="w-full h-16 pl-20 pr-4 bg-surface-container-low border-none rounded-xl text-on-surface focus:ring-2 focus:ring-primary transition-all text-left" dir="ltr" placeholder="6 XX XX XX XX" required type="tel" />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="block text-sm font-bold text-on-surface-variant mr-1">المدينة</label>
-                    <select name="city" className="w-full h-16 px-4 bg-surface-container-low border-none rounded-xl text-on-surface focus:ring-2 focus:ring-primary transition-all" required>
-                      <option value="">ختار المدينة ديالك</option>
-                      {['الدار البيضاء', 'الرباط', 'فاس', 'مراكش', 'أكادير', 'طنجة', 'مكناس', 'وجدة', 'القنيطرة', 'تطوان', 'خريبكة', 'بني ملال', 'الجديدة', 'آسفي', 'سطات', 'برشيد', 'الخميسات', 'الناظور', 'تازة', 'المحمدية', 'سلا', 'تمارة', 'العرائش', 'كلميم', 'بركان', 'الفقيه بن صالح', 'تاوريرت', 'بوسكورة', 'ورزازات', 'العيون', 'الداخلة', 'تارودانت', 'قلعة السراغنة', 'سيدي سليمان', 'سيدي قاسم', 'تيزنيت', 'طانطان', 'شفشاون', 'الحسيمة', 'تيفلت', 'وزان', 'جرسيف', 'المضيق', 'الفنيدق', 'سوق الأربعاء', 'بوجدور', 'تنغير', 'زاكورة', 'ميدلت', 'اليوسفية', 'بن جرير'].map(c => (
-                        <option key={c} value={c}>{c}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="flex items-center gap-3 py-2">
-                    <input className="w-5 h-5 rounded text-primary border-outline-variant focus:ring-primary" id="terms" type="checkbox" />
-                    <label className="text-sm text-on-surface-variant" htmlFor="terms">أنا موافق على <a className="text-primary font-bold underline" href="#">الشروط والأحكام</a> و <a className="text-primary font-bold underline" href="#">سياسة الخصوصية</a> ديالنا.</label>
-                  </div>
-                  <button type="submit" className="w-full h-16 bg-surface-container-highest text-on-surface font-bold text-lg rounded-xl border border-transparent hover:bg-transparent hover:text-primary hover:border-primary transition-colors flex items-center justify-center gap-3">
-                    سجل دابا
-                    <UserPlus className="w-5 h-5" />
-                  </button>
-                  <div className="text-center pt-4">
-                    <p className="text-on-surface-variant">عندك حساب؟ <button onClick={() => setMode('login')} className="text-primary font-bold hover:underline">تسجيل الدخول</button></p>
-                  </div>
-                </form>
-              </div>
-            </section>
-          </main>
-        </>
+            <h3 className="text-3xl font-black text-on-surface mb-4 font-headline">تم إرسال طلبك بنجاح!</h3>
+            <div className="bg-surface-container-low p-6 rounded-3xl mb-8 border border-outline-variant/20">
+              <p className="text-[10px] font-black text-on-surface-variant uppercase mb-2">رقم الهاتف المسجل</p>
+              <p className="text-2xl font-black text-primary" dir="ltr">{phoneNumber}</p>
+            </div>
+            <p className="text-on-surface-variant font-bold text-base leading-relaxed mb-10">
+              سيقوم فريق الدعم لدينا بالاتصال بك قريباً عبر الهاتف لتغيير كلمة المرور الخاصة بك.
+            </p>
+            <button 
+              onClick={() => setShowSupportSuccess(false)}
+              className="w-full py-5 bg-primary text-on-primary font-black rounded-2xl shadow-xl shadow-primary/20 transition-all hover:scale-[1.02] active:scale-95 text-lg"
+            >
+              فهمت، شكراً
+            </button>
+          </div>
+        </div>
       )}
+
+      <style dangerouslySetInnerHTML={{ __html: `
+        @keyframes marquee-up { 0% { transform: translateY(0); } 100% { transform: translateY(-50%); } }
+        @keyframes marquee-down { 0% { transform: translateY(-50%); } 100% { transform: translateY(0); } }
+        .animate-marquee-up { animation: marquee-up 60s linear infinite; }
+        .animate-marquee-down { animation: marquee-down 60s linear infinite; }
+      `}} />
     </div>
   );
 }

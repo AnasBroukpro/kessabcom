@@ -64,7 +64,7 @@ export default function SearchHeader({ onNavigate, initialCity = '', initialRadi
 
   const handleSignOut = async () => {
     await signOut();
-    onNavigate('home');
+    onNavigate('auth');
   };
 
   const handleLocateMe = () => {
@@ -201,7 +201,7 @@ export default function SearchHeader({ onNavigate, initialCity = '', initialRadi
                 className={`p-4 border-b border-outline-variant/5 hover:bg-[#F9F9F6] transition-colors cursor-pointer ${!notif.read ? 'bg-primary/5' : ''}`}
               >
                 <p className="text-sm font-bold text-[#1A1A1A] mb-1">{notif.title}</p>
-                <p className="text-xs text-[#757575] line-clamp-2">{notif.message}</p>
+                <p className="text-xs text-[#757575]">© 2026 KESSABCOM. جميع الحقوق محفوظة لكسابة المغرب.</p>
                 <p className="text-[10px] text-[#2E7D32] mt-2">
                   {notif.createdAt?.toDate ? notif.createdAt.toDate().toLocaleTimeString('ar-MA') : 'دابا'}
                 </p>
@@ -297,7 +297,7 @@ export default function SearchHeader({ onNavigate, initialCity = '', initialRadi
           <button onClick={() => onNavigate('home')} className="flex items-center group">
             <img 
               src="https://i.ibb.co/Psdn5FfW/logo-removebg-preview.png" 
-              alt="كسابكوم" 
+              alt="KESSABCOM" 
               className="h-7 md:h-9 w-auto object-contain transition-transform group-hover:scale-105"
               referrerPolicy="no-referrer"
             />

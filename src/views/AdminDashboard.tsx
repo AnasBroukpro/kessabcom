@@ -25,7 +25,7 @@ interface Props {
   activeSubView?: string;
 }
 
-type AdminTab = 'overview' | 'stats' | 'users' | 'listings' | 'monetization' | 'ads' | 'settings' | 'stock-market' | 'donations' | 'reports' | 'profile' | 'notifications';
+type AdminTab = 'overview' | 'stats' | 'users' | 'listings' | 'monetization' | 'ads' | 'settings' | 'stock-market' | 'donations' | 'reports' | 'support_requests' | 'profile' | 'notifications';
 
 interface StockMarketViewProps {
   settings: any;
@@ -353,6 +353,7 @@ export default function AdminDashboard({ onNavigate, activeSubView }: Props) {
   const [users, setUsers] = useState<any[]>([]);
   
   const [notifications, setNotifications] = useState<any[]>([]);
+  const [supportRequests, setSupportRequests] = useState<any[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
 
   // Profile states
@@ -370,6 +371,8 @@ export default function AdminDashboard({ onNavigate, activeSubView }: Props) {
   const [prefLanguage, setPrefLanguage] = useState(profile?.preferences?.language || 'ar');
   const [prefNotifications, setPrefNotifications] = useState(profile?.preferences?.notificationsEnabled ?? true);
   const [prefCompactMode, setPrefCompactMode] = useState(profile?.preferences?.compactMode ?? false);
+  const [showDeleteSupportConfirm, setShowDeleteSupportConfirm] = useState(false);
+  const [supportRequestToDelete, setSupportRequestToDelete] = useState<string | null>(null);
 
   const { refreshProfile } = useAuth();
 
@@ -641,18 +644,20 @@ export default function AdminDashboard({ onNavigate, activeSubView }: Props) {
 
   const fetchAdminData = React.useCallback(async () => {
     try {
-      const [usersData, listingsData, reportsData, donationsData, logsData] = await Promise.all([
+      const [usersData, listingsData, reportsData, donationsData, logsData, supportData] = await Promise.all([
         firestoreService.adminGetUsers(),
         firestoreService.adminGetListings(),
         firestoreService.adminGetReports(),
         firestoreService.adminGetDonations(),
-        firestoreService.adminGetLogs()
+        firestoreService.adminGetLogs(),
+        firestoreService.adminGetSupportRequests()
       ]);
       setUsers(usersData);
       setAnnouncements(listingsData);
       setReports(reportsData);
       setDonations(donationsData);
       setLogs(logsData);
+      setSupportRequests(supportData);
     } catch (error: any) {
       if (error.message?.includes('Quota')) setQuotaExceeded(true);
       console.error("Fetch admin data error:", error);
@@ -1106,6 +1111,7 @@ export default function AdminDashboard({ onNavigate, activeSubView }: Props) {
       case 'stock-market': return 'بورصة الأغنام';
       case 'donations': return 'تبرعات و الاستفادات';
       case 'reports': return 'التبليغات';
+      case 'support_requests': return 'الطلبات';
       case 'profile': return 'ملفي الشخصي';
       default: return 'لوحة التحكم';
     }
@@ -1567,6 +1573,107 @@ const renderOverview = () => (
           </div>
         </div>
       )}
+    </div>
+  );
+
+  const renderSupportRequests = () => (
+    <div className="space-y-6">
+      <h2 className="text-2xl font-black text-on-surface font-headline">طلبات الدعم والتقني</h2>
+      <p className="text-sm text-on-surface-variant font-medium">إدارة طلبات إعادة تعيين كلمة المرور والمشاكل التقنية</p>
+      
+      <div className="bg-surface rounded-3xl border border-outline-variant/30 shadow-md overflow-hidden">
+        <table className="w-full text-right">
+          <thead>
+            <tr className="bg-surface-container-low/50 border-b border-outline-variant/20">
+              <th className="p-5 font-black text-xs">نوع الطلب</th>
+              <th className="p-5 font-black text-xs">المستخدم</th>
+              <th className="p-5 font-black text-xs">رقم الهاتف</th>
+              <th className="p-5 font-black text-xs">التاريخ</th>
+              <th className="p-5 font-black text-xs">الحالة</th>
+              <th className="p-5 font-black text-xs text-left">إجراءات</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-outline-variant/10">
+            {supportRequests.map((req) => (
+              <tr key={req.id} className="hover:bg-primary/[0.02]">
+                <td className="p-5 font-bold text-sm">
+                  {req.type === 'password_reset' ? 'إعادة تعيين كلمة المرور' : req.type}
+                </td>
+                <td className="p-5 font-bold text-sm text-primary">
+                  {req.name || 'غير معروف'}
+                </td>
+                <td className="p-5 font-mono text-sm">{req.phone}</td>
+                <td className="p-5 text-xs text-on-surface-variant font-bold">
+                  {(() => {
+                    try {
+                      if (!req.createdAt) return 'قديماً';
+                      const date = req.createdAt.toDate ? req.createdAt.toDate() : new Date(req.createdAt);
+                      if (isNaN(date.getTime())) return 'قديماً';
+                      return new Intl.DateTimeFormat('ar-MA', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      }).format(date);
+                    } catch (e) {
+                      return 'قديماً';
+                    }
+                  })()}
+                </td>
+                <td className="p-5">
+                  <span className={`px-3 py-1 rounded-full text-[10px] font-black ${
+                    req.status === 'pending' ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'
+                  }`}>
+                    {req.status === 'pending' ? 'في الانتظار' : 'تمت المعالجة'}
+                  </span>
+                </td>
+                <td className="p-5 text-left">
+                  <div className="flex justify-end gap-2">
+                    {req.status === 'pending' && (
+                      <button 
+                        onClick={async () => {
+                          const tempPass = Math.floor(100000 + Math.random() * 900000).toString();
+                          const message = `مرحبا ${req.name || 'مستخدم كسابكوم'}،\n\nبناءً على طلبك، كلمة المرور المؤقتة الخاصة بك هي: *${tempPass}*\n\nيرجى تسجيل الدخول وتغييرها فوراً من إعدادات حسابك.\n\nفريق كسابكوم.`;
+                          const cleanPhone = (req.phone || '').replace(/\+/g, '');
+                          const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+                          
+                          window.open(whatsappUrl, '_blank');
+                          
+                          await firestoreService.adminUpdateSupportRequestStatus(req.id, 'completed');
+                          fetchAdminData();
+                        }}
+                        className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-all text-[10px] font-black"
+                        title="إرسال كلمة المرور عبر واتساب"
+                      >
+                        <Lock size={14} />
+                        إرسال كلمة المرور
+                      </button>
+                    )}
+                    <button 
+                      onClick={() => {
+                        setSupportRequestToDelete(req.id);
+                        setShowDeleteSupportConfirm(true);
+                      }}
+                      className="p-2 bg-red-50 text-red-700 rounded-lg hover:bg-red-600 hover:text-white transition-all"
+                      title="حذف"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {supportRequests.length === 0 && (
+              <tr>
+                <td colSpan={6} className="p-20 text-center text-on-surface-variant font-bold">
+                  لا توجد طلبات حالياً
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 
@@ -2725,7 +2832,7 @@ const renderOverview = () => (
             <button onClick={() => onNavigate('home')} className="flex items-center group">
               <img 
                 src="https://i.ibb.co/Psdn5FfW/logo-removebg-preview.png" 
-                alt="كسابكوم" 
+                alt="KESSABCOM" 
                 className="h-12 w-auto object-contain transition-transform group-hover:scale-105"
                 referrerPolicy="no-referrer"
               />
@@ -2762,6 +2869,18 @@ const renderOverview = () => (
                 <span className="bg-error text-on-error text-[10px] px-2 py-0.5 rounded-full font-bold">{reports.length}</span>
               )}
               <span>التبليغات</span>
+            </button>
+            <button 
+              onClick={() => setActiveTab('support_requests')}
+              className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl font-bold transition-colors border ${activeTab === 'support_requests' ? 'bg-primary-container text-on-primary-container border-primary shadow-sm hover:bg-transparent hover:text-primary' : 'text-on-surface-variant border-transparent hover:border-on-surface-variant'}`}
+            >
+              <Shield className="w-5 h-5 text-blue-600" />
+              {supportRequests.filter(r => r.status === 'pending').length > 0 && (
+                <span className="bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">
+                  {supportRequests.filter(r => r.status === 'pending').length}
+                </span>
+              )}
+              <span>الطلبات</span>
             </button>
             <button 
               onClick={() => setActiveTab('stats')}
@@ -2851,6 +2970,7 @@ const renderOverview = () => (
           {activeTab === 'users' && renderUsers()}
           {activeTab === 'listings' && renderListings()}
           {activeTab === 'reports' && renderReports()}
+          {activeTab === 'support_requests' && renderSupportRequests()}
           {activeTab === 'monetization' && (
             settings.paymentSystemEnabled ? renderMonetization() : (
               <div className="p-12 text-center bg-surface rounded-2xl border border-outline-variant/30">
@@ -3392,6 +3512,44 @@ const renderOverview = () => (
                     تعديل البيانات
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+        {showDeleteSupportConfirm && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+            <div className="bg-surface w-full max-w-md rounded-3xl p-8 shadow-2xl border border-outline-variant/20 animate-in zoom-in-95 duration-200">
+              <div className="w-20 h-20 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                <AlertCircle className="w-10 h-10" />
+              </div>
+              <h3 className="text-2xl font-black text-on-surface text-center mb-4 font-headline">واش بصح بغيتي تمسح هاد الطلب؟</h3>
+              <p className="text-on-surface-variant text-center mb-8 font-medium">
+                هاد العملية ما يمكنش ترجع فيها. واش متأكد؟
+              </p>
+              <div className="grid grid-cols-2 gap-4">
+                <button 
+                  onClick={() => setShowDeleteSupportConfirm(false)}
+                  className="py-4 bg-surface-container-high text-on-surface font-bold rounded-2xl transition-colors border border-transparent hover:bg-transparent hover:text-on-surface hover:border-on-surface"
+                >
+                  إلغاء
+                </button>
+                <button 
+                  onClick={async () => {
+                    if (supportRequestToDelete) {
+                      try {
+                        await firestoreService.adminDeleteSupportRequest(supportRequestToDelete);
+                        fetchAdminData();
+                        setShowDeleteSupportConfirm(false);
+                        setSupportRequestToDelete(null);
+                      } catch (error) {
+                        console.error("Failed to delete support request:", error);
+                      }
+                    }
+                  }}
+                  className="py-4 bg-red-600 text-white font-bold rounded-2xl transition-colors border border-transparent hover:bg-transparent hover:text-red-600 hover:border-red-600 shadow-lg shadow-red-200 flex items-center justify-center gap-2"
+                >
+                  نعم، مسح الطلب
+                </button>
               </div>
             </div>
           </div>

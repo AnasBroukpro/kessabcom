@@ -26,6 +26,7 @@ interface AuthContextType {
   loading: boolean;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  updateProfileState: (profile: UserProfile | null) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -85,15 +86,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
-  const signOut = () => auth.signOut();
+  const signOut = async () => {
+    await auth.signOut();
+    setProfile(null);
+    sessionStorage.clear();
+  };
 
   const refreshProfile = async () => {
     if (user) {
+      setLoading(true);
       try {
         const profileData = await firestoreService.getUserProfile(user.uid);
         setProfile(profileData);
       } catch (error) {
         console.warn("Error refreshing profile:", error);
+      } finally {
+        setLoading(false);
       }
     }
   };
@@ -106,7 +114,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       unreadCount, 
       loading, 
       signOut, 
-      refreshProfile 
+      refreshProfile,
+      updateProfileState: setProfile
     }}>
       {children}
     </AuthContext.Provider>

@@ -4,7 +4,6 @@ import path from "path";
 import { fileURLToPath } from "url";
 import admin from "firebase-admin";
 import fs from "fs";
-import { Firestore, FieldValue, Timestamp } from '@google-cloud/firestore';
 import fetch from "node-fetch";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
@@ -67,17 +66,10 @@ if (!admin.apps.length) {
   }
 }
 
-const firestoreOptions: any = {
-  projectId: firebaseConfig.projectId || process.env.FIREBASE_PROJECT_ID,
-  databaseId: firebaseConfig.firestoreDatabaseId || process.env.FIRESTORE_DATABASE_ID || "(default)",
-};
-
-if (fs.existsSync(serviceAccountPath)) {
-  firestoreOptions.keyFilename = serviceAccountPath;
-}
-
-const db = new Firestore(firestoreOptions);
+const db = admin.firestore();
 const auth = admin.auth();
+const FieldValue = admin.firestore.FieldValue;
+const Timestamp = admin.firestore.Timestamp;
 
 // Helper to verify reCAPTCHA Enterprise token
 const verifyRecaptcha = async (token: string, action: string) => {
@@ -211,10 +203,13 @@ async function startServer() {
     "http://127.0.0.1:5174",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "http://localhost:3001",
+    "http://127.0.0.1:3001",
   ];
 
   app.use(cors({
     origin: (origin, callback) => {
+      console.log(`🔒 CORS Origin Check: "${origin}"`);
       // Bug #10 FIX: in production, reject requests with no Origin header (potential CSRF/direct calls)
       if (!origin) {
         if (process.env.NODE_ENV === 'production') {
@@ -356,7 +351,7 @@ async function startServer() {
       console.log(`✅ API: User ${uid} profile created/updated`);
       res.status(201).json({ message: "User profile created" });
     } catch (e: any) {
-      console.error(`❌ API: Registration error for ${uid}:`, e.message);
+      console.error(`❌ API: Registration error for ${uid}:`, e);
       res.status(500).json({ error: e.message });
     }
   });
@@ -378,12 +373,48 @@ async function startServer() {
 
   app.get("/api/auth/check-phone/:phone", checkPhoneLimiter, async (req, res) => {
     try {
-      const phoneParam = req.params.phone;
-      const phone = Array.isArray(phoneParam) ? phoneParam[0]?.trim() : phoneParam?.trim();
-      if (!phone) return res.status(400).json({ error: "Numéro invalide" });
+      const rawPhone = req.params.phone;
+      if (!rawPhone) return res.status(400).json({ error: "Numéro invalide" });
 
-      const snap = await db.collection('users').where('phoneNumber', '==', phone).limit(1).get();
-      res.json({ exists: !snap.empty });
+      // 1. Generate formats to search in Firestore
+      let clean = rawPhone.replace(/\D/g, '');
+      if (clean.startsWith('212')) clean = clean.substring(3);
+      if (clean.startsWith('0')) clean = clean.substring(1);
+      
+      const formats = [
+        rawPhone,
+        `+212${clean}`,
+        `0${clean}`,
+        clean
+      ];
+
+      // 2. Check Firestore
+      const snap = await db.collection('users')
+        .where('phoneNumber', 'in', formats)
+        .limit(1)
+        .get();
+
+      if (snap.empty) {
+        return res.json({ exists: false });
+      }
+
+      const userData = snap.docs[0].data();
+      const uid = snap.docs[0].id;
+
+      // 3. Verify if user actually exists in Firebase Auth
+      // We check by UID first, then by the deterministic email if needed
+      try {
+        await auth.getUser(uid);
+        // If we reach here, user exists in both places
+        return res.json({ exists: true });
+      } catch (authErr: any) {
+        if (authErr.code === 'auth/user-not-found') {
+          console.log(`🧹 Cleaning up orphaned Firestore record for UID: ${uid} (Phone: ${userData.phoneNumber})`);
+          await db.collection('users').doc(uid).delete();
+          return res.json({ exists: false, orphaned: true, cleaned: true });
+        }
+        throw authErr;
+      }
     } catch (e: any) {
       console.error("check-phone error:", e);
       res.status(500).json({ error: "Erreur serveur" });
@@ -398,6 +429,7 @@ async function startServer() {
       }, { merge: true });
       res.json({ message: "Profile updated" });
     } catch (e: any) {
+      console.error('❌ API: updateProfile error:', e);
       res.status(500).json({ error: e.message });
     }
   });
@@ -425,6 +457,7 @@ async function startServer() {
       
       res.json({ id: doc.id, ...data });
     } catch (e: any) {
+      console.error(`❌ API: getUser error for ${req.params.id}:`, e);
       res.status(500).json({ error: e.message });
     }
   });
@@ -1277,6 +1310,75 @@ async function startServer() {
     }
   });
 
+  // --- SUPPORT REQUESTS ENDPOINTS ---
+  app.post("/api/support/requests", optionalVerifyToken, async (req: any, res) => {
+    try {
+      const { type, phone, details, name } = req.body;
+      const data = {
+        type, // e.g., 'password_reset'
+        phone,
+        name: name || 'غير معروف',
+        details: details || '',
+        status: 'pending',
+        userId: req.user?.uid || null,
+        createdAt: FieldValue.serverTimestamp()
+      };
+      const docRef = await db.collection('supportRequests').add(data);
+      res.status(201).json({ id: docRef.id });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.get("/api/admin/support/requests", verifyToken, isAdmin, async (req: any, res) => {
+    try {
+      const snap = await db.collection('supportRequests').orderBy('createdAt', 'desc').limit(100).get();
+      res.json(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.put("/api/admin/support/requests/:id/status", verifyToken, isAdmin, async (req: any, res) => {
+    try {
+      const { status } = req.body;
+      await db.collection('supportRequests').doc(req.params.id).update({ status, updatedAt: FieldValue.serverTimestamp() });
+      res.json({ status: "ok" });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.delete("/api/admin/support/requests/:id", verifyToken, isAdmin, async (req: any, res) => {
+    try {
+      await db.collection('supportRequests').doc(req.params.id).delete();
+      res.json({ status: "ok" });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.put("/api/users/:id", verifyToken, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const callerDoc = await db.collection('users').doc(req.user.uid).get();
+      const isAdmin = callerDoc.data()?.role === 'admin';
+      
+      if (req.user.uid !== id && !isAdmin) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+
+      await db.collection('users').doc(id).set({
+        ...req.body,
+        updatedAt: FieldValue.serverTimestamp()
+      }, { merge: true });
+      
+      res.json({ status: "ok" });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   // --- VITE MIDDLEWARE (production only) ---
   // In development, Vite runs separately on port 5173 via `npm run dev:client`
   // and proxies /api calls to this server on port 3000.
@@ -1287,6 +1389,12 @@ async function startServer() {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
+
+  // Global Error Handler
+  app.use((err: any, req: any, res: Response, next: NextFunction) => {
+    console.error("🔥 GLOBAL ERROR:", err);
+    res.status(500).json({ error: err.message || "Internal Server Error" });
+  });
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`✅ API Server running on http://localhost:${PORT}`);

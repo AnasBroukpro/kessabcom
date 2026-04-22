@@ -19,7 +19,7 @@
  * - Admin collections: restricted to admin role.
  */
 import { auth } from '../lib/firebase';
-import { onSnapshot, query, collection, where, orderBy, limit, doc } from 'firebase/firestore';
+import { onSnapshot, query, collection, where, orderBy, limit, doc, getDocs } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../lib/firebase';
 
@@ -681,11 +681,58 @@ export const firestoreService = {
     }).catch((error) => { throw error; });
   },
 
+  async hasUserListings(uid: string): Promise<boolean> {
+    try {
+      const q = query(
+        collection(db, 'announcements'),
+        where('sellerId', '==', uid),
+        limit(1)
+      );
+      const snapshot = await getDocs(q);
+      return !snapshot.empty;
+    } catch (error) {
+      console.error("Error checking user listings:", error);
+      return false;
+    }
+  },
+
   async markNotificationAsRead(userId: string, notificationId: string) {
     const headers = await getAuthHeaders();
     return fetch(`${API_BASE}/notifications/${notificationId}/read`, {
       method: 'PUT',
       headers
     }).then(res => res.json());
+  },
+
+  // Support Requests (New)
+  async createSupportRequest(type: string, data: any) {
+    const headers = await getAuthHeaders();
+    return apiFetch(`${API_BASE}/support/requests`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ type, ...data })
+    });
+  },
+
+  async adminGetSupportRequests() {
+    const headers = await getAuthHeaders();
+    return apiFetch(`${API_BASE}/admin/support/requests`, { headers });
+  },
+
+  async adminUpdateSupportRequestStatus(id: string, status: string) {
+    const headers = await getAuthHeaders();
+    return apiFetch(`${API_BASE}/admin/support/requests/${id}/status`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({ status })
+    });
+  },
+
+  async adminDeleteSupportRequest(id: string) {
+    const headers = await getAuthHeaders();
+    return apiFetch(`${API_BASE}/admin/support/requests/${id}`, {
+      method: 'DELETE',
+      headers
+    });
   }
 };

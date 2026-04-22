@@ -11,7 +11,7 @@ export default function Footer({ onNavigate }: FooterProps) {
         <div className="flex justify-center mb-6">
           <img 
             src="https://i.ibb.co/Psdn5FfW/logo-removebg-preview.png" 
-            alt="كسابكوم" 
+            alt="KESSABCOM" 
             className="h-16 w-auto object-contain brightness-0 invert opacity-80"
             referrerPolicy="no-referrer"
           />
@@ -23,7 +23,7 @@ export default function Footer({ onNavigate }: FooterProps) {
           <button onClick={() => onNavigate('terms')} className="text-[#A0A0A0] hover:text-white px-3 py-1.5 rounded-lg border border-transparent hover:border-[#A0A0A0] transition-colors">شروط الاستخدام</button>
           <button onClick={() => onNavigate('privacy')} className="text-[#A0A0A0] hover:text-white px-3 py-1.5 rounded-lg border border-transparent hover:border-[#A0A0A0] transition-colors">سياسة الخصوصية</button>
         </div>
-        <p className="text-xs text-[#757575]">© 2026 كسابكوم. جميع الحقوق محفوظة لكسابة المغرب.</p>
+        <p className="text-xs text-[#757575]">© 2026 KESSABCOM. جميع الحقوق محفوظة لكسابة المغرب.</p>
       </div>
     </footer>
   );
