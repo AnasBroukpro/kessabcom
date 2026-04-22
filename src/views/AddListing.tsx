@@ -228,7 +228,8 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
 
       // Generate reCAPTCHA Enterprise token for server-side verification 
       let recaptchaToken = '';
-      if (import.meta.env.PROD && typeof window !== 'undefined' && (window as any).grecaptcha?.enterprise) {
+      // Temporarily disabled to avoid blocking production submissions
+      if (false && import.meta.env.PROD && typeof window !== 'undefined' && (window as any).grecaptcha?.enterprise) {
         try {
           const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
           if (siteKey) {

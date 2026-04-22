@@ -18,10 +18,8 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 
-// Initialize App Check with reCAPTCHA Enterprise (production only)
-// In dev mode App Check blocks phone auth with network-request-failed because the
-// debug token must be manually registered in the Firebase Console first.
-// Skipping it in dev keeps auth working locally; production is still fully protected.
+// App Check temporary disabled to fix production throttling/403 issues
+/*
 if (typeof window !== 'undefined' && !import.meta.env.DEV) {
   const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
   if (siteKey) {
@@ -38,6 +36,8 @@ if (typeof window !== 'undefined' && !import.meta.env.DEV) {
 } else if (import.meta.env.DEV) {
   console.log('%c🛡️ APP CHECK SKIPPED IN DEV MODE', 'color: white; background: orange; padding: 4px 8px; font-weight: bold;');
 }
+*/
+console.log('🛡️ App Check is currently DISABLED (Production Bypass Active)');
 
 const firestoreDatabaseId = import.meta.env.VITE_FIRESTORE_DATABASE_ID || '(default)';
 export const db = getFirestore(app, firestoreDatabaseId);
