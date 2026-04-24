@@ -25,7 +25,6 @@ export default function SearchHeader({ onNavigate, initialCity = '', initialRadi
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isNotificationSidebarOpen, setIsNotificationSidebarOpen] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [showNotifications, setShowNotifications] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
   const [isOpenCity, setIsOpenCity] = useState(false);
@@ -193,44 +192,7 @@ export default function SearchHeader({ onNavigate, initialCity = '', initialRadi
     );
   };
 
-  const renderNotifications = () => {
-    const safeNotifications = Array.isArray(notifications) ? notifications : [];
-    const unreadCount = safeNotifications.filter(n => !n.read).length;
-    return (
-      <div className="absolute top-full left-0 mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-outline-variant/20 overflow-hidden z-[60] animate-in fade-in slide-in-from-top-2 duration-200">
-        <div className="p-4 border-b border-outline-variant/10 flex items-center justify-between">
-          <h3 className="font-bold text-[#1A1A1A]">التنبيهات</h3>
-          {unreadCount > 0 && (
-            <span className="text-[10px] bg-[#2E7D32] text-white px-2 py-0.5 rounded-full">{unreadCount} جديد</span>
-          )}
-        </div>
-        <div className="max-h-96 overflow-y-auto">
-          {safeNotifications.length > 0 ? (
-            safeNotifications.map((notif) => (
-              <div 
-                key={notif.id} 
-                onClick={() => handleMarkNotifAsRead(notif.id)}
-                className={`p-4 border-b border-outline-variant/5 hover:bg-[#F9F9F6] transition-colors cursor-pointer ${!notif.read ? 'bg-primary/5' : ''}`}
-              >
-                <p className="text-sm font-bold text-[#1A1A1A] mb-1">{notif.title}</p>
-                <p className="text-xs text-[#757575]">{notif.message}</p>
-                <p className="text-[10px] text-[#2E7D32] mt-2">
-                  {notif.createdAt?.toDate ? notif.createdAt.toDate().toLocaleTimeString('ar-MA') : 'دابا'}
-                </p>
-              </div>
-            ))
-          ) : (
-            <div className="p-8 text-center text-on-surface-variant italic text-sm">
-              ما عندك حتى تنبيه حالياً
-            </div>
-          )}
-        </div>
-        <button className="w-full p-3 text-sm font-bold text-[#2E7D32] transition-colors border-t border-outline-variant/10 hover:bg-[#2E7D32] hover:text-white">
-          مشاهدة الكل
-        </button>
-      </div>
-    );
-  };
+
 
   return (
     <>
@@ -450,15 +412,16 @@ export default function SearchHeader({ onNavigate, initialCity = '', initialRadi
           {user ? (
             <>
               {/* Notifications */}
-              <div className="relative" ref={notificationsRef}>
+              <div className="relative">
                 <button 
-                  onClick={() => setShowNotifications(!showNotifications)}
-                  className={`p-2.5 rounded-xl transition-colors border ${showNotifications ? 'bg-[#E8F5E9] text-[#2E7D32] border-[#2E7D32]' : 'bg-[#F9F9F6] text-[#757575] border-transparent hover:border-[#757575]'}`}
+                  onClick={() => setIsNotificationSidebarOpen(true)}
+                  className={`p-2.5 rounded-xl transition-colors border ${isNotificationSidebarOpen ? 'bg-[#E8F5E9] text-[#2E7D32] border-[#2E7D32]' : 'bg-[#F9F9F6] text-[#757575] border-transparent hover:border-[#757575]'}`}
                 >
                   <Bell className="w-5 h-5" />
-                  <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
+                  {(Array.isArray(notifications) ? notifications : []).some(n => !n.read) && (
+                    <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
+                  )}
                 </button>
-                {showNotifications && renderNotifications()}
               </div>
 
               {/* Profile */}
