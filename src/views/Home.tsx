@@ -29,11 +29,11 @@ export default function Home({ onNavigate }: Props) {
     const R = 6371; // km
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = 
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-      Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
   };
 
@@ -73,13 +73,13 @@ export default function Home({ onNavigate }: Props) {
       }
     }
   }, [isOpenCity, isOpenRadius]);
-  
+
 
 
   const handleMarkNotifAsRead = async (id: string) => {
     if (user) await firestoreService.markNotificationAsRead(user.uid, id);
   };
-  
+
   const [contactModalOpen, setContactModalOpen] = useState(false);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
@@ -109,7 +109,7 @@ export default function Home({ onNavigate }: Props) {
       if (cached) {
         setAnnouncements(cached);
       }
-      
+
       const response = await firestoreService.getAnnouncements();
       if (response && response.data) {
         setCachedData('home_announcements', response.data);
@@ -186,7 +186,7 @@ export default function Home({ onNavigate }: Props) {
   const renderProfileMenu = () => {
     const role = profile?.role || 'buyer';
     const displayName = profile?.fullName || (role === 'admin' ? 'المشرف' : role === 'seller' ? 'الكساب' : 'المشتري');
-    
+
     return (
       <div className="absolute top-full left-0 pt-2 w-64 z-[60]">
         <div className="bg-white rounded-2xl shadow-2xl border border-outline-variant/20 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
@@ -205,64 +205,64 @@ export default function Home({ onNavigate }: Props) {
               </div>
             </div>
           </div>
-        
-        <div className="p-2">
-          {role === 'buyer' && (
-            <>
-              <button onClick={() => { onNavigate('buyer', undefined, undefined, undefined, 'dashboard'); setShowProfileMenu(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-[#4A4A4A] hover:bg-[#F9F9F6] rounded-xl transition-colors">
-                <LayoutDashboard className="w-4 h-4" />
-                <span>لوحة التحكم</span>
-              </button>
-              <button onClick={() => { onNavigate('buyer', undefined, undefined, undefined, 'kessaba-offers'); setShowProfileMenu(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-[#4A4A4A] hover:bg-[#F9F9F6] rounded-xl transition-colors">
-                <ShoppingBag className="w-4 h-4" />
-                <span>طلباتي</span>
-              </button>
-            </>
-          )}
-          
-          {role === 'seller' && (
-            <>
-              <button onClick={() => { onNavigate('seller', undefined, undefined, undefined, 'dashboard'); setShowProfileMenu(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-[#4A4A4A] hover:bg-[#F9F9F6] rounded-xl transition-colors">
-                <LayoutDashboard className="w-4 h-4" />
-                <span>لوحة التحكم</span>
-              </button>
-              <button onClick={() => { onNavigate('seller', undefined, undefined, undefined, 'flock'); setShowProfileMenu(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-[#4A4A4A] hover:bg-[#F9F9F6] rounded-xl transition-colors">
-                <List className="w-4 h-4" />
-                <span>إعلاناتي</span>
-              </button>
-              <button onClick={() => { onNavigate('add-listing'); setShowProfileMenu(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-[#4A4A4A] hover:bg-[#F9F9F6] rounded-xl transition-colors">
-                <PlusCircle className="w-4 h-4" />
-                <span>إضافة إعلان</span>
-              </button>
-            </>
-          )}
-          
-          {role === 'admin' && (
-            <>
-              <button onClick={() => { onNavigate('admin', undefined, undefined, undefined, 'overview'); setShowProfileMenu(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-[#4A4A4A] hover:bg-[#F9F9F6] rounded-xl transition-colors">
-                <LayoutDashboard className="w-4 h-4" />
-                <span>لوحة التحكم</span>
-              </button>
-              <button onClick={() => { onNavigate('admin', undefined, undefined, undefined, 'users'); setShowProfileMenu(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-[#4A4A4A] hover:bg-[#F9F9F6] rounded-xl transition-colors">
-                <Users className="w-4 h-4" />
-                <span>المستخدمين</span>
-              </button>
-              <button onClick={() => { onNavigate('admin', undefined, undefined, undefined, 'settings'); setShowProfileMenu(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-[#4A4A4A] hover:bg-[#F9F9F6] rounded-xl transition-colors">
-                <Settings className="w-4 h-4" />
-                <span>الإعدادات</span>
-              </button>
-            </>
-          )}
-          
-          <div className="h-px bg-outline-variant/10 my-2 mx-2"></div>
-          
-          <button onClick={handleSignOut} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-bold text-red-600 hover:bg-red-50 rounded-xl transition-colors">
-            <LogOut className="w-4 h-4" />
-            <span>تسجيل الخروج</span>
-          </button>
+
+          <div className="p-2">
+            {role === 'buyer' && (
+              <>
+                <button onClick={() => { onNavigate('buyer', undefined, undefined, undefined, 'dashboard'); setShowProfileMenu(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-[#4A4A4A] hover:bg-[#F9F9F6] rounded-xl transition-colors">
+                  <LayoutDashboard className="w-4 h-4" />
+                  <span>لوحة التحكم</span>
+                </button>
+                <button onClick={() => { onNavigate('buyer', undefined, undefined, undefined, 'kessaba-offers'); setShowProfileMenu(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-[#4A4A4A] hover:bg-[#F9F9F6] rounded-xl transition-colors">
+                  <ShoppingBag className="w-4 h-4" />
+                  <span>طلباتي</span>
+                </button>
+              </>
+            )}
+
+            {role === 'seller' && (
+              <>
+                <button onClick={() => { onNavigate('seller', undefined, undefined, undefined, 'dashboard'); setShowProfileMenu(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-[#4A4A4A] hover:bg-[#F9F9F6] rounded-xl transition-colors">
+                  <LayoutDashboard className="w-4 h-4" />
+                  <span>لوحة التحكم</span>
+                </button>
+                <button onClick={() => { onNavigate('seller', undefined, undefined, undefined, 'flock'); setShowProfileMenu(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-[#4A4A4A] hover:bg-[#F9F9F6] rounded-xl transition-colors">
+                  <List className="w-4 h-4" />
+                  <span>إعلاناتي</span>
+                </button>
+                <button onClick={() => { onNavigate('add-listing'); setShowProfileMenu(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-[#4A4A4A] hover:bg-[#F9F9F6] rounded-xl transition-colors">
+                  <PlusCircle className="w-4 h-4" />
+                  <span>إضافة إعلان</span>
+                </button>
+              </>
+            )}
+
+            {role === 'admin' && (
+              <>
+                <button onClick={() => { onNavigate('admin', undefined, undefined, undefined, 'overview'); setShowProfileMenu(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-[#4A4A4A] hover:bg-[#F9F9F6] rounded-xl transition-colors">
+                  <LayoutDashboard className="w-4 h-4" />
+                  <span>لوحة التحكم</span>
+                </button>
+                <button onClick={() => { onNavigate('admin', undefined, undefined, undefined, 'users'); setShowProfileMenu(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-[#4A4A4A] hover:bg-[#F9F9F6] rounded-xl transition-colors">
+                  <Users className="w-4 h-4" />
+                  <span>المستخدمين</span>
+                </button>
+                <button onClick={() => { onNavigate('admin', undefined, undefined, undefined, 'settings'); setShowProfileMenu(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-[#4A4A4A] hover:bg-[#F9F9F6] rounded-xl transition-colors">
+                  <Settings className="w-4 h-4" />
+                  <span>الإعدادات</span>
+                </button>
+              </>
+            )}
+
+            <div className="h-px bg-outline-variant/10 my-2 mx-2"></div>
+
+            <button onClick={handleSignOut} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-bold text-red-600 hover:bg-red-50 rounded-xl transition-colors">
+              <LogOut className="w-4 h-4" />
+              <span>تسجيل الخروج</span>
+            </button>
+          </div>
         </div>
       </div>
-    </div>
     );
   };
 
@@ -270,18 +270,18 @@ export default function Home({ onNavigate }: Props) {
   return (
     <div className="antialiased" dir="rtl">
       {/* TopNavBar */}
-      <MobileSidebar 
-        isOpen={isSidebarOpen} 
-        onClose={() => setIsSidebarOpen(false)} 
-        onNavigate={onNavigate} 
+      <MobileSidebar
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
+        onNavigate={onNavigate}
       />
       <nav className="fixed top-0 w-full z-50 bg-white/90 backdrop-blur-md border-b border-outline-variant/30">
         <div className="flex justify-between items-center px-6 h-16 max-w-7xl mx-auto flex-row-reverse md:flex-row">
           <div className="flex items-center gap-8">
             <button onClick={() => onNavigate('home')} className="flex items-center group">
-              <img 
-                src={logoV2} 
-                alt="KESSABCOM" 
+              <img
+                src={logoV2}
+                alt="KESSABCOM"
                 className="h-8 md:h-10 w-auto object-contain transition-transform group-hover:scale-105"
               />
             </button>
@@ -292,7 +292,7 @@ export default function Home({ onNavigate }: Props) {
           </div>
           <div className="flex items-center gap-2 md:gap-4">
             {/* Hamburger Button (Mobile Only) */}
-            <button 
+            <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
               className="md:hidden w-10 h-10 flex flex-col items-center justify-center gap-1.5 bg-[#F9F9F6] rounded-xl border border-outline-variant/10 transition-colors hover:border-[#2E7D32]"
             >
@@ -300,12 +300,12 @@ export default function Home({ onNavigate }: Props) {
               <span className="w-5 h-0.5 bg-[#2E7D32] rounded-full"></span>
               <span className="w-5 h-0.5 bg-[#2E7D32] rounded-full"></span>
             </button>
-            
+
             {user ? (
               <>
                 {/* Notifications */}
                 <div className="relative" ref={notificationsRef}>
-                  <button 
+                  <button
                     onClick={() => setShowNotifications(!showNotifications)}
                     className={`p-2 rounded-xl border border-transparent transition-colors relative ${showNotifications ? 'bg-[#E8F5E9] text-[#2E7D32] border-[#2E7D32]' : 'bg-[#F9F9F6] text-[#757575] hover:bg-white hover:text-[#2E7D32] hover:border-[#2E7D32]'}`}
                   >
@@ -325,8 +325,8 @@ export default function Home({ onNavigate }: Props) {
                       <div className="max-h-96 overflow-y-auto">
                         {notifications.length > 0 ? (
                           notifications.map((notif) => (
-                            <div 
-                              key={notif.id} 
+                            <div
+                              key={notif.id}
                               className={`p-4 border-b border-outline-variant/5 transition-colors cursor-pointer ${!notif.read ? 'bg-[#E8F5E9]/30 hover:bg-[#E8F5E9]/50' : 'hover:bg-[#F9F9F6]'}`}
                               onClick={() => handleMarkNotifAsRead(notif.id)}
                             >
@@ -351,8 +351,8 @@ export default function Home({ onNavigate }: Props) {
                 </div>
 
                 {/* Profile */}
-                <div 
-                  className="relative" 
+                <div
+                  className="relative"
                   ref={profileRef}
                   onMouseEnter={() => setShowProfileMenu(true)}
                   onMouseLeave={() => setShowProfileMenu(false)}
@@ -383,12 +383,12 @@ export default function Home({ onNavigate }: Props) {
         <section className="relative min-h-[calc(100dvh-64px)] flex items-center justify-center bg-[#FDFCF8] px-4 z-20 overflow-hidden">
           {/* Enhanced Background with Overlay */}
           <div className="absolute inset-0 z-0">
-            <img 
-              alt="مرعى أخضر في جبال الأطلس" 
-              className="w-full h-full object-cover" 
-              src="https://i.ibb.co/hxCgrSY7/generated-image.jpg" 
+            <img
+              alt="مرعى أخضر في جبال الأطلس"
+              className="w-full h-full object-cover"
+              src="https://i.ibb.co/hxCgrSY7/generated-image.jpg"
               fetchpriority="high"
-              referrerPolicy="no-referrer" 
+              referrerPolicy="no-referrer"
             />
             {/* Linear Gradient Overlay for maximum text contrast (WCAG 2.1) */}
             <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-transparent"></div>
@@ -396,20 +396,20 @@ export default function Home({ onNavigate }: Props) {
 
           {/* Optimized Floating Elements (Visual Storytelling) */}
           <div className="absolute inset-0 pointer-events-none overflow-hidden hidden md:block">
-            <motion.div 
+            <motion.div
               animate={{ y: [0, -15, 0], rotate: [0, 3, 0] }}
               transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
               className="absolute top-[15%] right-[10%] w-48 h-48 lg:w-64 lg:h-64 opacity-90"
             >
-              <img 
-                src="https://i.pinimg.com/474x/f1/c4/f3/f1c4f375f585d2c88ef5bf4b453cd01e.jpg" 
-                alt="خروف صحي ممتاز" 
-                className="w-full h-full object-contain rounded-full border-8 border-white/20 shadow-[0_20px_50px_rgba(0,0,0,0.3)] backdrop-blur-sm" 
-                referrerPolicy="no-referrer" 
+              <img
+                src="https://i.pinimg.com/474x/f1/c4/f3/f1c4f375f585d2c88ef5bf4b453cd01e.jpg"
+                alt="خروف صحي ممتاز"
+                className="w-full h-full object-contain rounded-full border-8 border-white/20 shadow-[0_20px_50px_rgba(0,0,0,0.3)] backdrop-blur-sm"
+                referrerPolicy="no-referrer"
               />
             </motion.div>
-            
-            <motion.div 
+
+            <motion.div
               animate={{ scale: [1, 1.1, 1], opacity: [0.15, 0.25, 0.15] }}
               transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
               className="absolute bottom-[20%] left-[5%] w-48 h-48 lg:w-72 lg:h-72"
@@ -418,15 +418,15 @@ export default function Home({ onNavigate }: Props) {
             </motion.div>
 
             {/* New Barki Circular Image on the Left */}
-            <motion.div 
+            <motion.div
               animate={{ y: [0, -10, 0], rotate: [0, -3, 0] }}
               transition={{ duration: 6, repeat: Infinity, ease: "easeInOut", delay: 1 }}
               className="absolute top-[35%] left-[5%] lg:left-[10%] w-40 h-40 lg:w-56 lg:h-56 opacity-95"
             >
-              <img 
-                src={barkiImage} 
-                alt="حولي بركي" 
-                className="w-full h-full object-cover rounded-full border-8 border-white/40 shadow-[0_20px_50px_rgba(0,0,0,0.4)] backdrop-blur-sm" 
+              <img
+                src={barkiImage}
+                alt="حولي بركي"
+                className="w-full h-full object-cover rounded-full border-8 border-white/40 shadow-[0_20px_50px_rgba(0,0,0,0.4)] backdrop-blur-sm"
               />
             </motion.div>
           </div>
@@ -447,18 +447,18 @@ export default function Home({ onNavigate }: Props) {
             </p>
 
             {/* Modern Expert Search Bar */}
-            <motion.div 
+            <motion.div
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.5, duration: 0.8 }}
               className="mt-6 md:mt-12 max-w-fit mx-auto"
             >
-              <div 
+              <div
                 ref={searchBarRef}
                 className="bg-white/95 backdrop-blur-xl p-2 md:p-3 rounded-2xl shadow-[0_30px_60px_rgba(0,0,0,0.3)] border border-white/20 z-[60] relative"
               >
                 <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2 md:gap-3">
-                  
+
                   {/* City Selector & Locate Me Wrapper for Mobile Row */}
                   <div className="flex flex-row items-stretch gap-2 w-full md:w-auto">
                     {/* City Selector Block */}
@@ -466,7 +466,7 @@ export default function Home({ onNavigate }: Props) {
                       <MapPin className="w-5 h-5 md:w-6 md:h-6 text-[#2E7D32] shrink-0" />
                       <div className="flex flex-col text-right mr-3 md:mr-4 flex-1">
                         <span className="text-[10px] font-black text-[#2E7D32] uppercase tracking-wider mb-0.5">المدينة</span>
-                        <input 
+                        <input
                           type="text"
                           value={citySearch}
                           onChange={(e) => { setCitySearch(e.target.value); setIsOpenCity(true); }}
@@ -474,18 +474,18 @@ export default function Home({ onNavigate }: Props) {
                           placeholder="فين كتقلب؟"
                           className="bg-transparent border-none outline-none w-full text-lg md:text-xl font-black text-[#1A1A1A] text-right placeholder:text-[#757575]/40"
                         />
-                        
+
                         {isOpenCity && (
                           <div className={`absolute ${openUpwards ? 'bottom-full mb-4' : 'top-full mt-4'} right-0 left-0 w-full bg-white rounded-xl shadow-2xl border border-outline-variant/10 max-h-80 overflow-y-auto z-[100] p-1 animate-in ${openUpwards ? 'slide-in-from-bottom-2' : 'slide-in-from-top-2'} duration-200`}>
                             <div className="flex flex-col gap-0.5">
-                              <button 
+                              <button
                                 onClick={() => { setCitySearch(''); setIsOpenCity(false); }}
                                 className={`w-full text-right px-4 py-2 rounded-lg text-lg font-bold transition-colors ${!citySearch ? 'bg-[#2E7D32] text-white' : 'hover:bg-[#F9F9F6] text-[#4A4A4A]'}`}
                               >
                                 الكل
                               </button>
                               {moroccanCities.filter(c => c.includes(citySearch)).sort().map(city => (
-                                <button 
+                                <button
                                   key={city}
                                   onClick={() => { setCitySearch(city); setIsOpenCity(false); }}
                                   className={`w-full text-right px-4 py-2 rounded-lg text-lg font-bold transition-colors ${citySearch === city ? 'bg-[#2E7D32] text-white' : 'hover:bg-[#F9F9F6] text-[#4A4A4A]'}`}
@@ -497,15 +497,15 @@ export default function Home({ onNavigate }: Props) {
                           </div>
                         )}
                       </div>
-                      <ChevronDown 
+                      <ChevronDown
                         onClick={(e) => { e.stopPropagation(); setIsOpenCity(!isOpenCity); }}
-                        className={`w-5 h-5 text-[#757575] ml-2 cursor-pointer transition-transform ${isOpenCity ? 'rotate-180' : ''}`} 
+                        className={`w-5 h-5 text-[#757575] ml-2 cursor-pointer transition-transform ${isOpenCity ? 'rotate-180' : ''}`}
                       />
                     </div>
 
                     {/* Distinct "في مدينتي" Button */}
                     <div className="flex shrink-0">
-                      <button 
+                      <button
                         onClick={handleLocateMe}
                         disabled={isLocating}
                         className={`flex items-center justify-center gap-1.5 md:gap-2 px-3 md:px-4 py-2 md:py-4 bg-[#F0F0F0] hover:bg-[#E5E5E5] text-[#1B5E20] rounded-xl border border-outline-variant/20 transition-all transform active:scale-95 shadow-sm group/loc`}
@@ -518,21 +518,21 @@ export default function Home({ onNavigate }: Props) {
                   </div>
 
                   {/* Distance Selector Block */}
-                  <div 
+                  <div
                     onClick={() => { setIsOpenRadius(!isOpenRadius); setIsOpenCity(false); }}
                     className="w-full md:w-[180px] flex items-center px-3 md:px-4 py-2 md:py-2 relative group bg-white rounded-xl border border-outline-variant/10 shadow-sm transition-all hover:border-[#2E7D32]/30 cursor-pointer"
                   >
                     <Route className="w-6 h-6 text-[#2E7D32] shrink-0" />
                     <div className="flex flex-col text-right mr-4 flex-1">
                       <span className="text-[10px] font-black text-[#2E7D32] uppercase tracking-wider mb-0.5">المسافة</span>
-                      <button 
+                      <button
                         onClick={() => { setIsOpenRadius(!isOpenRadius); setIsOpenCity(false); }}
                         className="bg-transparent border-none outline-none w-full text-xl font-black text-[#1A1A1A] text-right flex items-center justify-between"
                       >
                         <span className="truncate">
-                          {radiusSearch === '10' ? '10 كلم' : 
-                           radiusSearch === '20' ? '20 كلم' : 
-                           radiusSearch === '50' ? '50 كلم' : 'اختيار'}
+                          {radiusSearch === '10' ? '10 كلم' :
+                            radiusSearch === '20' ? '20 كلم' :
+                              radiusSearch === '50' ? '50 كلم' : 'اختيار'}
                         </span>
                       </button>
 
@@ -544,7 +544,7 @@ export default function Home({ onNavigate }: Props) {
                               { val: '20', label: '20 كلم دايرة بيك' },
                               { val: '50', label: '50 كلم دايرة بيك' }
                             ].map(dist => (
-                              <button 
+                              <button
                                 key={dist.val}
                                 onClick={() => { setRadiusSearch(dist.val); setIsOpenRadius(false); }}
                                 className={`w-full text-right px-4 py-2 rounded-lg text-lg font-bold transition-colors ${radiusSearch === dist.val ? 'bg-[#2E7D32] text-white' : 'hover:bg-[#F9F9F6] text-[#4A4A4A]'}`}
@@ -561,7 +561,7 @@ export default function Home({ onNavigate }: Props) {
 
                   {/* Search CTA Button */}
                   <div className="md:pr-1">
-                    <button 
+                    <button
                       onClick={handleSearchNearMe}
                       className="w-full md:w-auto bg-[#2E7D32] text-white py-3 md:py-5 px-14 rounded-xl font-black text-lg md:text-xl flex items-center justify-center gap-3 md:gap-4 shadow-[0_10px_25px_rgba(46,125,50,0.4)] hover:shadow-[0_15px_35px_rgba(46,125,50,0.5)] transform hover:-translate-y-1 active:scale-95 transition-all duration-300 group"
                     >
@@ -585,10 +585,10 @@ export default function Home({ onNavigate }: Props) {
                     { id: 'بركي', label: 'البركي' },
                     { id: 'مستورد', label: 'الأغنام المستوردة' }
                   ].map((tag) => (
-                    <button 
+                    <button
                       key={tag.id}
                       onClick={() => {
-                        setSelectedBreeds(prev => 
+                        setSelectedBreeds(prev =>
                           prev.includes(tag.id) ? prev.filter(b => b !== tag.id) : [...prev, tag.id]
                         );
                       }}
@@ -644,7 +644,7 @@ export default function Home({ onNavigate }: Props) {
         {(settings.banners?.banner1DesktopEnabled !== false || settings.banners?.banner1MobileEnabled !== false) && (
           <div className={`max-w-7xl mx-auto px-6 py-10 ${settings.banners?.banner1DesktopEnabled === false ? 'md:hidden' : ''} ${settings.banners?.banner1MobileEnabled === false ? 'hidden md:block' : ''}`}>
             {settings.banners?.banner1 ? (
-              <div 
+              <div
                 onClick={() => settings.banners?.banner1Url && window.open(settings.banners.banner1Url, '_blank')}
                 className={`relative rounded-3xl overflow-hidden shadow-md group cursor-pointer border border-outline-variant/10 ${settings.banners?.banner1Url ? 'hover:opacity-90 transition-opacity' : ''} ${settings.banners?.banner1Mobile ? 'aspect-square' : 'aspect-video'} md:aspect-[24/4.5]`}
               >
@@ -652,9 +652,9 @@ export default function Home({ onNavigate }: Props) {
                   {settings.banners?.banner1Mobile && typeof settings.banners.banner1Mobile === 'string' && (
                     <source media="(max-width: 767px)" srcSet={settings.banners.banner1Mobile} />
                   )}
-                  <img 
-                    src={settings.banners.banner1} 
-                    alt="Ad Banner 1" 
+                  <img
+                    src={settings.banners.banner1}
+                    alt="Ad Banner 1"
                     className="w-full h-full object-cover"
                     referrerPolicy="no-referrer"
                   />
@@ -683,7 +683,8 @@ export default function Home({ onNavigate }: Props) {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {Array.isArray(announcements) && announcements.slice(0, 6).map((listing) => (
+            {(Array.isArray(announcements) ? announcements : []).slice(0, 6).map((listing) => (
+
 
               <div key={listing.id} className="bg-white rounded-2xl overflow-hidden shadow-sm border border-outline-variant/20 hover:shadow-xl transition-all duration-300 group cursor-pointer" onClick={() => onNavigate('listing-details', listing.id)}>
                 <div className="relative h-64 overflow-hidden">
@@ -693,7 +694,7 @@ export default function Home({ onNavigate }: Props) {
                   </div>
                   <div className="absolute bottom-4 right-4 bg-white/90 backdrop-blur text-[#1A1A1A] px-3 py-1.5 rounded-full text-[10px] font-bold shadow-sm flex items-center gap-1 cursor-pointer hover:bg-white transition-colors" onClick={(e) => {
                     e.stopPropagation();
-                    const url = listing.coordinates 
+                    const url = listing.coordinates
                       ? `https://www.google.com/maps/dir/?api=1&destination=${listing.coordinates.lat},${listing.coordinates.lng}`
                       : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(listing.location || '')}`;
                     window.open(url, '_blank');
@@ -702,7 +703,7 @@ export default function Home({ onNavigate }: Props) {
                     <span>
                       {(() => {
                         const listingCity = cityMapping[(listing.location || '').toLowerCase()] || listing.location || '';
-                        
+
                         let dist = listing.distance || 0;
                         if (citySearch) {
                           const searchCoords = cityCoords[citySearch];
@@ -721,9 +722,9 @@ export default function Home({ onNavigate }: Props) {
                             dist = 999;
                           }
                         }
-                        
+
                         const city = getDisplayCity(listing);
-                        
+
                         if (dist === 0 || dist >= 999) return city;
                         if (dist < 5) return `${city} (قريب ليك)`;
                         if (dist < 25) return `${city} (على بعد ${Math.round(dist)} كلم)`;
@@ -733,7 +734,7 @@ export default function Home({ onNavigate }: Props) {
                     </span>
                   </div>
                   {!settings.guestBuyerMode && (
-                    <button 
+                    <button
                       onClick={(e) => {
                         e.stopPropagation();
                         if (user) {
@@ -743,9 +744,8 @@ export default function Home({ onNavigate }: Props) {
                           setLoginModalOpen(true);
                         }
                       }}
-                      className={`absolute top-4 left-4 p-2 bg-white/90 backdrop-blur rounded-full transition-colors shadow-sm ${
-                        user && favorites.some(f => f.listingId === listing.id) ? 'text-red-500' : 'text-[#757575] hover:text-red-500'
-                      }`}
+                      className={`absolute top-4 left-4 p-2 bg-white/90 backdrop-blur rounded-full transition-colors shadow-sm ${user && favorites.some(f => f.listingId === listing.id) ? 'text-red-500' : 'text-[#757575] hover:text-red-500'
+                        }`}
                     >
                       <Heart className={`w-4 h-4 ${user && favorites.some(f => f.listingId === listing.id) ? 'fill-current' : ''}`} />
                     </button>
@@ -781,7 +781,7 @@ export default function Home({ onNavigate }: Props) {
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-3 mt-4 border-t border-outline-variant/20 pt-4">
-                    <button 
+                    <button
                       onClick={(e) => {
                         e.stopPropagation();
                         setSelectedSellerPhone(listing.phone);
@@ -793,13 +793,13 @@ export default function Home({ onNavigate }: Props) {
                     >
                       تواصل مع الكساب
                     </button>
-                    <button 
+                    <button
                       onClick={(e) => {
                         e.stopPropagation();
                         if (!settings.guestBuyerMode && !profile) {
-                           setLoginModalOpen(true);
+                          setLoginModalOpen(true);
                         } else {
-                           onNavigate('listing-details', listing.id);
+                          onNavigate('listing-details', listing.id);
                         }
                       }}
                       className="py-2.5 bg-[#F9F9F6] text-[#1A1A1A] font-bold rounded-lg border border-transparent hover:bg-white hover:text-[#2E7D32] hover:border-[#2E7D32] transition-colors text-sm"
@@ -817,7 +817,7 @@ export default function Home({ onNavigate }: Props) {
         {(settings.banners?.banner2DesktopEnabled !== false || settings.banners?.banner2MobileEnabled !== false) && (
           <div className={`max-w-7xl mx-auto px-6 py-10 ${settings.banners?.banner2DesktopEnabled === false ? 'md:hidden' : ''} ${settings.banners?.banner2MobileEnabled === false ? 'hidden md:block' : ''}`}>
             {settings.banners?.banner2 ? (
-              <div 
+              <div
                 onClick={() => settings.banners?.banner2Url && window.open(settings.banners.banner2Url, '_blank')}
                 className={`relative rounded-3xl overflow-hidden shadow-md group cursor-pointer border border-outline-variant/10 ${settings.banners?.banner2Url ? 'hover:opacity-90 transition-opacity' : ''} ${settings.banners?.banner2Mobile ? 'aspect-square' : 'aspect-video'} md:aspect-[24/4.5]`}
               >
@@ -825,9 +825,9 @@ export default function Home({ onNavigate }: Props) {
                   {settings.banners?.banner2Mobile && typeof settings.banners.banner2Mobile === 'string' && (
                     <source media="(max-width: 767px)" srcSet={settings.banners.banner2Mobile} />
                   )}
-                  <img 
-                    src={settings.banners.banner2} 
-                    alt="Ad Banner 2" 
+                  <img
+                    src={settings.banners.banner2}
+                    alt="Ad Banner 2"
                     className="w-full h-full object-cover"
                     referrerPolicy="no-referrer"
                   />
@@ -854,7 +854,7 @@ export default function Home({ onNavigate }: Props) {
               {/* Connection Line (Desktop) */}
               <div className="hidden md:block absolute top-1/2 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-[#2E7D32]/20 to-transparent -translate-y-1/2 z-0"></div>
 
-              <motion.div 
+              <motion.div
                 whileHover={{ y: -10 }}
                 className="relative z-10 flex flex-col items-center text-center group"
               >
@@ -870,7 +870,7 @@ export default function Home({ onNavigate }: Props) {
                 <div className="mt-4 w-8 h-8 rounded-full bg-[#2E7D32] text-white flex items-center justify-center font-bold text-sm">1</div>
               </motion.div>
 
-              <motion.div 
+              <motion.div
                 whileHover={{ y: -10 }}
                 className="relative z-10 flex flex-col items-center text-center group"
               >
@@ -886,7 +886,7 @@ export default function Home({ onNavigate }: Props) {
                 <div className="mt-4 w-8 h-8 rounded-full bg-[#2E7D32] text-white flex items-center justify-center font-bold text-sm">2</div>
               </motion.div>
 
-              <motion.div 
+              <motion.div
                 whileHover={{ y: -10 }}
                 className="relative z-10 flex flex-col items-center text-center group"
               >
@@ -915,7 +915,7 @@ export default function Home({ onNavigate }: Props) {
         {(settings.banners?.banner3DesktopEnabled !== false || settings.banners?.banner3MobileEnabled !== false) && (
           <div className={`max-w-7xl mx-auto px-6 py-10 ${settings.banners?.banner3DesktopEnabled === false ? 'md:hidden' : ''} ${settings.banners?.banner3MobileEnabled === false ? 'hidden md:block' : ''}`}>
             {settings.banners?.banner3 ? (
-              <div 
+              <div
                 onClick={() => settings.banners?.banner3Url && window.open(settings.banners.banner3Url, '_blank')}
                 className={`relative rounded-3xl overflow-hidden shadow-md group cursor-pointer border border-outline-variant/10 ${settings.banners?.banner3Url ? 'hover:opacity-90 transition-opacity' : ''} ${settings.banners?.banner3Mobile ? 'aspect-square' : 'aspect-video'} md:aspect-[24/4.5]`}
               >
@@ -923,9 +923,9 @@ export default function Home({ onNavigate }: Props) {
                   {settings.banners?.banner3Mobile && typeof settings.banners.banner3Mobile === 'string' && (
                     <source media="(max-width: 767px)" srcSet={settings.banners.banner3Mobile} />
                   )}
-                  <img 
-                    src={settings.banners.banner3} 
-                    alt="Ad Banner 3" 
+                  <img
+                    src={settings.banners.banner3}
+                    alt="Ad Banner 3"
                     className="w-full h-full object-cover"
                     referrerPolicy="no-referrer"
                   />
@@ -950,14 +950,14 @@ export default function Home({ onNavigate }: Props) {
             <div className="relative z-10 w-full md:w-1/2 text-center md:text-right">
               <span className="inline-block bg-white/20 backdrop-blur-md px-4 py-2 rounded-full text-xs font-black text-white mb-6 uppercase tracking-widest">مساحة الكساب</span>
               <h2 className="text-3xl md:text-5xl font-black text-white mb-6 font-headline leading-tight">
-                عندك كسيبة وبغيتي <br /> 
+                عندك كسيبة وبغيتي <br />
                 <span className="text-[#A5D6A7]">تجيب الناس للضيعة؟</span>
               </h2>
               <p className="text-[#E8F5E9] text-base md:text-xl mb-10 max-w-md mx-auto md:mr-0 md:ml-0 font-medium leading-relaxed">
                 منصة kessabcom.ma كايسهل على المشتري يلقاك فخريطة المدينة. حط إعلانك وجيب الكليان حتى لدارك.
               </p>
-              <button 
-                onClick={() => onNavigate('auth')} 
+              <button
+                onClick={() => onNavigate('auth')}
                 className="w-full md:w-auto bg-white text-[#2E7D32] px-10 py-5 rounded-2xl font-black text-lg flex items-center justify-center gap-3 border-2 border-transparent hover:bg-transparent hover:text-white hover:border-white transition-all duration-300 shadow-2xl hover:scale-105 active:scale-95"
               >
                 <PlusCircle className="w-6 h-6" />
@@ -988,7 +988,7 @@ export default function Home({ onNavigate }: Props) {
         {/* Removed */}
       </main>
 
-      <ContactSellerModal 
+      <ContactSellerModal
         isOpen={contactModalOpen}
         onClose={() => setContactModalOpen(false)}
         sellerPhone={selectedSellerPhone}
@@ -997,7 +997,7 @@ export default function Home({ onNavigate }: Props) {
         onNavigate={onNavigate}
       />
 
-      <LoginRequiredModal 
+      <LoginRequiredModal
         isOpen={loginModalOpen}
         onClose={() => setLoginModalOpen(false)}
         onNavigate={onNavigate}
@@ -1018,7 +1018,7 @@ const Countdown = () => {
 
   useEffect(() => {
     if (!settings.aidDate) return;
-    
+
     // Target date: Date de l'Aid fixée par l'admin
     const targetDate = new Date(settings.aidDate).setHours(0, 0, 0, 0);
 
@@ -1067,7 +1067,7 @@ const Countdown = () => {
             باقي لعيد الأضحى المبارك
           </h2>
         </div>
-        
+
         <div className="flex justify-center gap-2 md:gap-3" dir="ltr">
           {[
             { label: 'أيام', value: timeLeft.days },
