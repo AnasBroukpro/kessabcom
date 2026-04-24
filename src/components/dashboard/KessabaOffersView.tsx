@@ -488,7 +488,7 @@ export default function KessabaOffersView({
     );
   }
 
-  const filteredRequests = kessabaRequests.filter(req => {
+  const filteredRequests = (Array.isArray(kessabaRequests) ? kessabaRequests : []).filter(req => {
     if (filterStatus === 'active') return req.status !== 'Archived';
     if (filterStatus === 'archived') return req.status === 'Archived';
     return true;
