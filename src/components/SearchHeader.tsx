@@ -235,7 +235,20 @@ export default function SearchHeader({ onNavigate, initialCity = '', initialRadi
                   />
                 </button>
 
-                {/* 2. Profile Image (To the right of Notification) */}
+                {/* 2. Notification */}
+                <div className="relative">
+                  <button 
+                    onClick={() => setIsNotificationSidebarOpen(true)}
+                    className={`p-2 rounded-lg transition-colors border ${isNotificationSidebarOpen ? 'bg-[#E8F5E9] text-[#2E7D32] border-[#2E7D32]' : 'bg-[#F9F9F6] text-[#757575] border-transparent hover:border-[#757575]'}`}
+                  >
+                    <Bell className="w-4.5 h-4.5" />
+                    {(Array.isArray(notifications) ? notifications : []).some(n => !n.read) && (
+                      <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-red-500 rounded-full border border-white"></span>
+                    )}
+                  </button>
+                </div>
+
+                {/* 3. Profile Image */}
                 <button 
                   onClick={() => {
                     const role = profile?.role || 'buyer';
@@ -249,19 +262,6 @@ export default function SearchHeader({ onNavigate, initialCity = '', initialRadi
                     <User className="w-4 h-4 text-[#2E7D32]" />
                   )}
                 </button>
-
-                {/* 3. Notification */}
-                <div className="relative">
-                  <button 
-                    onClick={() => setIsNotificationSidebarOpen(true)}
-                    className={`p-2 rounded-lg transition-colors border ${isNotificationSidebarOpen ? 'bg-[#E8F5E9] text-[#2E7D32] border-[#2E7D32]' : 'bg-[#F9F9F6] text-[#757575] border-transparent hover:border-[#757575]'}`}
-                  >
-                    <Bell className="w-4.5 h-4.5" />
-                    {(Array.isArray(notifications) ? notifications : []).some(n => !n.read) && (
-                      <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-red-500 rounded-full border border-white"></span>
-                    )}
-                  </button>
-                </div>
               </>
             ) : (
               <div className="flex items-center gap-2">
