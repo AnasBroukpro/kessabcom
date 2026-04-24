@@ -531,7 +531,7 @@ export default function SearchResults({ onNavigate, initialCity, initialRadius, 
                     
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       <span className="bg-[#E8F5E9] px-2 py-0.5 rounded text-[10px] sm:text-xs font-black text-[#2E7D32] border border-[#2E7D32]/10">{listing.category || 'سردي'}</span>
-                      {listing.sizes?.slice(0, 2).map((size: string, idx: number) => (
+                      {(Array.isArray(listing.sizes) ? listing.sizes : []).slice(0, 2).map((size: string, idx: number) => (
                         <span key={idx} className="bg-[#F9F9F6] px-2 py-0.5 rounded text-[10px] sm:text-xs font-bold text-[#4A4A4A] border border-outline-variant/10">
                           {size === 'small' ? 'صغير' : size === 'medium' ? 'متوسط' : size === 'large' ? 'كبير' : size === 'extra-large' ? 'كبير جداً' : size}
                         </span>
@@ -614,7 +614,7 @@ export default function SearchResults({ onNavigate, initialCity, initialRadius, 
                       <div className="flex items-center gap-1.5">
                         <span className="text-[10px] font-bold text-[#757575]">الحجم:</span>
                         <div className="flex gap-1 text-[10px] font-bold text-[#4A4A4A]">
-                          {listing.sizes?.slice(0, 3).map((size: string, idx: number) => (
+                          {(Array.isArray(listing.sizes) ? listing.sizes : []).slice(0, 3).map((size: string, idx: number) => (
                             <span key={idx} className="bg-[#F9F9F6] px-1.5 py-0.5 rounded border border-outline-variant/10">
                               {size === 'small' ? 'صغير' : size === 'medium' ? 'متوسط' : size === 'large' ? 'كبير' : size === 'extra-large' ? 'كبير جداً' : size}
                             </span>

@@ -192,7 +192,8 @@ export default function SearchHeader({ onNavigate, initialCity = '', initialRadi
   };
 
   const renderNotifications = () => {
-    const unreadCount = notifications.filter(n => !n.read).length;
+    const safeNotifications = Array.isArray(notifications) ? notifications : [];
+    const unreadCount = safeNotifications.filter(n => !n.read).length;
     return (
       <div className="absolute top-full left-0 mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-outline-variant/20 overflow-hidden z-[60] animate-in fade-in slide-in-from-top-2 duration-200">
         <div className="p-4 border-b border-outline-variant/10 flex items-center justify-between">
@@ -202,8 +203,8 @@ export default function SearchHeader({ onNavigate, initialCity = '', initialRadi
           )}
         </div>
         <div className="max-h-96 overflow-y-auto">
-          {notifications.length > 0 ? (
-            notifications.map((notif) => (
+          {safeNotifications.length > 0 ? (
+            safeNotifications.map((notif) => (
               <div 
                 key={notif.id} 
                 onClick={() => handleMarkNotifAsRead(notif.id)}
@@ -288,7 +289,9 @@ export default function SearchHeader({ onNavigate, initialCity = '', initialRadi
                     className={`p-2 rounded-lg transition-colors border ${showNotifications ? 'bg-[#E8F5E9] text-[#2E7D32] border-[#2E7D32]' : 'bg-[#F9F9F6] text-[#757575] border-transparent hover:border-[#757575]'}`}
                   >
                     <Bell className="w-4.5 h-4.5" />
-                    <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-red-500 rounded-full border border-white"></span>
+                    {(Array.isArray(notifications) ? notifications : []).some(n => !n.read) && (
+                      <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-red-500 rounded-full border border-white"></span>
+                    )}
                   </button>
                   {showNotifications && renderNotifications()}
                 </div>

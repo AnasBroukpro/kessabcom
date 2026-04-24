@@ -310,7 +310,7 @@ export default function Home({ onNavigate }: Props) {
                     className={`p-2 rounded-xl border border-transparent transition-colors relative ${showNotifications ? 'bg-[#E8F5E9] text-[#2E7D32] border-[#2E7D32]' : 'bg-[#F9F9F6] text-[#757575] hover:bg-white hover:text-[#2E7D32] hover:border-[#2E7D32]'}`}
                   >
                     <Bell className="w-5 h-5" />
-                    {notifications.some(n => !n.read) && (
+                    {(Array.isArray(notifications) ? notifications : []).some(n => !n.read) && (
                       <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
                     )}
                   </button>
@@ -318,13 +318,13 @@ export default function Home({ onNavigate }: Props) {
                     <div className="absolute top-full left-0 mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-outline-variant/20 overflow-hidden z-[60] animate-in fade-in slide-in-from-top-2 duration-200 text-right">
                       <div className="p-4 border-b border-outline-variant/10 flex items-center justify-between">
                         <h3 className="font-bold text-[#1A1A1A]">التنبيهات</h3>
-                        {notifications.filter(n => !n.read).length > 0 && (
-                          <span className="text-[10px] bg-[#2E7D32] text-white px-2 py-0.5 rounded-full">{notifications.filter(n => !n.read).length} جديد</span>
+                        {(Array.isArray(notifications) ? notifications : []).filter(n => !n.read).length > 0 && (
+                          <span className="text-[10px] bg-[#2E7D32] text-white px-2 py-0.5 rounded-full">{(Array.isArray(notifications) ? notifications : []).filter(n => !n.read).length} جديد</span>
                         )}
                       </div>
                       <div className="max-h-96 overflow-y-auto">
-                        {notifications.length > 0 ? (
-                          notifications.map((notif) => (
+                        {(Array.isArray(notifications) ? notifications : []).length > 0 ? (
+                          (Array.isArray(notifications) ? notifications : []).map((notif) => (
                             <div
                               key={notif.id}
                               className={`p-4 border-b border-outline-variant/5 transition-colors cursor-pointer ${!notif.read ? 'bg-[#E8F5E9]/30 hover:bg-[#E8F5E9]/50' : 'hover:bg-[#F9F9F6]'}`}
@@ -653,7 +653,7 @@ export default function Home({ onNavigate }: Props) {
                     <source media="(max-width: 767px)" srcSet={settings.banners.banner1Mobile} />
                   )}
                   <img
-                    src={settings.banners.banner1}
+                    src={typeof settings.banners?.banner1 === 'string' ? settings.banners.banner1 : ''}
                     alt="Ad Banner 1"
                     className="w-full h-full object-cover"
                     referrerPolicy="no-referrer"
@@ -738,7 +738,7 @@ export default function Home({ onNavigate }: Props) {
                       onClick={(e) => {
                         e.stopPropagation();
                         if (user) {
-                          const isFavorite = favorites.some(f => f.listingId === listing.id);
+                          const isFavorite = (Array.isArray(favorites) ? favorites : []).some(f => f.listingId === listing.id);
                           firestoreService.toggleFavorite(listing.id, isFavorite);
                         } else {
                           setLoginModalOpen(true);
@@ -758,7 +758,7 @@ export default function Home({ onNavigate }: Props) {
                       <div className="flex items-center gap-1.5">
                         <span className="text-[10px] font-bold text-[#757575]">الحجم:</span>
                         <div className="flex gap-1 text-[10px] font-bold text-[#4A4A4A]">
-                          {listing.sizes?.slice(0, 3).map((size: string, idx: number) => (
+                          {(Array.isArray(listing.sizes) ? listing.sizes : []).slice(0, 3).map((size: string, idx: number) => (
                             <span key={idx} className="bg-[#F9F9F6] px-1.5 py-0.5 rounded border border-outline-variant/10">
                               {size === 'small' ? 'صغير' : size === 'medium' ? 'متوسط' : size === 'large' ? 'كبير' : size === 'extra-large' ? 'كبير جداً' : size}
                             </span>
@@ -826,7 +826,7 @@ export default function Home({ onNavigate }: Props) {
                     <source media="(max-width: 767px)" srcSet={settings.banners.banner2Mobile} />
                   )}
                   <img
-                    src={settings.banners.banner2}
+                    src={typeof settings.banners?.banner2 === 'string' ? settings.banners.banner2 : ''}
                     alt="Ad Banner 2"
                     className="w-full h-full object-cover"
                     referrerPolicy="no-referrer"
@@ -924,7 +924,7 @@ export default function Home({ onNavigate }: Props) {
                     <source media="(max-width: 767px)" srcSet={settings.banners.banner3Mobile} />
                   )}
                   <img
-                    src={settings.banners.banner3}
+                    src={typeof settings.banners?.banner3 === 'string' ? settings.banners.banner3 : ''}
                     alt="Ad Banner 3"
                     className="w-full h-full object-cover"
                     referrerPolicy="no-referrer"

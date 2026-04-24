@@ -39,8 +39,8 @@ export default function NotificationSidebar({ isOpen, onClose, notifications = [
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-2">
-              {notifications.length > 0 ? (
-                notifications.map((notif) => (
+              {(Array.isArray(notifications) ? notifications : []).length > 0 ? (
+                (Array.isArray(notifications) ? notifications : []).map((notif) => (
                   <div                
                     key={notif.id}
                     className={`px-4 py-3 border-b border-gray-50 transition-all cursor-pointer ${!notif.read ? 'bg-green-50/50 hover:bg-green-50' : 'hover:bg-gray-50'}`}

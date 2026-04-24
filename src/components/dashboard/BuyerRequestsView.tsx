@@ -306,8 +306,8 @@ export function BuyerRequestsView({
       </div>
 
       <div className="space-y-4">
-        {requests.length > 0 ? (
-          requests.map((request) => (
+        {(Array.isArray(requests) ? requests : []).length > 0 ? (
+          (Array.isArray(requests) ? requests : []).map((request) => (
             <div 
               key={request.id} 
               className="bg-white rounded-[10px] p-6 border border-outline-variant/10 shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row items-center gap-6 group"

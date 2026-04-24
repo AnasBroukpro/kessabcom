@@ -74,9 +74,9 @@ const FavoritesView = ({ favorites, announcements, listings, onNavigate, handleT
                       <div className="flex items-center gap-1.5">
                         <span className="text-[10px] font-bold text-[#757575]">الحجم:</span>
                         <div className="flex gap-1 text-[10px] font-bold text-[#4A4A4A]">
-                          {(listing.sizes || ['medium']).slice(0, 2).map((size: string, idx: number) => (
-                            <span key={idx} className="bg-[#F9F9F6] px-1.5 py-0.5 rounded border border-outline-variant/10">
-                              {size === 'small' ? 'صغير' : size === 'medium' ? 'متوسط' : size === 'large' ? 'كبير' : size}
+                          {(Array.isArray(listing.sizes) ? listing.sizes : ['medium']).slice(0, 2).map((size: string, idx: number) => (
+                            <span key={idx} className="bg-surface-container-high px-1.5 py-0.5 rounded text-[9px] font-bold text-on-surface">
+                              {size === 'small' ? 'صغير' : size === 'medium' ? 'متوسط' : size === 'large' ? 'كبير' : size === 'extra-large' ? 'كبير جداً' : size}
                             </span>
                           ))}
                         </div>

@@ -60,8 +60,8 @@ export default function ListingDetails({ onNavigate, listingId }: Props) {
             <p className="text-[#2E7D32] font-bold text-sm sm:text-base truncate">{relatedListing.title}</p>
             <div className="flex items-center gap-1.5 shrink-0">
               <div className="flex gap-1 text-[8px] sm:text-[10px] font-bold text-[#4A4A4A]">
-                {relatedListing.sizes?.slice(0, 2).map((size: string, idx: number) => (
-                  <span key={idx} className="bg-[#F9F9F6] px-1.5 py-0.5 rounded border border-outline-variant/10 whitespace-nowrap">
+                {(Array.isArray(relatedListing.sizes) ? relatedListing.sizes : []).slice(0, 2).map((size: string, idx: number) => (
+                  <span key={idx} className="bg-surface-container-high px-1.5 py-0.5 rounded text-[9px] font-bold text-on-surface">
                     {size === 'small' ? 'صغير' : size === 'medium' ? 'متوسط' : size === 'large' ? 'كبير' : size === 'extra-large' ? 'كبير جداً' : size}
                   </span>
                 ))}
@@ -162,7 +162,8 @@ export default function ListingDetails({ onNavigate, listingId }: Props) {
               const relatedArr = Array.isArray(relatedRaw)
                 ? relatedRaw
                 : ((relatedRaw as any).data ?? []);
-              setRelatedListings(relatedArr.filter((l: any) => l.id !== listingId).slice(0, 3));
+              const filteredRelated = (Array.isArray(relatedArr) ? relatedArr : []).filter((l: any) => l.id !== listingId);
+              setRelatedListings(filteredRelated.slice(0, 3));
             }
           }
         } catch (error) {
