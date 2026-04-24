@@ -14,6 +14,7 @@ import LoginRequiredModal from '../components/LoginRequiredModal';
 import NewsTicker from '../components/NewsTicker';
 import logoV2 from '../assets/marketing/branding/logo v2.png';
 import MobileSidebar from '../components/MobileSidebar';
+import NotificationSidebar from '../components/NotificationSidebar';
 
 interface Props {
   onNavigate: (view: ViewType, listingId?: string, city?: string, radius?: string, subView?: string, breed?: string) => void;
@@ -43,7 +44,7 @@ export default function Home({ onNavigate }: Props) {
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [showNotifications, setShowNotifications] = useState(false);
+  const [isNotificationSidebarOpen, setIsNotificationSidebarOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [selectedBreeds, setSelectedBreeds] = useState<string[]>([]);
   const [showCityModal, setShowCityModal] = useState(false);
@@ -89,7 +90,6 @@ export default function Home({ onNavigate }: Props) {
 
   const suggestionsRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
-  const notificationsRef = useRef<HTMLDivElement>(null);
 
   const filteredCities = moroccanCities.filter(city => city.includes(citySearch));
 
@@ -275,6 +275,12 @@ export default function Home({ onNavigate }: Props) {
         onClose={() => setIsSidebarOpen(false)}
         onNavigate={onNavigate}
       />
+      <NotificationSidebar
+        isOpen={isNotificationSidebarOpen}
+        onClose={() => setIsNotificationSidebarOpen(false)}
+        notifications={Array.isArray(notifications) ? notifications : []}
+        onMarkNotificationAsRead={handleMarkNotifAsRead}
+      />
       <nav className="fixed top-0 w-full z-50 bg-white/90 backdrop-blur-md border-b border-outline-variant/30">
         <div className="flex justify-between items-center px-6 h-16 max-w-7xl mx-auto flex-row-reverse md:flex-row">
           <div className="flex items-center gap-8">
@@ -304,50 +310,16 @@ export default function Home({ onNavigate }: Props) {
             {user ? (
               <>
                 {/* Notifications */}
-                <div className="relative" ref={notificationsRef}>
+                <div className="relative">
                   <button
-                    onClick={() => setShowNotifications(!showNotifications)}
-                    className={`p-2 rounded-xl border border-transparent transition-colors relative ${showNotifications ? 'bg-[#E8F5E9] text-[#2E7D32] border-[#2E7D32]' : 'bg-[#F9F9F6] text-[#757575] hover:bg-white hover:text-[#2E7D32] hover:border-[#2E7D32]'}`}
+                    onClick={() => setIsNotificationSidebarOpen(true)}
+                    className={`p-2 rounded-xl border border-transparent transition-colors relative ${isNotificationSidebarOpen ? 'bg-[#E8F5E9] text-[#2E7D32] border-[#2E7D32]' : 'bg-[#F9F9F6] text-[#757575] hover:bg-white hover:text-[#2E7D32] hover:border-[#2E7D32]'}`}
                   >
                     <Bell className="w-5 h-5" />
                     {(Array.isArray(notifications) ? notifications : []).some(n => !n.read) && (
                       <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
                     )}
                   </button>
-                  {showNotifications && (
-                    <div className="absolute top-full left-0 mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-outline-variant/20 overflow-hidden z-[60] animate-in fade-in slide-in-from-top-2 duration-200 text-right">
-                      <div className="p-4 border-b border-outline-variant/10 flex items-center justify-between">
-                        <h3 className="font-bold text-[#1A1A1A]">التنبيهات</h3>
-                        {(Array.isArray(notifications) ? notifications : []).filter(n => !n.read).length > 0 && (
-                          <span className="text-[10px] bg-[#2E7D32] text-white px-2 py-0.5 rounded-full">{(Array.isArray(notifications) ? notifications : []).filter(n => !n.read).length} جديد</span>
-                        )}
-                      </div>
-                      <div className="max-h-96 overflow-y-auto">
-                        {(Array.isArray(notifications) ? notifications : []).length > 0 ? (
-                          (Array.isArray(notifications) ? notifications : []).map((notif) => (
-                            <div
-                              key={notif.id}
-                              className={`p-4 border-b border-outline-variant/5 transition-colors cursor-pointer ${!notif.read ? 'bg-[#E8F5E9]/30 hover:bg-[#E8F5E9]/50' : 'hover:bg-[#F9F9F6]'}`}
-                              onClick={() => handleMarkNotifAsRead(notif.id)}
-                            >
-                              <p className="text-sm font-bold text-[#1A1A1A] mb-1">{notif.title}</p>
-                              <p className="text-xs text-[#757575]">{notif.message}</p>
-                              <p className="text-[10px] text-[#2E7D32] mt-2">
-                                {notif.createdAt?.toDate?.()?.toLocaleDateString('ar-MA') || 'منذ وقت قصير'}
-                              </p>
-                            </div>
-                          ))
-                        ) : (
-                          <div className="p-8 text-center text-on-surface-variant font-bold">لا توجد تنبيهات</div>
-                        )}
-                      </div>
-                      {notifications.length > 0 && (
-                        <button className="w-full p-3 text-sm font-bold text-[#2E7D32] border-t border-transparent hover:bg-white hover:border-[#2E7D32] transition-colors border-t border-outline-variant/10">
-                          مشاهدة الكل
-                        </button>
-                      )}
-                    </div>
-                  )}
                 </div>
 
                 {/* Profile */}
@@ -357,7 +329,13 @@ export default function Home({ onNavigate }: Props) {
                   onMouseEnter={() => setShowProfileMenu(true)}
                   onMouseLeave={() => setShowProfileMenu(false)}
                 >
-                  <button className="flex items-center justify-center w-10 h-10 rounded-full bg-[#F9F9F6] border border-outline-variant/10 hover:bg-white hover:border-[#2E7D32] transition-colors overflow-hidden shadow-sm">
+                  <button 
+                    onClick={() => {
+                      const role = profile?.role || 'buyer';
+                      onNavigate(role === 'admin' ? 'admin' : role === 'seller' ? 'seller' : 'buyer', undefined, undefined, undefined, role === 'admin' ? 'overview' : 'dashboard');
+                    }}
+                    className="flex items-center justify-center w-10 h-10 rounded-full bg-[#F9F9F6] border border-outline-variant/10 hover:bg-white hover:border-[#2E7D32] transition-colors overflow-hidden shadow-sm"
+                  >
                     {profile?.photoURL ? (
                       <img src={profile.photoURL} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                     ) : (
