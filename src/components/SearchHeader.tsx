@@ -32,7 +32,6 @@ export default function SearchHeader({ onNavigate, initialCity = '', initialRadi
   
   const suggestionsRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
-  const notificationsRef = useRef<HTMLDivElement>(null);
   const searchBarRef = useRef<HTMLDivElement>(null);
 
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -56,9 +55,6 @@ export default function SearchHeader({ onNavigate, initialCity = '', initialRadi
     function handleClickOutside(event: MouseEvent) {
       if (suggestionsRef.current && !suggestionsRef.current.contains(event.target as Node)) {
         setShowSuggestions(false);
-      }
-      if (notificationsRef.current && !notificationsRef.current.contains(event.target as Node)) {
-        setShowNotifications(false);
       }
       if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
         setShowProfileMenu(false);
@@ -220,7 +216,6 @@ export default function SearchHeader({ onNavigate, initialCity = '', initialRadi
                 {/* 1. Animated Hamburger Button (Right-most) */}
                 <button 
                   onClick={() => {
-                    setShowNotifications(false);
                     setShowProfileMenu(false);
                     setIsSidebarOpen(!isSidebarOpen);
                   }}
@@ -242,7 +237,10 @@ export default function SearchHeader({ onNavigate, initialCity = '', initialRadi
 
                 {/* 2. Profile Image (To the right of Notification) */}
                 <button 
-                  onClick={() => onNavigate(profile?.role === 'seller' ? 'seller' : 'buyer')}
+                  onClick={() => {
+                    const role = profile?.role || 'buyer';
+                    onNavigate(role === 'admin' ? 'admin' : role === 'seller' ? 'seller' : 'buyer', undefined, undefined, undefined, role === 'admin' ? 'overview' : 'dashboard');
+                  }}
                   className="w-9 h-9 rounded-full bg-[#F9F9F6] border border-outline-variant/10 overflow-hidden flex items-center justify-center"
                 >
                   {profile?.photoURL ? (
