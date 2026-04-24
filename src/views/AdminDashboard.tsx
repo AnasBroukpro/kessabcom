@@ -278,7 +278,7 @@ function StockMarketView({ settings, updateSettings }: StockMarketViewProps) {
         </div>
 
         <div className="space-y-3">
-          {newsItems.map((news, index) => (
+          {(Array.isArray(newsItems) ? newsItems : []).map((news, index) => (
             <div key={index} className="flex justify-between items-center bg-surface-container-low p-4 rounded-xl border border-outline-variant/10">
               <span className="font-medium text-on-surface">{news}</span>
               <button 
@@ -1165,7 +1165,7 @@ const renderDonations = () => {
             </tr>
           </thead>
           <tbody className="divide-y divide-outline-variant/10">
-            {filtered.map((req) => (
+            {(Array.isArray(filtered) ? filtered : []).map((req) => (
               <tr key={req.id} className="hover:bg-surface-container-lowest transition-colors">
                 <td className="p-4 font-bold">{req.name}</td>
                 <td className="p-4">
@@ -1224,7 +1224,7 @@ const renderDonations = () => {
             </tr>
           </thead>
           <tbody className="divide-y divide-outline-variant/10">
-            {reports.map((report) => (
+            {(Array.isArray(reports) ? reports : []).map((report) => (
               <tr key={report.id} className="hover:bg-surface-container-lowest transition-colors">
                 <td className="p-4 font-mono text-xs">{report.announcementId}</td>
                 <td className="p-4 font-bold">{report.reporterId === 'anonymous' ? 'زائر' : 'مستخدم'}</td>

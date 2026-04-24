@@ -18,10 +18,10 @@ export default function Notifications({ onNavigate, hideHeader = false }: Props)
   };
 
   const handleClearAll = async () => {
-    if (!user || !notifications.length) return;
+    if (!user || !(notifications || []).length) return;
     if (window.confirm('هل أنت متأكد من حذف جميع التنبيهات؟')) {
       try {
-        await Promise.all(notifications.map(n => firestoreService.deleteNotification(user.uid, n.id)));
+        await Promise.all((Array.isArray(notifications) ? notifications : []).map(n => firestoreService.deleteNotification(user.uid, n.id)));
       } catch (error) {
         console.error('Failed to clear notifications:', error);
       }
@@ -63,7 +63,7 @@ export default function Notifications({ onNavigate, hideHeader = false }: Props)
             <h1 className={`${hideHeader ? 'text-2xl' : 'text-3xl'} font-black text-on-surface font-headline`}>كل التنبيهات</h1>
           </div>
           
-          {notifications.length > 0 && (
+          {(notifications || []).length > 0 && (
             <button 
               onClick={handleClearAll}
               className="flex items-center gap-2 px-6 py-3 bg-red-50 text-red-600 rounded-2xl font-black text-sm hover:bg-red-600 hover:text-white transition-all border border-red-100"
@@ -75,9 +75,9 @@ export default function Notifications({ onNavigate, hideHeader = false }: Props)
         </div>
 
         <div className="bg-white rounded-[2.5rem] border border-outline-variant/30 shadow-xl overflow-hidden">
-          {notifications.length > 0 ? (
+          {(notifications || []).length > 0 ? (
             <div className="divide-y divide-outline-variant/10">
-              {notifications.map((notif) => (
+              {(Array.isArray(notifications) ? notifications : []).map((notif) => (
                 <div 
                   key={notif.id}
                   onClick={() => handleMarkAsRead(notif.id)}

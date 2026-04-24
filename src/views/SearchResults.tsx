@@ -113,7 +113,7 @@ export default function SearchResults({ onNavigate, initialCity, initialRadius, 
     }
   };
 
-  const filteredListings = listings.filter(listing => {
+  const filteredListings = (Array.isArray(listings) ? listings : []).filter(listing => {
     const matchesTypes = selectedTypes.length === 0 || selectedTypes.includes(listing.category);
     const matchesSize = selectedSizes.length === 0 || (listing.sizes && listing.sizes.some((s: string) => selectedSizes.includes(s)));
     const matchesRating = selectedRatings.length === 0 || selectedRatings.includes(Math.floor(listing.rating || 0));
@@ -449,7 +449,7 @@ export default function SearchResults({ onNavigate, initialCity, initialRadius, 
               {/* Map Area */}
               <div className={`flex-1 relative bg-[#F9F9F6] ${activeTab === 'list' ? 'hidden md:block' : 'block'} h-full`}>
                 <GoogleMapComponent
-                  listings={filteredListings
+                  listings={(Array.isArray(filteredListings) ? filteredListings : [])
                     .filter(l => l.coordinates && l.coordinates.lat && l.coordinates.lng)
                     .map((l: any) => ({
                       id: l.id,
@@ -707,7 +707,7 @@ export default function SearchResults({ onNavigate, initialCity, initialRadius, 
                   {(() => {
                     // Aggregate counts
                     const cityCounts: Record<string, number> = {};
-                    listings.forEach(l => {
+                    (Array.isArray(listings) ? listings : []).forEach(l => {
                       const city = getDisplayCity(l);
                       cityCounts[city] = (cityCounts[city] || 0) + 1;
                     });

@@ -543,10 +543,10 @@ export default function ListingDetails({ onNavigate, listingId }: Props) {
                     <div className="bg-[#F9F9F6] p-4 rounded-2xl border border-outline-variant/10">
                       <p className="text-[10px] text-[#757575] mb-1">حجم الحولي</p>
                       <div className="flex gap-1 flex-wrap">
-                        {listing?.sizes?.length > 0 ? listing.sizes.map((size: string, idx: number) => (
+                        {(listing?.sizes || []).length > 0 ? listing.sizes.map((size: string, idx: number) => (
                           <span key={idx} className="text-xs font-bold text-[#1A1A1A]">
                             {size === 'small' ? 'صغير' : size === 'medium' ? 'متوسط' : size === 'large' ? 'كبير' : size === 'extra-large' ? 'كبير جداً' : size}
-                            {idx < listing.sizes.length - 1 ? '، ' : ''}
+                            {idx < (listing.sizes || []).length - 1 ? '، ' : ''}
                           </span>
                         )) : '---'}
                       </div>
@@ -644,11 +644,11 @@ export default function ListingDetails({ onNavigate, listingId }: Props) {
                     </div>
                   )}
 
-                  {sellerProfile?.reviews && sellerProfile.reviews.length > 0 ? (
+                  {Array.isArray(sellerProfile?.reviews) && sellerProfile.reviews.length > 0 ? (
                     <div>
                       <h2 className="text-xl font-bold text-[#1A1A1A] mb-6">شنو قالو الناس على هاد الكساب</h2>
                       <div className="space-y-4">
-                        {sellerProfile.reviews.map((review: any, idx: number) => (
+                        {(sellerProfile?.reviews || []).map((review: any, idx: number) => (
                           <div key={idx} className="bg-[#F9F9F6] p-6 rounded-2xl">
                             <div className="flex justify-between items-start mb-4">
                               <div className="flex items-center gap-4">

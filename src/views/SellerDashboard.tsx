@@ -68,7 +68,7 @@ export default function SellerDashboard({ onNavigate, activeSubView }: Props) {
   };
 
   useEffect(() => {
-    if (user && activeTab === 'buyer-requests' && requests.length === 0) {
+    if (user && activeTab === 'buyer-requests' && (requests || []).length === 0) {
       fetchRequests();
     }
   }, [user, activeTab]);
@@ -121,7 +121,7 @@ export default function SellerDashboard({ onNavigate, activeSubView }: Props) {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         onNavigate={onNavigate}
-        requestsCount={requests.length}
+        requestsCount={(requests || []).length}
         settings={settings}
         signOut={signOut}
       />
@@ -183,7 +183,7 @@ export default function SellerDashboard({ onNavigate, activeSubView }: Props) {
       <SellerMobileNav 
         activeTab={activeTab}
         setActiveTab={setActiveTab}
-        requestsCount={requests.length}
+        requestsCount={(requests || []).length}
       />
 
       {/* Sticky "+" Button - Hidden on Desktop/Tablet */}
