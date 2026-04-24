@@ -387,7 +387,7 @@ export default function Home({ onNavigate }: Props) {
               alt="مرعى أخضر في جبال الأطلس" 
               className="w-full h-full object-cover" 
               src="https://i.ibb.co/hxCgrSY7/generated-image.jpg" 
-              fetchPriority="high"
+              fetchpriority="high"
               referrerPolicy="no-referrer" 
             />
             {/* Linear Gradient Overlay for maximum text contrast (WCAG 2.1) */}
@@ -822,7 +822,7 @@ export default function Home({ onNavigate }: Props) {
                 className={`relative rounded-3xl overflow-hidden shadow-md group cursor-pointer border border-outline-variant/10 ${settings.banners?.banner2Url ? 'hover:opacity-90 transition-opacity' : ''} ${settings.banners?.banner2Mobile ? 'aspect-square' : 'aspect-video'} md:aspect-[24/4.5]`}
               >
                 <picture className="w-full h-full">
-                  {settings.banners?.banner2Mobile && (
+                  {settings.banners?.banner2Mobile && typeof settings.banners.banner2Mobile === 'string' && (
                     <source media="(max-width: 767px)" srcSet={settings.banners.banner2Mobile} />
                   )}
                   <img 
@@ -920,7 +920,7 @@ export default function Home({ onNavigate }: Props) {
                 className={`relative rounded-3xl overflow-hidden shadow-md group cursor-pointer border border-outline-variant/10 ${settings.banners?.banner3Url ? 'hover:opacity-90 transition-opacity' : ''} ${settings.banners?.banner3Mobile ? 'aspect-square' : 'aspect-video'} md:aspect-[24/4.5]`}
               >
                 <picture className="w-full h-full">
-                  {settings.banners?.banner3Mobile && (
+                  {settings.banners?.banner3Mobile && typeof settings.banners.banner3Mobile === 'string' && (
                     <source media="(max-width: 767px)" srcSet={settings.banners.banner3Mobile} />
                   )}
                   <img 
