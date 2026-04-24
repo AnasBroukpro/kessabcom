@@ -380,7 +380,7 @@ export default function Home({ onNavigate }: Props) {
 
       <main className="pt-16">
         {/* Hero & Search Section - 100vh with vertical centering */}
-        <section className="relative min-h-[calc(100dvh-64px)] flex items-center justify-center bg-[#FDFCF8] px-4 z-20 overflow-hidden">
+        <section className="relative min-h-[calc(100dvh-64px)] flex items-center justify-center bg-[#FDFCF8] px-4 z-20">
           {/* Enhanced Background with Overlay */}
           <div className="absolute inset-0 z-0">
             <img
@@ -451,7 +451,7 @@ export default function Home({ onNavigate }: Props) {
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.5, duration: 0.8 }}
-              className="mt-6 md:mt-12 max-w-fit mx-auto"
+              className="mt-6 md:mt-12 max-w-fit mx-auto relative z-[200]"
             >
               <div
                 ref={searchBarRef}
