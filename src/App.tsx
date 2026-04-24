@@ -257,7 +257,7 @@ function AppContent() {
 
   return (
     <div className={`min-h-screen bg-surface text-on-surface font-body selection:bg-primary-fixed selection:text-on-primary-fixed flex flex-col ${['buyer', 'seller', 'admin'].includes(currentView) ? 'h-screen overflow-hidden' : ''}`}>
-      <ScrollToTop view={currentView} />
+      <ScrollToTop />
       <div className="flex-grow">
         {renderView()}
       </div>

@@ -1,24 +1,18 @@
 import React from 'react';
 import { 
-  Eye, MapPin, Phone, CheckCircle2, TrendingUp, PlusCircle, ArrowLeft, MessageCircle 
+  Eye, MapPin, Phone, CheckCircle2, TrendingUp, 
+  ArrowLeft, PlusCircle, User, Settings
 } from 'lucide-react';
 import { getDisplayCity } from '../../constants/cityMapping';
-
 import NewsTicker from '../NewsTicker';
 
-interface DashboardHomeViewProps {
+interface SellerHomeViewProps {
   profile: any;
-  activeFilter: 'today' | 'week' | 'month';
+  activeFilter: string;
   setActiveFilter: (filter: 'today' | 'week' | 'month') => void;
-  stats: {
-    totalViews: number;
-    totalLocationRequests: number;
-    totalCalls: number;
-    activeCount: number;
-    totalMessages: number;
-  };
+  stats: any;
   announcements: any[];
-  onNavigate: (view: any, listingId?: string) => void;
+  onNavigate: (view: any, id?: string) => void;
   setActiveTab: (tab: any) => void;
   settings: any;
   setListingToDelete: (id: string) => void;
@@ -26,7 +20,7 @@ interface DashboardHomeViewProps {
   renderStars: (rating: number) => React.ReactNode;
 }
 
-export default function DashboardHomeView({
+export default function SellerHomeView({
   profile,
   activeFilter,
   setActiveFilter,
@@ -38,147 +32,136 @@ export default function DashboardHomeView({
   setListingToDelete,
   setShowDeleteConfirm,
   renderStars
-}: DashboardHomeViewProps) {
+}: SellerHomeViewProps) {
   return (
-    <>
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-        <div>
-          <h2 className="text-2xl font-black text-on-surface font-headline">لوحة تحكم الكساب</h2>
-          <p className="text-on-surface-variant text-sm font-medium">
-            مرحبا بك {(() => {
-              const name = profile?.fullName || profile?.displayName;
-              if (!name || name.toLowerCase() === 'user') return 'سي محمد';
-              return name;
-            })()}، هاهي نظرة عامة على النشاط ديالك
-          </p>
+    <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+      {/* ── Welcome Header ── */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10">
+        <div className="flex items-center gap-4">
+          <div className="w-16 h-16 bg-[#115E2C] rounded-[10px] flex items-center justify-center text-white shadow-xl shadow-[#115E2C]/10">
+            <User className="w-8 h-8" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-black text-[#1A1A1A] font-headline tracking-tight">
+              مرحبا بك، {profile?.fullName || 'سي محمد'}
+            </h1>
+            <p className="text-[#757575] font-bold">هدا هو الوضع العام ديال القطيع ديالك اليوم</p>
+          </div>
         </div>
-        <div className="flex items-center gap-2 bg-surface-container-high p-1.5 rounded-2xl shadow-sm">
-          {[
-            { id: 'today', label: 'اليوم' },
-            { id: 'week', label: 'هاد السيمانة' },
-            { id: 'month', label: 'هاد الشهر' }
-          ].map((f) => (
-            <button 
-              key={f.id}
-              onClick={() => setActiveFilter(f.id as any)}
-              className={`px-5 py-2 rounded-xl text-xs font-black transition-all ${activeFilter === f.id ? 'bg-[#0a5c1a] text-white shadow-md' : 'text-on-surface-variant hover:bg-surface-variant'}`}
+        
+        <div className="flex bg-white p-1.5 rounded-[10px] shadow-sm border border-outline-variant/10">
+          {['today', 'week', 'month'].map((filter) => (
+            <button
+              key={filter}
+              onClick={() => setActiveFilter(filter as any)}
+              className={`px-6 py-2.5 rounded-[10px] text-sm font-black transition-all ${activeFilter === filter ? 'bg-[#115E2C] text-white shadow-lg' : 'text-[#757575] hover:text-[#115E2C]'}`}
             >
-              {f.label}
+              {filter === 'today' ? 'اليوم' : filter === 'week' ? 'هاد السيمانة' : 'هاد الشهر'}
             </button>
           ))}
         </div>
       </div>
 
-      {/* ── KPI Cards (Buyer Style) ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+      {/* ── KPI Cards ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
         {[
-          { 
-            label: 'إجمالي المشاهدات', 
-            value: stats.totalViews, 
-            unit: 'مشاهدة', 
-            icon: Eye, 
-            color: 'text-blue-600', 
-            bg: 'bg-blue-50' 
-          },
-          { 
-            label: 'زبناء حددو الموقع ديالك', 
-            value: stats.totalLocationRequests, 
-            unit: 'زبناء', 
-            icon: MapPin, 
-            color: 'text-green-600', 
-            bg: 'bg-green-50' 
-          },
-          { 
-            label: 'عدد الزبناء اللي اتصلوا بيك', 
-            value: stats.totalCalls, 
-            unit: 'شخص', 
-            icon: Phone, 
-            color: 'text-orange-600', 
-            bg: 'bg-orange-50' 
-          },
-          { 
-            label: 'الإعلانات النشطة', 
-            value: stats.activeCount, 
-            unit: 'إعلان', 
-            icon: CheckCircle2, 
-            color: 'text-purple-600', 
-            bg: 'bg-purple-50' 
-          },
+          { label: 'إجمالي المشاهدات', value: stats.totalViews, unit: 'مشاهدة', icon: Eye, color: 'text-blue-600', bg: 'bg-blue-50/50' },
+          { label: 'زبناء حددو الموقع', value: stats.totalLocationRequests, unit: 'زبناء', icon: MapPin, color: 'text-[#115E2C]', bg: 'bg-[#E8F5E9]/50' },
+          { label: 'اتصالات الزبناء', value: stats.totalCalls, unit: 'شخص', icon: Phone, color: 'text-orange-600', bg: 'bg-orange-50/50' },
+          { label: 'إعلانات نشطة', value: stats.activeCount, unit: 'إعلان', icon: CheckCircle2, color: 'text-purple-600', bg: 'bg-purple-50/50' },
         ].map((stat, i) => (
-          <div key={i} className="bg-white rounded-3xl p-6 flex items-center justify-between shadow-sm border border-outline-variant/10 group hover:shadow-md transition-all">
-            <div className="text-right">
-              <p className="text-[10px] font-black text-on-surface-variant mb-1 leading-tight">{stat.label}</p>
-              <div className="flex items-baseline gap-1">
-                <p className="text-2xl font-black text-on-surface">{stat.value || 0}</p>
-                <p className="text-[10px] font-bold text-on-surface-variant">{stat.unit}</p>
+          <div key={i} className="bg-white rounded-[10px] p-4 sm:p-6 flex flex-col sm:flex-row items-center sm:justify-between text-center sm:text-right shadow-sm border border-outline-variant/5 group hover:shadow-xl hover:border-[#115E2C]/10 transition-all duration-300">
+            <div className="order-2 sm:order-1 mt-3 sm:mt-0">
+              <p className="text-[9px] sm:text-[10px] font-black text-[#757575] mb-1 sm:mb-2 leading-tight uppercase tracking-wider">{stat.label}</p>
+              <div className="flex items-baseline justify-center sm:justify-start gap-1 sm:gap-1.5">
+                <p className="text-xl sm:text-3xl font-black text-[#1A1A1A]">{stat.value || 0}</p>
+                <p className="text-[9px] sm:text-[10px] font-bold text-[#757575]">{stat.unit}</p>
               </div>
             </div>
-            <div className={`w-12 h-12 rounded-2xl ${stat.bg} flex items-center justify-center ${stat.color} group-hover:scale-110 transition-transform`}>
-              <stat.icon className="w-6 h-6" />
+            <div className={`order-1 sm:order-2 w-10 h-10 sm:w-14 sm:h-14 rounded-[10px] ${stat.bg} flex items-center justify-center ${stat.color} group-hover:scale-110 transition-transform duration-300`}>
+              <stat.icon className="w-5 h-5 sm:w-7 sm:h-7" />
             </div>
           </div>
         ))}
       </div>
 
-      {/* ── News Band (White Background) ── */}
-      <div className="mb-10">
-        <NewsTicker className="!bg-white !border !border-outline-variant/10 !shadow-sm !rounded-2xl !p-4" />
+      {/* ── Market News Ticker Wrapper ── */}
+      <div className="mb-12 bg-white rounded-[10px] border border-outline-variant/10 shadow-sm overflow-hidden">
+        <NewsTicker className="!bg-transparent !border-none !shadow-none !p-4 !m-0" />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 mb-8">
-        {/* Right Column (2/3): My Flock */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
+        {/* Right Column (2/3): Latest Offers */}
         <div className="lg:col-span-2 space-y-6">
-          <div className="flex justify-between items-center mb-2">
-            <h2 className="text-xl font-black text-on-surface font-headline">أحدث عروضك</h2>
-            <button onClick={() => setActiveTab('flock')} className="text-[#0a5c1a] font-black text-sm flex items-center gap-1 hover:gap-2 transition-all">
+          <div className="flex justify-between items-end mb-2">
+            <div>
+              <h2 className="text-2xl font-black text-[#1A1A1A] font-headline tracking-tight">أحدث عروضك</h2>
+              <div className="w-12 h-1 bg-[#115E2C] rounded-full mt-2"></div>
+            </div>
+            <button onClick={() => setActiveTab('flock')} className="text-[#115E2C] font-black text-sm flex items-center gap-1.5 group hover:gap-2.5 transition-all">
               <span>شوف كلشي</span>
-              <ArrowLeft className="w-4 h-4" />
+              <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {Array.isArray(announcements) && announcements.slice(0, 2).map((announcement) => (
-              <div key={announcement.id} className="bg-white rounded-[2rem] overflow-hidden border border-outline-variant/30 shadow-sm group hover:shadow-md transition-all">
-                <div className="relative h-48 overflow-hidden">
-                  <img alt={announcement.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src={announcement.images?.[0] || "https://i.ytimg.com/vi/RrkkshRUttw/hq720.jpg?sqp=-oaymwEhCK4FEIIDSFryq4qpAxMIARUAAAAAGAElAADIQj0AgKJD&rs=AOn4CLD92lI4Kxe5liKSwWZaJuLAFopNeA"} referrerPolicy="no-referrer" />
-                  <div className="absolute top-4 right-4 bg-primary text-on-primary px-3 py-1 rounded-xl text-[10px] font-black shadow-lg">{announcement.status === 'active' ? 'نشط' : 'غير نشط'}</div>
+          {/* Mobile Carousel / Desktop Grid */}
+          <div className="flex md:grid md:grid-cols-2 gap-6 md:gap-8 overflow-x-auto md:overflow-x-visible pb-6 md:pb-0 snap-x no-scrollbar -mx-4 px-4 md:mx-0 md:px-0">
+            {Array.isArray(announcements) && announcements.slice(0, 4).map((announcement) => (
+              <div key={announcement.id} className="min-w-[280px] sm:min-w-[320px] md:min-w-0 bg-white rounded-[10px] overflow-hidden border border-outline-variant/10 shadow-sm group hover:shadow-2xl hover:border-[#115E2C]/20 transition-all duration-500 flex flex-col snap-center">
+                <div className="relative h-48 sm:h-56 overflow-hidden">
+                  <img alt={announcement.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" src={announcement.images?.[0] || "https://i.ytimg.com/vi/RrkkshRUttw/hq720.jpg?sqp=-oaymwEhCK4FEIIDSFryq4qpAxMIARUAAAAAGAElAADIQj0AgKJD&rs=AOn4CLD92lI4Kxe5liKSwWZaJuLAFopNeA"} referrerPolicy="no-referrer" />
+                  <div className={`absolute top-5 right-5 px-4 py-1.5 rounded-[10px] text-[10px] font-black shadow-xl backdrop-blur-md ${announcement.status === 'active' ? 'bg-[#115E2C] text-white' : 'bg-red-600 text-white'}`}>
+                    {announcement.status === 'active' ? 'نشط' : 'غير نشط'}
+                  </div>
                 </div>
-                <div className="p-6">
-                  <h3 className="font-black text-on-surface text-base mb-1 truncate">{announcement.title}</h3>
-                  <div className="flex items-center gap-2 text-[10px] text-on-surface-variant font-bold mb-4">
-                    <MapPin className="w-3.5 h-3.5 text-[#0a5c1a]" />
+                <div className="p-6 sm:p-8 text-right">
+                  <h3 className="font-black text-[#1A1A1A] text-lg mb-2 truncate group-hover:text-[#115E2C] transition-colors">{announcement.title}</h3>
+                  <div className="flex items-center gap-2 text-xs text-[#757575] font-bold mb-4 sm:mb-6">
+                    <MapPin className="w-4 h-4 text-[#115E2C]" />
                     <span>{getDisplayCity(announcement)}</span>
                   </div>
-                  <div className="flex items-center gap-3 text-[10px] font-black">
-                    <span className="flex items-center gap-1.5 bg-blue-50 text-blue-700 px-2 py-1 rounded-lg"><Eye className="w-3.5 h-3.5" /> {announcement.views || 0}</span>
-                    <span className="flex items-center gap-1.5 bg-orange-50 text-orange-700 px-2 py-1 rounded-lg"><Phone className="w-3.5 h-3.5" /> {announcement.calls || 0}</span>
+                  <div className="flex items-center gap-4 text-[11px] font-black">
+                    <span className="flex items-center gap-2 bg-[#E8F5E9] text-[#115E2C] px-3 py-1.5 rounded-[10px]"><Eye className="w-4 h-4" /> {announcement.views || 0}</span>
+                    <span className="flex items-center gap-2 bg-orange-50 text-orange-700 px-3 py-1.5 rounded-[10px]"><Phone className="w-4 h-4" /> {announcement.calls || 0}</span>
                   </div>
                 </div>
               </div>
             ))}
-            <div onClick={() => onNavigate('add-listing')} className="bg-surface-container-low rounded-[2rem] border-2 border-dashed border-outline-variant/50 flex flex-col items-center justify-center h-full min-h-[180px] cursor-pointer hover:bg-white hover:border-primary/50 transition-all group">
-               <PlusCircle className="w-8 h-8 text-primary mb-2 group-hover:scale-110 transition-transform" />
-               <p className="font-black text-sm text-on-surface">إضافة عرض جديد</p>
-               <ArrowLeft className="w-4 h-4 mt-2 text-on-surface-variant" />
-            </div>
+          </div>
+
+          {/* Add Listing Block (Moved below carousel) */}
+          <div 
+            onClick={() => onNavigate('add-listing')} 
+            className="bg-[#FDFCF8] rounded-[10px] border-2 border-dashed border-[#115E2C]/20 flex items-center justify-between p-6 cursor-pointer hover:bg-white hover:border-[#115E2C]/50 hover:shadow-xl transition-all duration-300 group w-full"
+          >
+             <div className="flex items-center gap-4">
+               <div className="w-12 h-12 rounded-[10px] bg-[#E8F5E9] flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <PlusCircle className="w-6 h-6 text-[#115E2C]" />
+               </div>
+               <div>
+                 <p className="font-black text-lg text-[#1A1A1A]">إضافة عرض جديد</p>
+                 <p className="text-sm text-[#757575] font-bold">صور، سجل وبيع دغيا</p>
+               </div>
+             </div>
+             <ArrowLeft className="w-6 h-6 text-[#115E2C] transition-transform group-hover:-translate-x-2" />
           </div>
         </div>
 
-        {/* Left Column (1/3): Tips */}
+        {/* Left Column (1/3): Tips Section */}
         <div className="space-y-6">
-          <div className="bg-[#F9F9F6] rounded-[2.5rem] p-8 border border-outline-variant/20 shadow-sm relative overflow-hidden h-full">
-             <div className="absolute -top-6 -right-6 w-24 h-24 bg-primary/5 rounded-full blur-2xl"></div>
-             <div className="relative z-10 flex flex-col h-full">
-                <div className="w-12 h-12 bg-[#0a5c1a] rounded-2xl flex items-center justify-center text-white mb-6 shadow-lg shadow-primary/20">
-                  <PlusCircle className="w-6 h-6" />
+          <div className="bg-white rounded-[10px] p-8 border border-outline-variant/10 shadow-sm relative overflow-hidden h-full flex flex-col group hover:shadow-2xl transition-all duration-500">
+             <div className="absolute top-0 right-0 w-32 h-32 bg-[#115E2C]/5 rounded-full -mr-16 -mt-16 blur-3xl group-hover:bg-[#115E2C]/10 transition-colors"></div>
+             <div className="relative z-10 flex flex-col h-full text-right">
+                <div className="w-14 h-14 bg-[#115E2C] rounded-[10px] flex items-center justify-center text-white mb-6 shadow-xl shadow-[#115E2C]/20 group-hover:rotate-6 transition-transform">
+                  <TrendingUp className="w-7 h-7" />
                 </div>
-                <h3 className="font-black text-xl mb-3 leading-tight">نصائح للكساب</h3>
-                <p className="text-sm text-on-surface-variant font-medium leading-relaxed mb-8 flex-1">
+                <h3 className="font-black text-2xl mb-4 leading-tight text-[#1A1A1A]">نصائح للكساب</h3>
+                <p className="text-sm text-[#757575] font-medium leading-relaxed mb-8 flex-1">
                   باش تبيع دغيا، صور الحولي فيديوهات واضحة فضو النهار. حاول تجاوب على مكالمات الزبناء فالحين، وكون شفاف فالثمن باش توفر عليك الوقت مع السمسارة.
                 </p>
                 <button 
                   onClick={() => onNavigate('tips')}
-                  className="text-[#0a5c1a] font-black text-sm flex items-center gap-2 hover:gap-3 transition-all"
+                  className="w-full py-4 bg-[#F5F5F0] text-[#115E2C] rounded-[10px] font-black text-sm flex items-center justify-center gap-3 hover:bg-[#115E2C] hover:text-white transition-all duration-300"
                 >
                   <span>شوف كاع النصائح</span>
                   <ArrowLeft className="w-4 h-4" />
@@ -187,6 +170,6 @@ export default function DashboardHomeView({
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
 }

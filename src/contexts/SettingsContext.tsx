@@ -96,7 +96,9 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const data = await firestoreService.getSettings();
+        const res = await fetch('/api/settings');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
         if (data) {
           const merged = { 
             ...defaultSettings, 
@@ -111,6 +113,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (error) {
         console.warn("Settings fetch issue:", error);
+        // Fallback is already defaultSettings via useState initialization
       } finally {
         setLoading(false);
       }

@@ -377,61 +377,37 @@ export default function SearchResults({ onNavigate, initialCity, initialRadius, 
         {/* View Content */}
         {filteredListings.length > 0 ? (
           viewMode === 'map' ? (
-            <div className="fixed inset-0 top-[148px] md:top-[81px] bg-white z-40 flex flex-col md:flex-row shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-500 overflow-hidden">
-              {/* Floating Exit Button for Mobile Map View */}
-              <div className="absolute top-4 left-4 z-[70] md:hidden">
-                <button 
-                  onClick={() => setViewMode('grid')}
-                  className="bg-white/90 backdrop-blur-md p-3 rounded-2xl shadow-xl border border-outline-variant/20 text-[#2E7D32]"
-                >
-                  <ArrowLeft className="w-6 h-6" />
-                </button>
-              </div>
-
-              {/* Map Layout - similar to screenshot */}
-              <div className={`w-full md:w-[450px] lg:w-[500px] bg-white flex flex-col border-l border-outline-variant/20 z-10 ${activeTab === 'map' ? 'hidden md:flex' : 'flex'} h-full overflow-hidden`}>
-                <div className="p-6 border-b border-outline-variant/20 flex justify-between items-center bg-white shrink-0">
+            <div className="flex flex-col md:flex-row bg-white rounded-3xl overflow-hidden shadow-sm border border-outline-variant/20 h-[calc(100vh-240px)] min-h-[500px] animate-in fade-in duration-500 relative z-10">
+              {/* Desktop Sidebar / Mobile List Tab */}
+              <div className={`w-full md:w-[400px] lg:w-[450px] flex-col border-l border-outline-variant/20 bg-[#FDFCF8] ${activeTab === 'map' ? 'hidden md:flex' : 'flex'} h-full shrink-0 relative z-20`}>
+                <div className="p-4 border-b border-outline-variant/20 bg-white flex justify-between items-center shrink-0">
                   <div>
-                    <h2 className="text-xl font-black text-[#1A1A1A] font-headline">{filteredListings.length} حولي قريب ليك</h2>
-                    <p className="text-sm text-[#757575]">فشعاع {radiusSearch === 'all' ? '150' : radiusSearch} كلم من {citySearch}</p>
-                  </div>
-                  <div className="flex gap-2">
-                    <button 
-                      onClick={() => setShowFilterModal(true)}
-                      className="p-2 bg-[#F9F9F6] rounded-xl transition-colors border border-transparent hover:border-gray-300"
-                    >
-                      <SlidersHorizontal className="w-5 h-5 text-[#1A1A1A]" />
-                    </button>
-                    <button 
-                      onClick={() => setViewMode('grid')}
-                      className="p-2 bg-red-50 rounded-xl transition-colors border border-transparent hover:border-red-600 text-red-600 md:hidden"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
+                    <h2 className="text-lg font-black text-[#1A1A1A] font-headline">{filteredListings.length} حولي فـ الخريطة</h2>
+                    <p className="text-xs text-[#757575]">شعاع {radiusSearch === 'all' ? '150' : radiusSearch} كلم</p>
                   </div>
                 </div>
                 
-                <div className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar">
+                <div className="flex-1 overflow-y-auto p-3 space-y-3 no-scrollbar">
                   {filteredListings.map((listing: any) => {
                     return (
                       <div 
                         key={listing.id} 
-                        className={`bg-[#FDFCF8] rounded-2xl overflow-hidden flex flex-row min-h-[9rem] border transition-all cursor-pointer group ${hoveredMarker === listing.id ? 'border-[#2E7D32] shadow-lg ring-1 ring-[#2E7D32]' : 'border-outline-variant/30 hover:shadow-lg'}`}
+                        className={`bg-white rounded-2xl overflow-hidden flex flex-row min-h-[120px] border transition-all cursor-pointer group ${hoveredMarker === listing.id ? 'border-[#2E7D32] shadow-md ring-1 ring-[#2E7D32]' : 'border-outline-variant/30 hover:shadow-md'}`}
                         onClick={() => onNavigate('listing-details', listing.id)}
                         onMouseEnter={() => setHoveredMarker(listing.id)}
                         onMouseLeave={() => setHoveredMarker(null)}
                       >
-                        <div className="w-28 h-full overflow-hidden relative shrink-0">
-                          <img alt={listing.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src={listing.images?.[0] || listing.image || "https://images.unsplash.com/photo-1511117833895-4b473c0b85d6?auto=format&fit=crop&q=80&w=800"} referrerPolicy="no-referrer" />
+                        <div className="w-[120px] h-[120px] relative shrink-0 self-start">
+                          <img alt={listing.title} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src={listing.images?.[0] || listing.image || "https://images.unsplash.com/photo-1511117833895-4b473c0b85d6?auto=format&fit=crop&q=80&w=800"} referrerPolicy="no-referrer" />
                         </div>
-                        <div className="flex-1 p-3 flex flex-col justify-between overflow-hidden">
+                        <div className="flex-1 p-2.5 flex flex-col justify-between min-w-0">
                           <div>
-                            <div className="flex justify-between items-start mb-0.5">
-                              <h3 className="font-black text-[#1A1A1A] text-xs truncate">ضيعة {listing.sellerName || 'كساب'}</h3>
+                            <div className="flex justify-between items-start mb-0.5 gap-2">
+                              <h3 className="font-black text-[#1A1A1A] text-xs truncate flex-1">ضيعة {listing.sellerName || 'كساب'}</h3>
                               <span className="text-[8px] font-black text-[#2E7D32] bg-[#2E7D32]/10 px-1.5 py-0.5 rounded-md shrink-0">{listing.category || 'سردي'}</span>
                             </div>
                             <div className="flex items-center gap-1 text-[#757575] text-[9px] font-bold">
-                              <MapPin className="w-2.5 h-2.5 text-[#2E7D32]" />
+                              <MapPin className="w-2.5 h-2.5 text-[#2E7D32] shrink-0" />
                               <span className="truncate">
                                 {getDisplayCity(listing)}
                                 {listing.calculatedDistance && listing.calculatedDistance !== 999 && ` (${Math.round(listing.calculatedDistance)} كلم)`}
@@ -439,25 +415,16 @@ export default function SearchResults({ onNavigate, initialCity, initialRadius, 
                             </div>
                           </div>
                           
-                          <div className="mt-auto pt-2">
+                          <div className="mt-2 pt-2 border-t border-outline-variant/10">
                             <div className="flex items-center justify-between mb-2">
-                              <span className="text-[#2E7D32] font-black text-xs">كيبدا من {listing.minPrice || listing.price} درهم</span>
-                              <div className="flex items-center gap-0.5">
-                                <Star className="w-2.5 h-2.5 fill-[#FFC107] text-[#FFC107]" />
+                              <span className="text-[#2E7D32] font-black text-[11px] truncate pr-1">من {listing.minPrice || listing.price} د.م</span>
+                              <div className="flex items-center gap-0.5 shrink-0 bg-[#FFF9C4] px-1 rounded text-[#F57F17]">
+                                <Star className="w-2.5 h-2.5 fill-current" />
                                 <span className="text-[9px] font-black">{(listing.rating || 5).toFixed(1)}</span>
                               </div>
                             </div>
                             
-                            <div className="flex items-center gap-2">
-                              <button 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onNavigate('listing-details', listing.id);
-                                }}
-                                className="flex-1 py-1.5 bg-white border border-[#2E7D32]/20 text-[#2E7D32] text-[9px] font-black rounded-lg hover:bg-[#2E7D32]/5 transition-all flex justify-center items-center"
-                              >
-                                التفاصيل
-                              </button>
+                            <div className="flex items-center gap-1.5">
                               <button 
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -477,16 +444,10 @@ export default function SearchResults({ onNavigate, initialCity, initialRadius, 
                     );
                   })}
                 </div>
-
-                {/* Mobile Map/List Toggle */}
-                <div className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-md p-1.5 rounded-full shadow-2xl flex md:hidden border border-outline-variant/10 z-[60]">
-                   <button onClick={() => setActiveTab('map')} className={`px-8 py-3 rounded-full text-sm font-black transition-colors border border-transparent ${activeTab === 'map' ? 'bg-[#2E7D32] text-white shadow-lg border-[#2E7D32]' : 'text-[#757575] hover:bg-white hover:text-[#2E7D32] hover:border-[#2E7D32]'}`}>الخريطة</button>
-                   <button onClick={() => setActiveTab('list')} className={`px-8 py-3 rounded-full text-sm font-black transition-colors border border-transparent ${activeTab === 'list' ? 'bg-[#2E7D32] text-white shadow-lg border-[#2E7D32]' : 'text-[#757575] hover:bg-white hover:text-[#2E7D32] hover:border-[#2E7D32]'}`}>اللائحة</button>
-                </div>
               </div>
 
-              {/* Map View */}
-              <div className={`flex-1 relative bg-[#F9F9F6] ${activeTab === 'list' ? 'hidden md:block' : 'block'}`}>
+              {/* Map Area */}
+              <div className={`flex-1 relative bg-[#F9F9F6] ${activeTab === 'list' ? 'hidden md:block' : 'block'} h-full`}>
                 <GoogleMapComponent
                   listings={filteredListings
                     .filter(l => l.coordinates && l.coordinates.lat && l.coordinates.lng)
@@ -515,54 +476,74 @@ export default function SearchResults({ onNavigate, initialCity, initialRadius, 
                   setHoveredListingId={setHoveredMarker}
                 />
                 
-                {/* View Switcher Overlay for Mobile Map */}
-                <div className="absolute top-4 right-4 z-[70] md:hidden">
-                  {renderViewSwitcher()}
-                </div>
-
-                {/* View Switcher Overlay for Desktop Map */}
-                <div className="absolute top-4 right-4 z-[70] hidden md:block">
-                  {renderViewSwitcher()}
+                {/* Mobile Floating Toggle for Map/List */}
+                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 md:hidden z-[60]">
+                  <div className="bg-[#1A1A1A] p-1 rounded-full shadow-2xl flex items-center gap-1 backdrop-blur-md bg-opacity-90 border border-white/10">
+                    <button 
+                      onClick={() => setActiveTab('map')} 
+                      className={`px-6 py-2 rounded-full text-xs font-black transition-all ${activeTab === 'map' ? 'bg-white text-[#1A1A1A] shadow-md' : 'text-white/70 hover:text-white'}`}
+                    >
+                      الخريطة
+                    </button>
+                    <button 
+                      onClick={() => setActiveTab('list')} 
+                      className={`px-6 py-2 rounded-full text-xs font-black transition-all ${activeTab === 'list' ? 'bg-white text-[#1A1A1A] shadow-md' : 'text-white/70 hover:text-white'}`}
+                    >
+                      اللائحة
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
           ) : viewMode === 'list' ? (
-            <div className="flex flex-col gap-6 max-w-5xl mx-auto">
+            <div className="flex flex-col gap-4 sm:gap-6 max-w-5xl mx-auto">
               {filteredListings.map((listing) => (
                 <div 
                   key={listing.id} 
-                  className="bg-white rounded-[2.5rem] overflow-hidden shadow-sm border border-outline-variant/20 hover:shadow-2xl transition-all duration-500 group cursor-pointer flex flex-row h-36 sm:h-44" 
+                  className="bg-white rounded-2xl overflow-hidden shadow-sm border border-outline-variant/20 hover:shadow-lg transition-all duration-300 group cursor-pointer flex flex-row min-h-[140px]" 
                   onClick={() => onNavigate('listing-details', listing.id)}
                 >
-                  <div className="relative w-32 sm:w-56 h-full overflow-hidden shrink-0">
+                  <div className="relative w-[140px] h-[140px] sm:w-[200px] sm:h-[200px] shrink-0 self-start">
                     <img 
                       alt={listing.title} 
-                      className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" 
+                      className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" 
                       src={listing.images?.[0] || listing.image || "https://images.unsplash.com/photo-1511117833895-4b473c0b85d6?auto=format&fit=crop&q=80&w=800"} 
                       referrerPolicy="no-referrer" 
                     />
                   </div>
-                  <div className="p-3 md:p-4 flex-1 flex flex-row justify-between overflow-hidden relative gap-2">
-                    {/* Right Column (Info + Buttons) */}
-                    <div className="flex flex-col justify-between items-start text-right min-w-0 flex-1">
-                      <div className="flex flex-col w-full">
-                         <h3 className="text-sm md:text-xl font-black text-[#1A1A1A] group-hover:text-[#2E7D32] transition-colors truncate mb-1">ضيعة {listing.sellerName || 'كساب'}</h3>
-                         <div className="flex flex-col gap-0.5 mb-2 w-full">
-                           <div className="flex items-center gap-1 text-[10px] md:text-xs text-[#757575] font-black truncate">
-                              <MapPin className="w-3 h-3 text-[#2E7D32] shrink-0" />
-                              <span className="truncate">
-                                {getDisplayCity(listing)}
-                                {listing.calculatedDistance && listing.calculatedDistance !== 999 && ` (على بعد ${Math.round(listing.calculatedDistance)} كلم)`}
-                              </span>
-                           </div>
-                           <div className="flex items-center gap-1 text-[10px] md:text-xs text-[#757575] font-black truncate">
-                              <MapPin className="w-3 h-3 opacity-0 shrink-0" />
-                              <span className="truncate">{listing.farmLocation || 'موقع الضيعة غير محدد'}</span>
-                           </div>
-                         </div>
+                  <div className="p-3 sm:p-5 flex-1 flex flex-col justify-between min-w-0">
+                    <div className="flex justify-between items-start gap-2">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-sm sm:text-xl font-black text-[#1A1A1A] group-hover:text-[#2E7D32] transition-colors truncate mb-1">ضيعة {listing.sellerName || 'كساب'}</h3>
+                        <div className="flex items-center gap-1 text-[10px] sm:text-sm text-[#757575] font-bold">
+                          <MapPin className="w-3 h-3 sm:w-4 sm:h-4 text-[#2E7D32] shrink-0" />
+                          <span className="truncate">
+                            {getDisplayCity(listing)}
+                            {listing.calculatedDistance && listing.calculatedDistance !== 999 && ` (${Math.round(listing.calculatedDistance)} كلم)`}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 bg-[#FFF9C4] px-1.5 py-0.5 rounded text-[10px] sm:text-xs font-bold text-[#F57F17] shrink-0">
+                        <Star className="w-3 h-3 fill-current" />
+                        <span>{(listing.rating || 5).toFixed(1)}</span>
+                      </div>
+                    </div>
+                    
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      <span className="bg-[#E8F5E9] px-2 py-0.5 rounded text-[10px] sm:text-xs font-black text-[#2E7D32] border border-[#2E7D32]/10">{listing.category || 'سردي'}</span>
+                      {listing.sizes?.slice(0, 2).map((size: string, idx: number) => (
+                        <span key={idx} className="bg-[#F9F9F6] px-2 py-0.5 rounded text-[10px] sm:text-xs font-bold text-[#4A4A4A] border border-outline-variant/10">
+                          {size === 'small' ? 'صغير' : size === 'medium' ? 'متوسط' : size === 'large' ? 'كبير' : size === 'extra-large' ? 'كبير جداً' : size}
+                        </span>
+                      ))}
+                    </div>
+
+                    <div className="mt-auto pt-3 flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+                      <div className="text-[#2E7D32] font-black text-xs sm:text-lg truncate">
+                        كيبدا من {listing.minPrice || listing.price || '0'} درهم
                       </div>
                       
-                      <div className="flex gap-2 mt-auto pb-1">
+                      <div className="flex items-center gap-2">
                         <button 
                           onClick={(e) => {
                             e.stopPropagation();
@@ -571,42 +552,19 @@ export default function SearchResults({ onNavigate, initialCity, initialRadius, 
                             setSelectedListingId(listing.id);
                             setContactModalOpen(true);
                           }}
-                          className="bg-[#2E7D32] text-white px-3 md:px-4 py-1.5 md:py-2 rounded-xl text-[9px] md:text-[10px] font-black shadow-md hover:shadow-lg transition-all flex flex-row-reverse items-center gap-1"
+                          className="flex-1 sm:flex-none px-3 py-1.5 sm:px-6 sm:py-2.5 bg-[#2E7D32] text-white rounded-lg text-[10px] sm:text-sm font-black transition-colors hover:bg-[#1B5E20] text-center shadow-sm"
                         >
-                          <Phone className="w-3 h-3" />
-                          <span>تواصل مع الكساب</span>
+                          تواصل
                         </button>
                         <button 
                           onClick={(e) => {
                             e.stopPropagation();
                             onNavigate('listing-details', listing.id);
                           }}
-                          className="bg-white border border-[#2E7D32]/20 text-[#2E7D32] px-3 md:px-4 py-1.5 md:py-2 rounded-xl text-[9px] md:text-[10px] font-black hover:bg-[#2E7D32]/5 transition-all flex items-center gap-1"
+                          className="flex-1 sm:flex-none px-3 py-1.5 sm:px-6 sm:py-2.5 bg-white text-[#2E7D32] border border-[#2E7D32]/20 rounded-lg text-[10px] sm:text-sm font-black transition-colors hover:bg-[#2E7D32]/5 text-center"
                         >
-                          <span>التفاصيل</span>
-                          <ArrowLeft className="w-3 h-3 ml-1" />
+                          التفاصيل
                         </button>
-                      </div>
-                    </div>
-
-                    {/* Left Column (Stars, Type, Sizes, Price) */}
-                    <div className="flex flex-col justify-between items-end shrink-0 pl-2 max-w-[40%]">
-                      <div className="flex items-center gap-1">
-                        <span className="text-xs font-black text-[#1A1A1A]">{(listing.rating || 5).toFixed(1)}</span>
-                        <Star className="w-3.5 h-3.5 fill-[#FFC107] text-[#FFC107]" />
-                      </div>
-                      <div className="flex flex-col items-end gap-1.5 mt-2">
-                        <span className="bg-[#E8F5E9] px-2 py-0.5 rounded-lg text-[8px] md:text-[10px] font-black text-[#2E7D32] border border-[#2E7D32]/10">{listing.category || 'سردي'}</span>
-                        <div className="flex flex-wrap gap-1 justify-end">
-                          {listing.sizes?.slice(0, 2).map((size: string, idx: number) => (
-                            <span key={idx} className="bg-[#F9F9F6] px-2 py-0.5 rounded-lg text-[8px] md:text-[10px] font-bold text-[#4A4A4A] border border-outline-variant/10">
-                              {size === 'small' ? 'صغير' : size === 'medium' ? 'متوسط' : size === 'large' ? 'كبير' : size === 'extra-large' ? 'كبير جداً' : size}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="mt-auto text-[#2E7D32] font-black text-sm md:text-base pb-1">
-                        كيبدا من {listing.minPrice || listing.price || '0'} درهم
                       </div>
                     </div>
                   </div>

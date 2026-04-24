@@ -189,7 +189,7 @@ const isAdmin = async (req: any, res: Response, next: NextFunction) => {
 
 async function startServer() {
   const app = express();
-  const PORT = parseInt(process.env.PORT || '3000', 10);
+  const PORT = parseInt(process.env.PORT || '3001', 10);
 
   app.use(express.json({ limit: '50mb' }));
 
@@ -573,9 +573,9 @@ async function startServer() {
         farmLocation: farmLocation ? String(farmLocation).trim() : null,
         coordinates: coordinates && typeof coordinates === 'object' ? coordinates : null,
         images: Array.isArray(images) ? images.slice(0, 10) : [],
-        videoUrl: videoUrl ? String(videoUrl).slice(0, 500) : null,
-        youtubeLink: youtubeLink ? String(youtubeLink).slice(0, 500) : null,
-        audioUrl: audioUrl ? String(audioUrl).slice(0, 500) : null,
+        videoUrl: videoUrl ? String(videoUrl).slice(0, 1000) : null,
+        youtubeLink: youtubeLink ? String(youtubeLink).slice(0, 1000) : null,
+        audioUrl: audioUrl ? String(audioUrl).slice(0, 1000) : null,
         ages: ages || null,
         age: age !== undefined ? String(age) : null,
         sizes: Array.isArray(sizes) ? sizes : [],

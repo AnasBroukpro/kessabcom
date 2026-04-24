@@ -32,9 +32,9 @@
   --color-on-error: #ffffff;
   --color-on-error-container: #93000a;
 
-  --font-headline: "Be Vietnam Pro", "Noto Sans Arabic", sans-serif;
-  --font-body: "Manrope", "Noto Sans Arabic", sans-serif;
-  --font-label: "Inter", "Noto Sans Arabic", sans-serif;
+  --font-headline: "Tajawal", "Noto Sans Arabic", sans-serif;
+  --font-body: "IBM Plex Sans Arabic", "Noto Sans Arabic", sans-serif;
+  --font-label: "IBM Plex Sans Arabic", "Noto Sans Arabic", sans-serif;
 }
 
 @layer base {
@@ -75,4 +75,7 @@
 /* Hide reCAPTCHA badge */
 .grecaptcha-badge { 
   visibility: hidden !important; 
+}
+
+@layer utilities {
 }

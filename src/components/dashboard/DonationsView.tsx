@@ -39,7 +39,7 @@ export function DonationsView({ onBack }: DonationsViewProps) {
   if (submitted) {
     return (
       <div className="flex-1 flex items-center justify-center p-8" dir="rtl">
-        <div className="max-w-md w-full bg-white rounded-3xl p-10 shadow-xl text-center border border-[#E8F5E9]">
+        <div className="max-w-md w-full bg-white rounded-[10px] p-10 shadow-xl text-center border border-[#E8F5E9]">
           <div className="w-20 h-20 bg-[#E8F5E9] rounded-full flex items-center justify-center mx-auto mb-6">
             <CheckCircle2 className="w-12 h-12 text-[#2E7D32]" />
           </div>
@@ -47,7 +47,7 @@ export function DonationsView({ onBack }: DonationsViewProps) {
           <p className="text-[#4A4A4A] font-medium mb-8">شكرا لك على كرمك يا كساب. التبرع ديالك غادي يوصل للناس لي محتاجين وغادي نتواصلو معاك لتنسيق عملية التسليم.</p>
           <button 
             onClick={() => { setSubmitted(false); onBack(); }} 
-            className="w-full bg-[#2E7D32] text-white py-4 rounded-xl font-bold border border-transparent hover:bg-white hover:text-[#2E7D32] hover:border-[#2E7D32] transition-colors"
+            className="w-full bg-[#2E7D32] text-white py-4 rounded-[10px] font-bold border border-transparent hover:bg-white hover:text-[#2E7D32] hover:border-[#2E7D32] transition-colors"
           >
             الرجوع للوحة التحكم
           </button>
@@ -64,13 +64,13 @@ export function DonationsView({ onBack }: DonationsViewProps) {
           <p className="text-on-surface-variant">ساهم في إدخال الفرحة على الأسر المعوزة. حدد عدد الأكباش لي بغيتي تبرع بيهم من القطيع ديالك.</p>
         </div>
 
-        <div className="bg-white rounded-3xl p-8 shadow-xl border border-outline-variant/20">
+        <div className="bg-white rounded-[10px] p-8 shadow-xl border border-outline-variant/20">
           <form className="space-y-6" onSubmit={handleSubmit}>
             <div className="space-y-2">
               <label className="block text-sm font-bold text-[#4A4A4A] mr-1">عدد الأكباش للتبرع</label>
               <div className="relative">
                 <input 
-                  className="w-full h-14 px-4 pr-12 bg-[#F9F9F6] border border-transparent rounded-xl focus:ring-2 focus:ring-[#2E7D32] focus:bg-white transition-all outline-none text-left" 
+                  className="w-full h-14 px-4 pr-12 bg-[#F9F9F6] border border-transparent rounded-[10px] focus:ring-2 focus:ring-[#2E7D32] focus:bg-white transition-all outline-none text-left" 
                   placeholder="مثلا: 1" 
                   required 
                   type="number" 
@@ -87,7 +87,7 @@ export function DonationsView({ onBack }: DonationsViewProps) {
               <label className="block text-sm font-bold text-[#4A4A4A] mr-1">ملاحظات إضافية</label>
               <div className="relative">
                 <textarea 
-                  className="w-full p-4 pr-12 bg-[#F9F9F6] border border-transparent rounded-xl focus:ring-2 focus:ring-[#2E7D32] focus:bg-white transition-all outline-none min-h-[150px]" 
+                  className="w-full p-4 pr-12 bg-[#F9F9F6] border border-transparent rounded-[10px] focus:ring-2 focus:ring-[#2E7D32] focus:bg-white transition-all outline-none min-h-[150px]" 
                   placeholder="مثلا: عندي أكباش واجدين للتبرع، بغيتهم يمشيو لدار الأيتام..." 
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
@@ -99,7 +99,7 @@ export function DonationsView({ onBack }: DonationsViewProps) {
             <button 
               type="submit" 
               disabled={isSubmitting}
-              className="w-full h-16 bg-[#2E7D32] text-white font-black text-xl rounded-xl shadow-lg border border-transparent hover:bg-white hover:text-[#2E7D32] hover:border-[#2E7D32] transition-colors flex items-center justify-center gap-2"
+              className="w-full h-16 bg-[#2E7D32] text-white font-black text-xl rounded-[10px] shadow-lg border border-transparent hover:bg-white hover:text-[#2E7D32] hover:border-[#2E7D32] transition-colors flex items-center justify-center gap-2"
             >
               {isSubmitting ? <Loader2 className="w-6 h-6 animate-spin" /> : 'تأكيد التبرع'}
             </button>

@@ -204,7 +204,7 @@ export default function KessabaOffersView({
             <span>الرجوع للعروض</span>
           </button>
 
-          <div className="bg-surface p-6 rounded-3xl border border-outline-variant/30 shadow-sm">
+          <div className="bg-surface p-6 rounded-[10px] border border-outline-variant/30 shadow-sm">
             <div className="flex justify-between items-start mb-6">
               <div>
                 <h2 className="text-2xl font-black text-on-surface font-headline">تفاصيل الطلب</h2>
@@ -239,24 +239,24 @@ export default function KessabaOffersView({
                 
                 <div className="flex flex-wrap gap-4 mt-4">
                   {selectedKessabaRequest.imageUrl && (
-                    <div className="w-24 h-24 rounded-xl overflow-hidden border border-outline-variant/30">
+                    <div className="w-24 h-24 rounded-[10px] overflow-hidden border border-outline-variant/30">
                       <img src={selectedKessabaRequest.imageUrl} alt="Request" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                     </div>
                   )}
                   {selectedKessabaRequest.videoUrl && (
-                    <div className="w-24 h-24 rounded-xl overflow-hidden border border-outline-variant/30 bg-black flex items-center justify-center">
+                    <div className="w-24 h-24 rounded-[10px] overflow-hidden border border-outline-variant/30 bg-black flex items-center justify-center">
                       <video src={selectedKessabaRequest.videoUrl} className="w-full h-full object-cover" />
                     </div>
                   )}
                   {selectedKessabaRequest.audioUrl && (
-                    <div className="w-full p-3 bg-surface-container-high rounded-xl flex items-center gap-3">
+                    <div className="w-full p-3 bg-surface-container-high rounded-[10px] flex items-center gap-3">
                       <Mic className="w-5 h-5 text-primary" />
                       <audio src={selectedKessabaRequest.audioUrl} controls className="h-8 flex-1" />
                     </div>
                   )}
                 </div>
               </div>
-              <div className="bg-surface-container-low p-4 rounded-2xl border border-outline-variant/20 flex flex-col items-center justify-center text-center">
+              <div className="bg-surface-container-low p-4 rounded-[10px] border border-outline-variant/20 flex flex-col items-center justify-center text-center">
                 <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center mb-2">
                   <ShoppingBag className="w-6 h-6" />
                 </div>
@@ -269,7 +269,7 @@ export default function KessabaOffersView({
             <div className="grid grid-cols-1 gap-4">
               {Array.isArray(offers) && offers.length > 0 ? (
                 offers.map((offer: any) => (
-                  <div key={offer.id} className="bg-surface-container-low p-6 rounded-2xl border border-outline-variant/20 hover:border-primary/30 transition-all">
+                  <div key={offer.id} className="bg-surface-container-low p-6 rounded-[10px] border border-outline-variant/20 hover:border-primary/30 transition-all">
                     <div className="flex flex-col md:flex-row justify-between gap-6">
                       <div className="flex-1 space-y-4">
                         <div className="flex justify-between items-start">
@@ -326,7 +326,7 @@ export default function KessabaOffersView({
                               window.open(offer.videoUrl, '_blank');
                             }
                           }}
-                          className="px-6 py-2 bg-surface-container-high text-on-surface font-bold rounded-xl hover:bg-surface-variant transition-all text-sm"
+                          className="px-6 py-2 bg-surface-container-high text-on-surface font-bold rounded-[10px] hover:bg-surface-variant transition-all text-sm"
                         >
                           مشاهدة الفيديو
                         </button>
@@ -339,7 +339,7 @@ export default function KessabaOffersView({
                                 handleSelectOffer(selectedKessabaRequest.id, offer.id);
                               }
                             }}
-                            className="px-6 py-2 bg-primary text-on-primary font-bold rounded-xl hover:bg-primary/90 transition-all text-sm"
+                            className="px-6 py-2 bg-primary text-on-primary font-bold rounded-[10px] hover:bg-primary/90 transition-all text-sm"
                           >
                             الاتصال بالكساب
                           </button>
@@ -349,7 +349,7 @@ export default function KessabaOffersView({
                   </div>
                 ))
               ) : (
-                <div className="text-center py-12 bg-surface-container-low rounded-2xl border-2 border-dashed border-outline-variant/30">
+                <div className="text-center py-12 bg-surface-container-low rounded-[10px] border-2 border-dashed border-outline-variant/30">
                   <Clock className="w-12 h-12 text-on-surface-variant/30 mx-auto mb-4" />
                   <p className="text-on-surface-variant font-bold">في انتظار العروض...</p>
                 </div>
@@ -373,7 +373,7 @@ export default function KessabaOffersView({
             <span>إلغاء الطلب</span>
           </button>
 
-          <div className="bg-surface p-8 rounded-3xl border border-outline-variant/30 shadow-xl">
+          <div className="bg-surface p-8 rounded-[10px] border border-outline-variant/30 shadow-xl">
             <h2 className="text-2xl font-black text-on-surface mb-6 font-headline">فتح المزاد</h2>
             <form onSubmit={handleCreateRequest} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -384,7 +384,7 @@ export default function KessabaOffersView({
                     placeholder="مثلا: حولي سردي للعيد"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    className="w-full p-4 bg-surface-container-low border border-outline-variant/20 rounded-2xl focus:ring-2 focus:ring-primary outline-none"
+                    className="w-full p-4 bg-surface-container-low border border-outline-variant/20 rounded-[10px] focus:ring-2 focus:ring-primary outline-none"
                     required
                   />
                 </div>
@@ -396,7 +396,7 @@ export default function KessabaOffersView({
                       placeholder="مثلا: 1800"
                       value={budget}
                       onChange={(e) => setBudget(e.target.value)}
-                      className="w-full p-4 bg-surface-container-low border border-outline-variant/20 rounded-2xl focus:ring-2 focus:ring-primary outline-none"
+                      className="w-full p-4 bg-surface-container-low border border-outline-variant/20 rounded-[10px] focus:ring-2 focus:ring-primary outline-none"
                       required
                     />
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-on-surface-variant">درهم</span>
@@ -430,12 +430,12 @@ export default function KessabaOffersView({
                   placeholder="اكتب هنا المواصفات لي كتقلب عليها..."
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  className="w-full p-4 bg-surface-container-low border border-outline-variant/20 rounded-2xl focus:ring-2 focus:ring-primary outline-none min-h-[120px]"
+                  className="w-full p-4 bg-surface-container-low border border-outline-variant/20 rounded-[10px] focus:ring-2 focus:ring-primary outline-none min-h-[120px]"
                   required
                 />
               </div>
 
-              <div className="p-6 bg-primary/5 rounded-2xl border border-primary/10 flex flex-col items-center gap-4">
+              <div className="p-6 bg-primary/5 rounded-[10px] border border-primary/10 flex flex-col items-center gap-4">
                 <p className="text-sm font-bold text-on-surface-variant">سجل وصفك بالصوت (اختياري)</p>
                 <div className="flex flex-col items-center gap-4 w-full">
                   {!audioUrl ? (
@@ -448,7 +448,7 @@ export default function KessabaOffersView({
                     </button>
                   ) : (
                     <div className="w-full space-y-4">
-                      <div className="flex items-center gap-3 bg-surface p-3 rounded-xl border border-outline-variant/20">
+                      <div className="flex items-center gap-3 bg-surface p-3 rounded-[10px] border border-outline-variant/20">
                         <audio src={audioUrl} controls className="h-8 flex-1" />
                         <button 
                           type="button"
@@ -475,7 +475,7 @@ export default function KessabaOffersView({
               <button 
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full py-4 bg-primary text-on-primary rounded-2xl font-black text-lg shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all flex items-center justify-center gap-2"
+                className="w-full py-4 bg-primary text-on-primary rounded-[10px] font-black text-lg shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all flex items-center justify-center gap-2"
               >
                 {isSubmitting ? <Loader2 className="w-6 h-6 animate-spin" /> : 'تأكيد ونشر'}
               </button>
@@ -496,7 +496,7 @@ export default function KessabaOffersView({
     <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-8" dir="rtl">
       <div className="max-w-4xl mx-auto">
         {successMessage && (
-          <div className="flex items-center gap-3 bg-green-500 text-white px-5 py-4 rounded-2xl shadow-lg mb-6 animate-in fade-in slide-in-from-top-4">
+          <div className="flex items-center gap-3 bg-green-500 text-white px-5 py-4 rounded-[10px] shadow-lg mb-6 animate-in fade-in slide-in-from-top-4">
             <CheckCircle2 className="w-5 h-5 shrink-0" />
             <p className="font-bold text-sm flex-1">{successMessage}</p>
             <button onClick={() => setSuccessMessage(null)} className="opacity-70 hover:opacity-100 transition-opacity">✕</button>
@@ -509,14 +509,14 @@ export default function KessabaOffersView({
           </div>
           <button 
             onClick={() => setShowNewRequestForm(true)}
-            className="bg-primary text-on-primary px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-primary/20 hover:scale-105 transition-all"
+            className="bg-primary text-on-primary px-6 py-3 rounded-[10px] font-bold flex items-center gap-2 shadow-lg shadow-primary/20 hover:scale-105 transition-all"
           >
             <PlusCircle className="w-5 h-5" />
             <span>طلب جديد</span>
           </button>
         </div>
 
-        <div className="flex gap-2 mb-6 bg-surface-container-high p-1 rounded-xl w-fit">
+        <div className="flex gap-2 mb-6 bg-surface-container-high p-1 rounded-[10px] w-fit">
           <button 
             onClick={() => setFilterStatus('active')}
             className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${filterStatus === 'active' ? 'bg-primary text-on-primary shadow-sm' : 'text-on-surface-variant hover:bg-surface-variant'}`}
@@ -536,7 +536,7 @@ export default function KessabaOffersView({
             <div 
               key={request.id}
               onClick={() => setSelectedKessabaRequest(request)}
-              className="bg-surface p-4 rounded-2xl border border-outline-variant/20 shadow-sm hover:shadow-md transition-all cursor-pointer group"
+              className="bg-surface p-4 rounded-[10px] border border-outline-variant/20 shadow-sm hover:shadow-md transition-all cursor-pointer group"
             >
               <div className="flex flex-col md:flex-row justify-between gap-4">
                 <div className="flex-1 space-y-1">
@@ -613,7 +613,7 @@ export default function KessabaOffersView({
                     <p className="text-xl font-black text-on-surface">{request.offersCount}</p>
                     <p className="text-[9px] font-bold text-on-surface-variant uppercase tracking-wider">عروض</p>
                   </div>
-                  <div className="w-10 h-10 rounded-xl bg-surface-container-high flex items-center justify-center text-on-surface-variant group-hover:bg-primary group-hover:text-on-primary transition-all">
+                  <div className="w-10 h-10 rounded-[10px] bg-surface-container-high flex items-center justify-center text-on-surface-variant group-hover:bg-primary group-hover:text-on-primary transition-all">
                     <ChevronRight className="w-5 h-5" />
                   </div>
                 </div>
@@ -623,7 +623,7 @@ export default function KessabaOffersView({
         </div>
 
         {filteredRequests.length === 0 && (
-          <div className="text-center py-12 bg-surface rounded-2xl border-2 border-dashed border-outline-variant/20">
+          <div className="text-center py-12 bg-surface rounded-[10px] border-2 border-dashed border-outline-variant/20">
             <ShoppingBag className="w-12 h-12 text-on-surface-variant/20 mx-auto mb-3" />
             <h3 className="text-lg font-bold text-on-surface">
               {filterStatus === 'archived' ? 'ما عندك حتى طلب فالأرشيف' : 'ما عندك حتى مزاد على المشتري'}

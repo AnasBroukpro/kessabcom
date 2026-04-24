@@ -57,7 +57,7 @@ export default function SettingsView({ profile, user }: SettingsViewProps) {
     <div className="space-y-8" dir="rtl">
       <h2 className="text-2xl font-black text-on-surface font-headline">الإعدادات</h2>
 
-      <div className="bg-surface rounded-3xl border border-outline-variant/30 overflow-hidden">
+      <div className="bg-surface rounded-[10px] border border-outline-variant/30 overflow-hidden">
         {/* Cover Image */}
         <div className="h-48 bg-surface-variant relative group">
           {profile?.coverURL ? (
@@ -68,7 +68,7 @@ export default function SettingsView({ profile, user }: SettingsViewProps) {
             </div>
           )}
           <label className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-            <div className="bg-white/90 backdrop-blur px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-bold text-on-surface">
+            <div className="bg-white/90 backdrop-blur px-4 py-2 rounded-[10px] flex items-center gap-2 text-sm font-bold text-on-surface">
               <Camera className="w-4 h-4" />
               <span>تغيير غلاف الضيعة</span>
             </div>
@@ -93,7 +93,7 @@ export default function SettingsView({ profile, user }: SettingsViewProps) {
         </div>
 
         <div className="p-8 border-b border-outline-variant/20 flex items-center gap-6 -mt-12 relative z-10">
-          <div className="w-24 h-24 rounded-3xl bg-surface flex items-center justify-center overflow-hidden border-4 border-surface shadow-xl relative group">
+          <div className="w-24 h-24 rounded-[10px] bg-surface flex items-center justify-center overflow-hidden border-4 border-surface shadow-xl relative group">
             {profile?.photoURL ? (
               <img src={profile.photoURL} className="w-full h-full object-cover" alt="Profile" referrerPolicy="no-referrer" />
             ) : (
@@ -139,7 +139,7 @@ export default function SettingsView({ profile, user }: SettingsViewProps) {
                   type="text" 
                   value={settingsName}
                   onChange={(e) => setSettingsName(e.target.value)}
-                  className="w-full p-3 bg-surface-container-low border border-outline-variant/20 rounded-xl focus:ring-2 focus:ring-primary outline-none" 
+                  className="w-full p-3 bg-surface-container-low border border-outline-variant/20 rounded-[10px] focus:ring-2 focus:ring-primary outline-none" 
                 />
               </div>
               <div className="space-y-2">
@@ -147,7 +147,7 @@ export default function SettingsView({ profile, user }: SettingsViewProps) {
                 <select 
                   value={settingsCity}
                   onChange={(e) => setSettingsCity(e.target.value)}
-                  className="w-full p-3 bg-surface-container-low border border-outline-variant/20 rounded-xl focus:ring-2 focus:ring-primary outline-none"
+                  className="w-full p-3 bg-surface-container-low border border-outline-variant/20 rounded-[10px] focus:ring-2 focus:ring-primary outline-none"
                 >
                   {moroccanCities.map(city => (
                     <option key={city} value={city}>{city}</option>
@@ -160,7 +160,7 @@ export default function SettingsView({ profile, user }: SettingsViewProps) {
                   type="tel" 
                   value={settingsPhone}
                   onChange={(e) => setSettingsPhone(e.target.value)}
-                  className="w-full p-3 bg-surface-container-low border border-outline-variant/20 rounded-xl focus:ring-2 focus:ring-primary outline-none" 
+                  className="w-full p-3 bg-surface-container-low border border-outline-variant/20 rounded-[10px] focus:ring-2 focus:ring-primary outline-none" 
                   dir="ltr" 
                 />
               </div>
@@ -171,7 +171,7 @@ export default function SettingsView({ profile, user }: SettingsViewProps) {
                   value={settingsWhatsapp}
                   onChange={(e) => setSettingsWhatsapp(e.target.value)}
                   placeholder="مثلا: 0600880088"
-                  className="w-full p-3 bg-surface-container-low border border-outline-variant/20 rounded-xl focus:ring-2 focus:ring-primary outline-none" 
+                  className="w-full p-3 bg-surface-container-low border border-outline-variant/20 rounded-[10px] focus:ring-2 focus:ring-primary outline-none" 
                   dir="ltr" 
                 />
               </div>
@@ -181,7 +181,7 @@ export default function SettingsView({ profile, user }: SettingsViewProps) {
               <button 
                 type="submit"
                 disabled={isUpdatingProfile}
-                className="px-8 py-3 bg-primary text-on-primary rounded-xl font-bold hover:bg-primary/90 transition-all flex items-center gap-2"
+                className="px-8 py-3 bg-primary text-on-primary rounded-[10px] font-bold hover:bg-primary/90 transition-all flex items-center gap-2"
               >
                 {isUpdatingProfile ? <Loader2 className="w-4 h-4 animate-spin" /> : 'حفظ التغييرات'}
                 {updateSuccess && <CheckCircle2 className="w-4 h-4" />}
@@ -196,7 +196,7 @@ export default function SettingsView({ profile, user }: SettingsViewProps) {
                     setSettingsWhatsapp(profile.whatsappNumber || '');
                   }
                 }}
-                className="px-8 py-3 bg-surface-container-high text-on-surface rounded-xl font-bold hover:bg-surface-variant transition-all"
+                className="px-8 py-3 bg-surface-container-high text-on-surface rounded-[10px] font-bold hover:bg-surface-variant transition-all"
               >
                 إلغاء
               </button>
@@ -205,10 +205,10 @@ export default function SettingsView({ profile, user }: SettingsViewProps) {
         </div>
       </div>
 
-      <div className="bg-error/5 rounded-3xl border border-error/20 p-8">
+      <div className="bg-error/5 rounded-[10px] border border-error/20 p-8">
         <h3 className="text-lg font-bold text-error mb-2">منطقة الخطر</h3>
         <p className="text-sm text-on-surface-variant mb-4">بمجرد حذف حسابك، سيتم مسح جميع بياناتك وإعلاناتك بشكل نهائي. هاد العملية مايمكنش ترجع فيها.</p>
-        <button className="px-6 py-2 bg-error text-on-error rounded-lg font-bold text-sm hover:bg-error/90 transition-all">حذف الحساب نهائياً</button>
+        <button className="px-6 py-2 bg-error text-on-error rounded-[10px] font-bold text-sm hover:bg-error/90 transition-all">حذف الحساب نهائياً</button>
       </div>
     </div>
   );

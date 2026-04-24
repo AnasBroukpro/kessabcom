@@ -25,19 +25,67 @@ export default function NewsTicker({ className = "", isMobile = false }: NewsTic
     "توقعات بارتفاع الطلب مع اقتراب العيد"
   ];
 
+  if (isMobile) {
+    return (
+      <div className={`w-full ${className}`}>
+        {breakingNews && (
+          <div className="bg-error text-white p-2.5 overflow-hidden w-full shadow-sm relative">
+            <div className="flex items-center animate-marquee whitespace-nowrap">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="flex items-center gap-2 mx-8">
+                  <Zap className="w-4 h-4 fill-current shrink-0" />
+                  <span className="font-black text-xs">عاجل: {breakingNews}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        <div className={`bg-white/95 backdrop-blur-sm p-3 overflow-hidden border-b border-outline-variant/10 flex items-center gap-3 shadow-sm`}>
+          <div className="font-black text-primary whitespace-nowrap bg-white/95 z-20 pr-1 text-xs border-l border-outline-variant/20 pl-2">خبار السوق:</div>
+          
+          <div className="flex-1 overflow-hidden relative pr-2">
+            <div className="flex items-center animate-marquee whitespace-nowrap text-[10px] font-bold text-on-surface">
+              {[...Array(3)].map((_, i) => (
+                <React.Fragment key={i}>
+                  {prices.map((item, idx) => (
+                    <div key={`param-${idx}`} className="flex items-center">
+                      <span className={`mx-1.5 px-2.5 py-1 rounded-full border shadow-sm flex items-center gap-1 ${item.color}`}>
+                        <TrendingUp className="w-3 h-3" />
+                        <span>{item.label}: <span className="font-black">{item.price}</span> درهم/كلغ</span>
+                      </span>
+                    </div>
+                  ))}
+                  {newsItems.map((news, idx) => (
+                    <div key={`news-${idx}`} className="flex items-center">
+                      <span className="mx-2 flex items-center gap-1 text-on-surface">
+                        <Info className="text-primary w-3 h-3" />
+                        <span>{news}</span>
+                      </span>
+                      <span className="mx-1 text-outline-variant">•</span>
+                    </div>
+                  ))}
+                </React.Fragment>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`bg-white/90 backdrop-blur-sm rounded-xl p-3 overflow-hidden border border-outline-variant/10 flex items-center gap-3 shadow-sm ${className}`}>
-      <div className={`font-black text-primary whitespace-nowrap bg-white/90 z-20 pr-2 ${isMobile ? 'text-xs' : 'text-sm'} border-l border-outline-variant/20 ml-2`}>خبار السوق:</div>
+      <div className={`font-black text-primary whitespace-nowrap bg-white/90 z-20 pr-2 text-sm border-l border-outline-variant/20 ml-2`}>خبار السوق:</div>
       
       <div className="flex-1 overflow-hidden relative border-r border-outline-variant/10 pr-2">
-        <div className={`flex items-center animate-marquee whitespace-nowrap ${isMobile ? 'text-[10px]' : 'text-sm'} font-bold text-on-surface`}>
+        <div className={`flex items-center animate-marquee whitespace-nowrap text-sm font-bold text-on-surface`}>
           {[...Array(3)].map((_, i) => (
             <React.Fragment key={i}>
               {/* Breaking News - Integrated into Marquee with special style */}
               {breakingNews && (
                 <div className="flex items-center">
-                  <div className={`mx-2 px-3 py-1.5 rounded-full bg-error text-on-error shadow-sm flex items-center gap-2 animate-pulse ring-2 ring-error/20 ${isMobile ? 'text-[9px]' : 'text-xs'}`}>
-                    <Zap className={isMobile ? "w-3 h-3 fill-current" : "w-4 h-4 fill-current"} />
+                  <div className={`mx-2 px-3 py-1.5 rounded-full bg-error text-on-error shadow-sm flex items-center gap-2 animate-pulse ring-2 ring-error/20 text-xs`}>
+                    <Zap className="w-4 h-4 fill-current" />
                     <span className="font-black">عاجل: {breakingNews}</span>
                   </div>
                   <span className="mx-2 text-outline-variant">•</span>
@@ -48,7 +96,7 @@ export default function NewsTicker({ className = "", isMobile = false }: NewsTic
               {prices.map((item, idx) => (
                 <div key={`param-${idx}`} className="flex items-center">
                   <span className={`mx-2 px-3 py-1 rounded-full border shadow-sm flex items-center gap-1.5 ${item.color}`}>
-                    <TrendingUp className={isMobile ? "w-3 h-3" : "w-4 h-4"} />
+                    <TrendingUp className="w-4 h-4" />
                     <span>{item.label}: <span className="font-black">{item.price}</span> درهم/كلغ</span>
                   </span>
                   <span className="mx-2 text-outline-variant">•</span>
@@ -59,7 +107,7 @@ export default function NewsTicker({ className = "", isMobile = false }: NewsTic
               {newsItems.map((news, idx) => (
                 <div key={`news-${idx}`} className="flex items-center">
                   <span className="mx-2 flex items-center gap-1.5 text-on-surface">
-                    <Info className={`text-primary ${isMobile ? "w-3 h-3" : "w-4 h-4"}`} />
+                    <Info className={`text-primary w-4 h-4`} />
                     <span>{news}</span>
                   </span>
                   <span className="mx-2 text-outline-variant">•</span>

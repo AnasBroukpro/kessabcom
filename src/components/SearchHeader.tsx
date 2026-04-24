@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Search, MapPin, Navigation, Bell, User, LogOut, LayoutDashboard, ShoppingBag, PlusCircle, Settings, Users, List, ChevronDown, Menu, X, LocateFixed } from 'lucide-react';
+import { Search, MapPin, Navigation, Bell, User, LogOut, LayoutDashboard, ShoppingBag, PlusCircle, Settings, Users, List, ChevronDown, Menu, X, LocateFixed, Target, Route } from 'lucide-react';
 import { motion } from 'motion/react';
 import { ViewType } from '../App';
 import { useAuth } from '../contexts/AuthContext';
 import MobileSidebar from './MobileSidebar';
 import { firestoreService } from '../services/firestoreService';
 import { cityCoords, getClosestCity } from '../constants/cityMapping';
+import logoV2 from '../assets/marketing/branding/logo v2.png';
 
 interface Props {
   onNavigate: (view: ViewType, listingId?: string, city?: string, radius?: string, subView?: string, breed?: string) => void;
@@ -25,9 +26,13 @@ export default function SearchHeader({ onNavigate, initialCity = '', initialRadi
   const [showNotifications, setShowNotifications] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
+  const [isOpenCity, setIsOpenCity] = useState(false);
+  const [isOpenRadius, setIsOpenRadius] = useState(false);
+  
   const suggestionsRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
+  const searchBarRef = useRef<HTMLDivElement>(null);
 
   const [notifications, setNotifications] = useState<any[]>([]);
 
@@ -56,6 +61,10 @@ export default function SearchHeader({ onNavigate, initialCity = '', initialRadi
       }
       if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
         setShowProfileMenu(false);
+      }
+      if (searchBarRef.current && !searchBarRef.current.contains(event.target as Node)) {
+        setIsOpenCity(false);
+        setIsOpenRadius(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -201,7 +210,7 @@ export default function SearchHeader({ onNavigate, initialCity = '', initialRadi
                 className={`p-4 border-b border-outline-variant/5 hover:bg-[#F9F9F6] transition-colors cursor-pointer ${!notif.read ? 'bg-primary/5' : ''}`}
               >
                 <p className="text-sm font-bold text-[#1A1A1A] mb-1">{notif.title}</p>
-                <p className="text-xs text-[#757575]">© 2026 KESSABCOM. جميع الحقوق محفوظة لكسابة المغرب.</p>
+                <p className="text-xs text-[#757575]">{notif.message}</p>
                 <p className="text-[10px] text-[#2E7D32] mt-2">
                   {notif.createdAt?.toDate ? notif.createdAt.toDate().toLocaleTimeString('ar-MA') : 'دابا'}
                 </p>
@@ -229,77 +238,90 @@ export default function SearchHeader({ onNavigate, initialCity = '', initialRadi
       />
       <header className="bg-white/90 backdrop-blur-md border-b border-outline-variant/30 sticky top-0 z-50">
 
-      <div className="max-w-7xl mx-auto px-6 py-3 md:py-0 md:h-20 flex flex-col md:grid md:grid-cols-3 md:items-center gap-3 md:gap-4">
+      <div className="max-w-7xl mx-auto px-6 py-3 md:py-0 md:h-20 flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-8">
         
-        {/* Top Mobile Row: Logo + Actions */}
-        <div className="flex items-center justify-between md:hidden">
-          {/* Logo */}
-          <button onClick={() => onNavigate('home')} className="text-xl font-black text-[#2E7D32] tracking-tight font-headline">Kessabcom</button>
-          
-          {/* Actions */}
-          <div className="flex items-center gap-3">
+        {/* Top Mobile Row: Actions (Right) + Logo (Left) */}
+        <div className="flex items-center justify-between md:hidden w-full">
+          {/* Actions (Right in RTL) */}
+          <div className="flex items-center gap-2">
             {user ? (
               <>
-                <div className="relative" ref={notificationsRef}>
-                  <button 
-                    onClick={() => setShowNotifications(!showNotifications)}
-                    className={`p-2 rounded-xl transition-colors border ${showNotifications ? 'bg-[#E8F5E9] text-[#2E7D32] border-[#2E7D32]' : 'bg-[#F9F9F6] text-[#757575] border-transparent hover:border-[#757575]'}`}
-                  >
-                    <Bell className="w-5 h-5" />
-                    <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
-                  </button>
-                  {showNotifications && renderNotifications()}
-                </div>
-                
-                {/* Animated Hamburger Button */}
+                {/* 1. Animated Hamburger Button (Right-most) */}
                 <button 
                   onClick={() => {
                     setShowNotifications(false);
                     setShowProfileMenu(false);
                     setIsSidebarOpen(!isSidebarOpen);
                   }}
-                  className="w-10 h-10 flex flex-col items-center justify-center gap-1.5 bg-[#F9F9F6] rounded-xl border border-outline-variant/10 relative z-[105]"
+                  className="w-9 h-9 flex flex-col items-center justify-center gap-1 bg-[#F9F9F6] rounded-lg border border-outline-variant/10 relative z-[105]"
                 >
                   <motion.span 
-                    animate={isSidebarOpen ? { rotate: 45, y: 8 } : { rotate: 0, y: 0 }}
-                    className="w-5 h-0.5 bg-[#2E7D32] rounded-full"
+                    animate={isSidebarOpen ? { rotate: 45, y: 7 } : { rotate: 0, y: 0 }}
+                    className="w-4 h-0.5 bg-[#2E7D32] rounded-full"
                   />
                   <motion.span 
                     animate={isSidebarOpen ? { opacity: 0 } : { opacity: 1 }}
-                    className="w-5 h-0.5 bg-[#2E7D32] rounded-full"
+                    className="w-4 h-0.5 bg-[#2E7D32] rounded-full"
                   />
                   <motion.span 
-                    animate={isSidebarOpen ? { rotate: -45, y: -8 } : { rotate: 0, y: 0 }}
-                    className="w-5 h-0.5 bg-[#2E7D32] rounded-full"
+                    animate={isSidebarOpen ? { rotate: -45, y: -7 } : { rotate: 0, y: 0 }}
+                    className="w-4 h-0.5 bg-[#2E7D32] rounded-full"
                   />
                 </button>
+
+                {/* 2. Profile Image (To the right of Notification) */}
+                <button 
+                  onClick={() => onNavigate(profile?.role === 'seller' ? 'seller' : 'buyer')}
+                  className="w-9 h-9 rounded-full bg-[#F9F9F6] border border-outline-variant/10 overflow-hidden flex items-center justify-center"
+                >
+                  {profile?.photoURL ? (
+                    <img src={profile.photoURL} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <User className="w-4 h-4 text-[#2E7D32]" />
+                  )}
+                </button>
+
+                {/* 3. Notification */}
+                <div className="relative" ref={notificationsRef}>
+                  <button 
+                    onClick={() => setShowNotifications(!showNotifications)}
+                    className={`p-2 rounded-lg transition-colors border ${showNotifications ? 'bg-[#E8F5E9] text-[#2E7D32] border-[#2E7D32]' : 'bg-[#F9F9F6] text-[#757575] border-transparent hover:border-[#757575]'}`}
+                  >
+                    <Bell className="w-4.5 h-4.5" />
+                    <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-red-500 rounded-full border border-white"></span>
+                  </button>
+                  {showNotifications && renderNotifications()}
+                </div>
               </>
             ) : (
               <div className="flex items-center gap-2">
-                <button onClick={() => onNavigate('auth')} className="bg-[#2E7D32] text-white px-5 py-2 rounded-xl text-sm font-bold shadow-sm transition-colors border border-transparent hover:bg-transparent hover:text-[#2E7D32] hover:border-[#2E7D32]">
-                  دخول
-                </button>
                 <button 
                   onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                  className="w-10 h-10 flex flex-col items-center justify-center gap-1.5 bg-[#F9F9F6] rounded-xl border border-outline-variant/10 transition-colors hover:border-[#2E7D32]"
+                  className="w-9 h-9 flex flex-col items-center justify-center gap-1 bg-[#F9F9F6] rounded-lg border border-outline-variant/10 transition-colors hover:border-[#2E7D32]"
                 >
-                  <span className="w-5 h-0.5 bg-[#2E7D32] rounded-full"></span>
-                  <span className="w-5 h-0.5 bg-[#2E7D32] rounded-full"></span>
-                  <span className="w-5 h-0.5 bg-[#2E7D32] rounded-full"></span>
+                  <span className="w-4 h-0.5 bg-[#2E7D32] rounded-full"></span>
+                  <span className="w-4 h-0.5 bg-[#2E7D32] rounded-full"></span>
+                  <span className="w-4 h-0.5 bg-[#2E7D32] rounded-full"></span>
+                </button>
+                <button onClick={() => onNavigate('auth')} className="bg-[#2E7D32] text-white px-3 py-1.5 rounded-lg text-[10px] font-bold shadow-sm">
+                  دخول
                 </button>
               </div>
             )}
           </div>
+
+          {/* Logo (Left in RTL) */}
+          <button onClick={() => onNavigate('home')} className="flex items-center">
+            <img src={logoV2} alt="منصة kessabcom.ma" className="h-7 w-auto object-contain" />
+          </button>
         </div>
 
-        {/* Desktop Logo & Nav (hidden on mobile) */}
-        <div className="hidden md:flex items-center gap-6 justify-start">
+        <div className="hidden md:flex items-center gap-6 shrink-0">
           <button onClick={() => onNavigate('home')} className="flex items-center group">
             <img 
-              src="https://i.ibb.co/Psdn5FfW/logo-removebg-preview.png" 
-              alt="KESSABCOM" 
-              className="h-7 md:h-9 w-auto object-contain transition-transform group-hover:scale-105"
-              referrerPolicy="no-referrer"
+              src={logoV2} 
+              alt="منصة kessabcom.ma" 
+              className="h-8 md:h-10 w-auto object-contain transition-transform group-hover:scale-105"
             />
           </button>
           <div className="flex items-center gap-4">
@@ -308,66 +330,113 @@ export default function SearchHeader({ onNavigate, initialCity = '', initialRadi
           </div>
         </div>
 
-        {/* Search Bar - Centered on Desktop, Full width on Mobile */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 bg-[#F9F9F6] border border-outline-variant/20 rounded-xl p-1.5 shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex flex-1 items-center divide-x divide-x-reverse divide-outline-variant/30">
-            <div className="flex-1 relative">
-              <div className="flex items-center px-3 gap-2 group">
-                <MapPin className="w-4 h-4 text-[#2E7D32] shrink-0" />
-                <select 
-                  value={citySearch}
-                  onChange={(e) => setCitySearch(e.target.value)}
-                  className="bg-transparent border-none outline-none w-full py-2.5 sm:py-2 text-sm font-bold text-[#1A1A1A] appearance-none cursor-pointer focus:text-[#2E7D32] transition-colors"
-                  style={{ direction: 'rtl' }}
-                >
-                  <option value="">فين كتقلب؟</option>
-                  {moroccanCities.map(city => (
-                    <option key={city} value={city}>{city}</option>
-                  ))}
-                </select>
-                <ChevronDown className="w-3 h-3 text-[#757575] absolute left-10 pointer-events-none" />
-                
-                <button 
-                  onClick={handleLocateMe}
-                  disabled={isLocating}
-                  title="موقعي الحالي"
-                  className={`p-1.5 rounded-lg hover:bg-[#E8F5E9] transition-colors ${isLocating ? 'animate-pulse text-[#2E7D32]' : 'text-[#757575]'}`}
-                >
-                  <LocateFixed className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-            
-            <div className="flex-1 flex items-center px-3 gap-2 group relative">
-              <Navigation className="w-4 h-4 text-[#2E7D32] shrink-0 group-hover:scale-110 transition-transform" />
-              <select 
-                value={radiusSearch}
-                onChange={(e) => setRadiusSearch(e.target.value)}
-                className="bg-transparent border-none outline-none w-full py-2.5 sm:py-2 text-sm font-bold text-[#1A1A1A] appearance-none cursor-pointer focus:text-[#2E7D32] transition-colors"
-                style={{ direction: 'rtl' }}
+        {/* Modern Expert Search Bar - Copied from Dashboard for consistency */}
+        <div ref={searchBarRef} className="lg:max-w-xl flex flex-row items-center gap-1 sm:gap-2 bg-[#F9F9F6] border border-outline-variant/20 rounded-[10px] p-1 sm:p-1.5 shadow-sm hover:shadow-md transition-shadow relative z-[60] w-fit mx-auto">
+          {/* City Selector */}
+          <div 
+            onClick={() => { setIsOpenCity(!isOpenCity); setIsOpenRadius(false); }}
+            className="w-32 sm:w-48 flex items-center px-2 sm:px-3 py-1.5 relative group bg-white rounded-[10px] border border-outline-variant/10 shadow-sm transition-all hover:border-[#2E7D32]/30 cursor-pointer shrink-0"
+          >
+            <MapPin className="hidden sm:block w-4 h-4 text-[#2E7D32] shrink-0" />
+            <div className="flex flex-col text-right sm:mr-3 flex-1 min-w-0">
+              <button 
+                onClick={(e) => { e.stopPropagation(); setIsOpenCity(!isOpenCity); setIsOpenRadius(false); }}
+                className="bg-transparent border-none outline-none w-full text-xs sm:text-sm font-bold text-[#1A1A1A] text-right flex items-center justify-between gap-1"
               >
-                <option value="10">10 كلم</option>
-                <option value="20">20 كلم</option>
-                <option value="50">50 كلم</option>
-                <option value="all">كاع لي كاين</option>
-              </select>
-              <ChevronDown className="w-3 h-3 text-[#757575] absolute left-3 pointer-events-none" />
+                <span className="truncate">{citySearch || 'فين كتقلب؟'}</span>
+              </button>
             </div>
+            <ChevronDown className={`hidden sm:block w-3.5 h-3.5 text-[#757575] transition-transform ${isOpenCity ? 'rotate-180' : ''}`} />
+
+            {isOpenCity && (
+              <div className="absolute top-full mt-1.5 left-0 right-0 w-full bg-white rounded-[10px] shadow-2xl border border-outline-variant/10 z-[100] p-1 animate-in slide-in-from-top-2 duration-200">
+                <div className="max-h-60 overflow-y-auto custom-scrollbar p-1">
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); setCitySearch(''); setIsOpenCity(false); onNavigate('search-results', undefined, '', radiusSearch); }}
+                    className={`w-full text-right px-4 py-2 rounded-[10px] text-sm font-bold transition-colors ${!citySearch ? 'bg-[#2E7D32] text-white' : 'hover:bg-[#F9F9F6] text-[#4A4A4A]'}`}
+                  >
+                    الكل
+                  </button>
+                  {moroccanCities.map(city => (
+                    <button 
+                      key={city}
+                      onClick={(e) => { e.stopPropagation(); setCitySearch(city); setIsOpenCity(false); onNavigate('search-results', undefined, city, radiusSearch); }}
+                      className={`w-full text-right px-4 py-2 rounded-[10px] text-sm font-bold transition-colors ${citySearch === city ? 'bg-[#2E7D32] text-white' : 'hover:bg-[#F9F9F6] text-[#4A4A4A]'}`}
+                    >
+                      {city}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <button 
+            onClick={(e) => { e.stopPropagation(); handleLocateMe(); }}
+            disabled={isLocating}
+            title="في مدينتي"
+            className={`p-1.5 sm:p-2 rounded-[10px] hover:bg-[#E8F5E9] border border-outline-variant/10 bg-white shadow-sm transition-colors shrink-0 flex items-center justify-center ${isLocating ? 'animate-pulse text-[#2E7D32]' : 'text-[#2E7D32]'}`}
+          >
+            <LocateFixed className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${isLocating ? 'animate-pulse' : ''}`} />
+          </button>
+
+          {/* Distance Selector */}
+          <div 
+            onClick={() => { setIsOpenRadius(!isOpenRadius); setIsOpenCity(false); }}
+            className="w-[85px] sm:w-[120px] flex items-center px-1.5 sm:px-3 py-1.5 relative group bg-white rounded-[10px] border border-outline-variant/10 shadow-sm transition-all hover:border-[#2E7D32]/30 cursor-pointer shrink-0"
+          >
+            <Navigation className="hidden sm:block w-3.5 h-3.5 text-[#2E7D32] shrink-0" />
+            <div className="flex flex-col text-right sm:mr-3 flex-1">
+              <button 
+                onClick={(e) => { e.stopPropagation(); setIsOpenRadius(!isOpenRadius); setIsOpenCity(false); }}
+                className="bg-transparent border-none outline-none w-full text-xs sm:text-sm font-bold text-[#1A1A1A] text-right flex items-center justify-between"
+              >
+                <span className="truncate">
+                  {radiusSearch === '10' ? '10 كلم' : 
+                   radiusSearch === '20' ? '20 كلم' : 
+                   radiusSearch === '50' ? '50 كلم' : 
+                   radiusSearch === 'all' ? 'الكل' : 'المسافة'}
+                </span>
+              </button>
+
+              {isOpenRadius && (
+                <div className="absolute top-full mt-2 left-0 right-0 w-full bg-white rounded-[10px] shadow-2xl border border-outline-variant/10 z-[100] p-1 animate-in slide-in-from-top-2 duration-200">
+                  <div className="flex flex-col gap-0.5">
+                    {[
+                      { val: '10', label: '10 كلم' },
+                      { val: '20', label: '20 كلم' },
+                      { val: '50', label: '50 كلم' },
+                      { val: 'all', label: 'الكل' }
+                    ].map(dist => (
+                      <button 
+                        key={dist.val}
+                        onClick={(e) => { e.stopPropagation(); setRadiusSearch(dist.val); setIsOpenRadius(false); }}
+                        className={`w-full text-right px-4 py-2 rounded-[10px] text-sm font-bold transition-colors ${radiusSearch === dist.val ? 'bg-[#2E7D32] text-white' : 'hover:bg-[#F9F9F6] text-[#4A4A4A]'}`}
+                      >
+                        {dist.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            <ChevronDown className={`hidden sm:block w-3 h-3 text-[#757575] ml-1 transition-transform ${isOpenRadius ? 'rotate-180' : ''}`} />
           </div>
           
           <button onClick={() => {
-            if (!citySearch) {
-              alert("عافاك اختار المدينة فين كتقلب أولا");
+            if (!citySearch && radiusSearch !== 'all') {
+              alert("عافاك اختار المدينة فين كتقلب أولاً");
               return;
             }
             onNavigate('search-results', undefined, citySearch, radiusSearch);
-          }} className="bg-[#2E7D32] text-white p-3 sm:p-2.5 rounded-lg transition-colors border border-transparent hover:bg-transparent hover:text-[#2E7D32] hover:border-[#2E7D32] shadow-sm flex items-center justify-center shrink-0">
-            <Search className="w-4 h-4 sm:w-4 sm:h-4" />
+          }} className="bg-[#2E7D32] text-white py-1.5 px-4 sm:px-6 rounded-[10px] border border-transparent hover:bg-white hover:text-[#2E7D32] hover:border-[#2E7D32] transition-all shadow-sm flex items-center gap-2 justify-center shrink-0 group">
+            <span className="text-xs sm:text-sm font-bold">بحث</span>
+            <Search className="w-3.5 h-3.5 sm:w-4 sm:h-4 group-hover:scale-110 transition-transform" />
           </button>
         </div>
 
         {/* Actions - Desktop only */}
-        <div className="hidden md:flex items-center gap-4 justify-end">
+        <div className="hidden md:flex items-center gap-4 shrink-0">
           {user ? (
             <>
               {/* Notifications */}

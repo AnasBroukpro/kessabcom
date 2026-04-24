@@ -45,17 +45,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(firebaseUser);
       
       if (firebaseUser) {
-        try {
-          const profileData = await firestoreService.getUserProfile(firebaseUser.uid);
-          if (profileData && profileData.error) {
-             setProfile(null);
-          } else {
-             setProfile(profileData);
+        const fetchProfile = async (retries = 3) => {
+          try {
+            const profileData = await firestoreService.getUserProfile(firebaseUser.uid);
+            if (profileData && !profileData.error) {
+              setProfile(profileData);
+              return true;
+            }
+          } catch (error: any) {
+            if (retries > 0 && error.message?.includes('404')) {
+              console.log(`⏳ Profile not found, retrying... (${retries} left)`);
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              return fetchProfile(retries - 1);
+            }
+            console.warn("Profile fetch issue:", error);
           }
-        } catch (error) {
-          console.warn("Profile fetch issue:", error);
-          setProfile(null);
-        }
+          return false;
+        };
+
+        const success = await fetchProfile();
+        if (!success) setProfile(null);
       } else {
         setProfile(null);
         setNotifications([]);

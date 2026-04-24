@@ -131,7 +131,7 @@ export function BuyerRequestsView({
   if (offerSent) {
     return (
       <div className="flex-1 flex items-center justify-center p-8" dir="rtl">
-        <div className="max-w-md w-full bg-white rounded-[2.5rem] p-10 shadow-2xl text-center border border-primary/10">
+        <div className="max-w-md w-full bg-white rounded-[10px] p-10 shadow-2xl text-center border border-primary/10">
           <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-6">
             <CheckCircle2 className="w-12 h-12 text-green-600" />
           </div>
@@ -139,7 +139,7 @@ export function BuyerRequestsView({
           <p className="text-on-surface-variant font-medium mb-8">المشتري غادي يتوصل بالعرض ديالك وغادي يتواصل معاك يلا بغى يكمل العملية.</p>
           <button 
             onClick={() => { setOfferSent(false); setSelectedRequest(null); }} 
-            className="w-full bg-[#0a5c1a] text-white py-4 rounded-2xl font-black shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all"
+            className="w-full bg-[#0a5c1a] text-white py-4 rounded-[10px] font-black shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all"
           >
             الرجوع للطلبات
           </button>
@@ -160,7 +160,7 @@ export function BuyerRequestsView({
           <span>رجوع لتفاصيل الطلب</span>
         </button>
 
-        <div className="bg-white rounded-[2.5rem] p-8 shadow-xl border border-outline-variant/20">
+        <div className="bg-white rounded-[10px] p-8 shadow-xl border border-outline-variant/20">
           <h2 className="text-2xl font-black text-on-surface mb-2 font-headline">تقديم عرض للمشتري</h2>
           <p className="text-on-surface-variant text-sm mb-8">جاوب على طلب <span className="font-bold text-primary">{request?.buyerName}</span> وبين ليه الجودة ديال الحوالا لي عندك.</p>
 
@@ -171,7 +171,7 @@ export function BuyerRequestsView({
                 value={offerDesc}
                 onChange={(e) => setOfferDesc(e.target.value)}
                 placeholder="مثلا: عندي حوالا سردي ملاح، العمر 14 شهر، كسابيين مزيان..."
-                className={`w-full p-5 bg-surface-container-low border ${errors.description ? 'border-red-500' : 'border-outline-variant/30'} rounded-[1.5rem] focus:ring-2 focus:ring-primary outline-none min-h-[150px] font-medium`}
+                className={`w-full p-5 bg-surface-container-low border ${errors.description ? 'border-red-500' : 'border-outline-variant/30'} rounded-[10px] focus:ring-2 focus:ring-primary outline-none min-h-[150px] font-medium`}
               />
               {errors.description && <p className="text-red-500 text-xs font-bold mt-1 mr-1">{errors.description}</p>}
             </div>
@@ -181,7 +181,7 @@ export function BuyerRequestsView({
                  <label className="text-sm font-black text-on-surface-variant mr-1">صورة للحولي</label>
                  <div className="relative group">
                    {imagePreview ? (
-                     <div className="relative h-32 rounded-2xl overflow-hidden border border-primary/20">
+                     <div className="relative h-32 rounded-[10px] overflow-hidden border border-primary/20">
                        <img src={imagePreview} className="w-full h-full object-cover" />
                        <button 
                         type="button"
@@ -192,7 +192,7 @@ export function BuyerRequestsView({
                        </button>
                      </div>
                    ) : (
-                     <label className="h-32 rounded-2xl border-2 border-dashed border-outline-variant/30 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-all">
+                     <label className="h-32 rounded-[10px] border-2 border-dashed border-outline-variant/30 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-all">
                        <Camera className="w-8 h-8 text-on-surface-variant/30" />
                        <span className="text-[10px] font-black text-on-surface-variant">إضافة صورة</span>
                        <input type="file" accept="image/*" className="hidden" onChange={onImageChange} />
@@ -203,7 +203,7 @@ export function BuyerRequestsView({
 
                <div className="space-y-2">
                  <label className="text-sm font-black text-on-surface-variant mr-1">فيديو (إختياري)</label>
-                 <label className="h-32 rounded-2xl border-2 border-dashed border-outline-variant/30 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-all">
+                 <label className="h-32 rounded-[10px] border-2 border-dashed border-outline-variant/30 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-all">
                    <Video className="w-8 h-8 text-on-surface-variant/30" />
                    <span className="text-[10px] font-black text-on-surface-variant">إضافة فيديو</span>
                    <input type="file" accept="video/*" className="hidden" onChange={(e) => setVideoFile(e.target.files?.[0] || null)} />
@@ -214,7 +214,7 @@ export function BuyerRequestsView({
             <button 
               type="submit"
               disabled={isSubmitting || !!existingOffer}
-              className={`w-full py-5 rounded-[1.5rem] font-black text-lg shadow-lg transition-all flex items-center justify-center gap-3 ${isSubmitting ? 'bg-surface-container-high text-on-surface-variant' : 'bg-[#0a5c1a] text-white hover:scale-[1.02] active:scale-95'}`}
+              className={`w-full py-5 rounded-[10px] font-black text-lg shadow-lg transition-all flex items-center justify-center gap-3 ${isSubmitting ? 'bg-surface-container-high text-on-surface-variant' : 'bg-[#0a5c1a] text-white hover:scale-[1.02] active:scale-95'}`}
             >
               {isSubmitting ? (
                 <>
@@ -247,7 +247,7 @@ export function BuyerRequestsView({
             <span>رجوع للطلبات</span>
           </button>
 
-          <div className="bg-white rounded-[2.5rem] p-8 border border-outline-variant/20 shadow-xl space-y-6">
+          <div className="bg-white rounded-[10px] p-8 border border-outline-variant/20 shadow-xl space-y-6">
             <div className="flex justify-between items-start">
               <div>
                 <h3 className="text-2xl font-black text-on-surface font-headline">{request.title || 'طلب مشتري'}</h3>
@@ -259,17 +259,17 @@ export function BuyerRequestsView({
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div className="p-4 bg-surface-container-low rounded-2xl border border-outline-variant/10 text-center">
+              <div className="p-4 bg-surface-container-low rounded-[10px] border border-outline-variant/10 text-center">
                 <p className="text-xs font-bold text-on-surface-variant mb-1">السلالة المطلوبة</p>
                 <p className="font-black text-primary text-lg">{request.breed}</p>
               </div>
-              <div className="p-4 bg-surface-container-low rounded-2xl border border-outline-variant/10 text-center">
+              <div className="p-4 bg-surface-container-low rounded-[10px] border border-outline-variant/10 text-center">
                 <p className="text-xs font-bold text-on-surface-variant mb-1">الميزانية</p>
                 <p className="font-black text-[#0a5c1a] text-lg">{request.budget} درهم</p>
               </div>
             </div>
 
-            <div className="p-6 bg-surface-container-low rounded-2xl border border-outline-variant/10">
+            <div className="p-6 bg-surface-container-low rounded-[10px] border border-outline-variant/10">
               <p className="text-xs font-black text-on-surface-variant mb-2">تفاصيل الطلب</p>
               <p className="text-on-surface font-medium leading-relaxed italic">"{request.description}"</p>
             </div>
@@ -277,7 +277,7 @@ export function BuyerRequestsView({
             <button 
               onClick={() => setSelectedRequest(request.id)}
               disabled={request.offersCount >= 6 || !!existingOffer}
-              className={`w-full py-5 rounded-2xl font-black text-lg border border-transparent transition-all flex items-center justify-center gap-2 ${request.offersCount >= 6 ? 'bg-surface-container-high text-on-surface-variant cursor-not-allowed' : 'bg-[#0a5c1a] text-white hover:scale-[1.02] active:scale-95 shadow-lg shadow-primary/20'}`}
+              className={`w-full py-5 rounded-[10px] font-black text-lg border border-transparent transition-all flex items-center justify-center gap-2 ${request.offersCount >= 6 ? 'bg-surface-container-high text-on-surface-variant cursor-not-allowed' : 'bg-[#0a5c1a] text-white hover:scale-[1.02] active:scale-95 shadow-lg shadow-primary/20'}`}
             >
               {existingOffer ? 'تم تقديم عرضك سابقاً' : request.offersCount >= 6 ? 'العروض مكتملة' : 'تقديم عرض دابا'}
               {!existingOffer && request.offersCount < 6 && <ChevronRight className="w-5 h-5 rotate-180" />}
@@ -303,10 +303,10 @@ export function BuyerRequestsView({
           requests.map((request) => (
             <div 
               key={request.id} 
-              className="bg-white rounded-[2rem] p-6 border border-outline-variant/10 shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row items-center gap-6 group"
+              className="bg-white rounded-[10px] p-6 border border-outline-variant/10 shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row items-center gap-6 group"
             >
               {/* Left Side: Category Icon */}
-              <div className="hidden md:flex w-16 h-16 rounded-2xl bg-surface-container-high items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+              <div className="hidden md:flex w-16 h-16 rounded-[10px] bg-surface-container-high items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
                 <ShoppingBag className="w-8 h-8 text-primary/40" />
               </div>
 
@@ -329,14 +329,14 @@ export function BuyerRequestsView({
                 <button 
                   onClick={() => setSelectedRequest(request.id)}
                   disabled={request.offersCount >= 6}
-                  className={`flex-1 md:w-32 py-3 rounded-xl font-black text-xs transition-all flex items-center justify-center gap-1.5 ${request.offersCount >= 6 ? 'bg-surface-container-high text-on-surface-variant' : 'bg-[#0a5c1a] text-white hover:bg-[#0a5c1a]/90 shadow-sm'}`}
+                  className={`flex-1 md:w-32 py-3 rounded-[10px] font-black text-xs transition-all flex items-center justify-center gap-1.5 ${request.offersCount >= 6 ? 'bg-surface-container-high text-on-surface-variant' : 'bg-[#0a5c1a] text-white hover:bg-[#0a5c1a]/90 shadow-sm'}`}
                 >
                   <Send className="w-3.5 h-3.5" />
                   <span>تقديم عرض</span>
                 </button>
                 <button 
                   onClick={() => setSelectedRequest(request)}
-                  className="flex-1 md:w-32 py-3 bg-surface-container-high text-on-surface font-black rounded-xl text-xs hover:bg-surface-variant transition-all flex items-center justify-center gap-1.5"
+                  className="flex-1 md:w-32 py-3 bg-surface-container-high text-on-surface font-black rounded-[10px] text-xs hover:bg-surface-variant transition-all flex items-center justify-center gap-1.5"
                 >
                   <ChevronRight className="w-3.5 h-3.5 rotate-180" />
                   <span>التفاصيل</span>
@@ -345,7 +345,7 @@ export function BuyerRequestsView({
             </div>
           ))
         ) : (
-          <div className="py-24 text-center bg-surface-container-low rounded-[3rem] border-2 border-dashed border-outline-variant/20">
+          <div className="py-24 text-center bg-surface-container-low rounded-[10px] border-2 border-dashed border-outline-variant/20">
             <div className="w-20 h-20 bg-surface rounded-full flex items-center justify-center mx-auto mb-6">
               <ShoppingBag className="w-10 h-10 text-on-surface-variant/20" />
             </div>
@@ -360,7 +360,7 @@ export function BuyerRequestsView({
           <button 
             onClick={onLoadMore}
             disabled={isLoadingMore}
-            className="px-10 py-4 bg-white border border-outline-variant/30 text-on-surface font-black rounded-2xl hover:bg-surface-variant shadow-sm transition-all flex items-center gap-3"
+            className="px-10 py-4 bg-white border border-outline-variant/30 text-on-surface font-black rounded-[10px] hover:bg-surface-variant shadow-sm transition-all flex items-center gap-3"
           >
             {isLoadingMore ? <Loader2 className="w-5 h-5 animate-spin" /> : 'مشاهدة المزيد من الطلبات'}
           </button>

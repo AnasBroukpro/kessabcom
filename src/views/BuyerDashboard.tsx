@@ -230,7 +230,7 @@ export default function BuyerDashboard({ onNavigate, activeSubView }: Props) {
             <button onClick={() => onNavigate('home')} className="flex items-center group">
               <img 
                 src="https://i.ibb.co/Psdn5FfW/logo-removebg-preview.png" 
-                alt="KESSABCOM" 
+                alt="منصة kessabcom.ma" 
                 className="h-12 w-auto object-contain transition-transform group-hover:scale-105"
                 referrerPolicy="no-referrer"
               />

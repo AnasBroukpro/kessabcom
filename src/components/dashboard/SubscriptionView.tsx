@@ -10,7 +10,7 @@ export default function SubscriptionView({ settings }: SubscriptionViewProps) {
     <div className="space-y-8" dir="rtl">
       <h2 className="text-2xl font-black text-on-surface font-headline">الاشتراك</h2>
 
-      <div className="bg-primary/5 rounded-3xl border border-primary/20 p-8 flex flex-col md:flex-row justify-between items-center gap-8">
+      <div className="bg-primary/5 rounded-[10px] border border-primary/20 p-8 flex flex-col md:flex-row justify-between items-center gap-8">
         <div className="space-y-4 text-center md:text-right">
           <div className="inline-flex items-center gap-2 px-4 py-1 bg-primary text-on-primary rounded-full text-xs font-bold">
             <CheckCircle2 className="w-4 h-4" />
@@ -34,7 +34,7 @@ export default function SubscriptionView({ settings }: SubscriptionViewProps) {
           { name: 'باقة المحترف', price: '199 درهم/شهر', features: ['20 إعلان', 'صور وفيديو', 'دعم سريع', 'إحصائيات متقدمة'], active: true },
           { name: 'باقة الضيعة الكبيرة', price: '499 درهم/شهر', features: ['إعلانات غير محدودة', 'ترويج الإعلان', 'مدير حساب خاص', 'تصوير احترافي'] },
         ].filter(plan => !settings.paymentSystemEnabled || !plan.isFree).map((plan, i) => (
-          <div key={i} className={`bg-surface p-8 rounded-3xl border shadow-sm flex flex-col justify-between ${plan.active ? 'border-primary ring-2 ring-primary/20' : 'border-outline-variant/30'}`}>
+          <div key={i} className={`bg-surface p-8 rounded-[10px] border shadow-sm flex flex-col justify-between ${plan.active ? 'border-primary ring-2 ring-primary/20' : 'border-outline-variant/30'}`}>
             <div>
               <h4 className="text-xl font-black text-on-surface mb-2">{plan.name}</h4>
               <p className="text-2xl font-black text-primary mb-6">{plan.price}</p>
@@ -47,7 +47,7 @@ export default function SubscriptionView({ settings }: SubscriptionViewProps) {
                 ))}
               </ul>
             </div>
-            <button className={`w-full py-3 rounded-xl font-bold transition-all ${plan.active ? 'bg-surface-container-high text-on-surface cursor-default' : 'bg-primary text-on-primary hover:bg-primary/90'}`}>
+            <button className={`w-full py-3 rounded-[10px] font-bold transition-all ${plan.active ? 'bg-surface-container-high text-on-surface cursor-default' : 'bg-primary text-on-primary hover:bg-primary/90'}`}>
               {plan.active ? 'باقتك الحالية' : 'ترقية الآن'}
             </button>
           </div>

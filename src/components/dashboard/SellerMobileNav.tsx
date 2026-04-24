@@ -21,22 +21,22 @@ export default function SellerMobileNav({
   ];
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-outline-variant/20 flex items-center justify-between px-2 pb-safe pt-2 z-40" style={{ paddingBottom: 'env(safe-area-inset-bottom, 16px)' }}>
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl border-t border-outline-variant/10 flex items-center justify-between px-4 pb-safe pt-3 z-40 shadow-[0_-8px_30px_rgb(0,0,0,0.04)]" style={{ paddingBottom: 'env(safe-area-inset-bottom, 20px)' }}>
       {items.map(item => (
         <button 
           key={item.id}
           onClick={() => setActiveTab(item.id as SellerTab)}
-          className={`flex-1 flex flex-col items-center justify-center gap-1 p-2 rounded-xl transition-colors ${activeTab === item.id ? 'text-primary' : 'text-on-surface-variant hover:text-primary/70'}`}
+          className={`flex-1 flex flex-col items-center justify-center gap-1.5 p-2 rounded-[10px] transition-all duration-300 ${activeTab === item.id ? 'text-[#115E2C] scale-110' : 'text-[#757575] hover:text-[#115E2C]'}`}
         >
           <div className="relative">
-            <item.icon className={`w-5 h-5 ${activeTab === item.id && 'fill-primary/20'}`} />
+            <item.icon className={`w-5 h-5 ${activeTab === item.id ? 'stroke-[2.5px]' : 'stroke-2'}`} />
             {item.badge !== undefined && item.badge > 0 && (
-              <span className="absolute -top-1 -right-1.5 bg-error text-white text-[8px] w-3.5 h-3.5 flex items-center justify-center rounded-full font-bold">
+              <span className="absolute -top-2 -right-2 bg-red-600 text-white text-[8px] w-4 h-4 flex items-center justify-center rounded-full font-black border-2 border-white shadow-sm animate-bounce">
                 {item.badge}
               </span>
             )}
           </div>
-          <span className="text-[10px] font-bold">{item.label}</span>
+          <span className={`text-[10px] font-black tracking-tight ${activeTab === item.id ? 'opacity-100' : 'opacity-60'}`}>{item.label}</span>
         </button>
       ))}
     </nav>

@@ -67,7 +67,7 @@ export default function Maintenance({ activationDate, onNavigate }: Props) {
         </div>
 
         <div className="pt-8">
-          <p className="text-xs text-on-surface-variant">© 2026 KESSABCOM. جميع الحقوق محفوظة.</p>
+          <p className="text-xs text-on-surface-variant">© 2026 منصة kessabcom.ma. جميع الحقوق محفوظة.</p>
         </div>
       </div>
     </div>

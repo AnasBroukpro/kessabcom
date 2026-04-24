@@ -1,16 +1,19 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ViewType } from '../App';
-import { Search, MapPin, Navigation, ArrowLeft, BadgeCheck, Scale, BookOpen, User, Star, ShieldCheck, Heart, Camera, CheckCircle, Clock, HeartHandshake, TrendingUp, Bell, LogOut, LayoutDashboard, ShoppingBag, PlusCircle, Settings, Users, List, ChevronDown, Loader2 } from 'lucide-react';
+import { Search, MapPin, Navigation, ArrowLeft, BadgeCheck, Scale, BookOpen, User, Star, ShieldCheck, Heart, Camera, CheckCircle, Clock, HeartHandshake, TrendingUp, Bell, LogOut, LayoutDashboard, ShoppingBag, PlusCircle, Settings, Users, List, ChevronDown, Loader2, Target, Route } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useAuth } from '../contexts/AuthContext';
 import { firestoreService } from '../services/firestoreService';
 import { getCachedData, setCachedData } from '../lib/cache';
 import { cityMapping, cityCoords, getDisplayCity, getClosestCity } from '../constants/cityMapping';
+import barkiImage from '../assets/marketing/branding/حولي بركي..png';
 
 import { useSettings } from '../hooks/useSettings';
 import ContactSellerModal from '../components/ContactSellerModal';
 import LoginRequiredModal from '../components/LoginRequiredModal';
 import NewsTicker from '../components/NewsTicker';
+import logoV2 from '../assets/marketing/branding/logo v2.png';
+import MobileSidebar from '../components/MobileSidebar';
 
 interface Props {
   onNavigate: (view: ViewType, listingId?: string, city?: string, radius?: string, subView?: string, breed?: string) => void;
@@ -41,12 +44,24 @@ export default function Home({ onNavigate }: Props) {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [selectedBreed, setSelectedBreed] = useState<string | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [selectedBreeds, setSelectedBreeds] = useState<string[]>([]);
   const [showCityModal, setShowCityModal] = useState(false);
   const [isOpenCity, setIsOpenCity] = useState(false);
   const [isOpenRadius, setIsOpenRadius] = useState(false);
   const [openUpwards, setOpenUpwards] = useState(false);
   const searchBarRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchBarRef.current && !searchBarRef.current.contains(event.target as Node)) {
+        setIsOpenCity(false);
+        setIsOpenRadius(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     if (isOpenCity || isOpenRadius) {
@@ -155,7 +170,9 @@ export default function Home({ onNavigate }: Props) {
       setShowCityModal(true);
       return;
     }
-    onNavigate('search-results', undefined, citySearch, radiusSearch, undefined, selectedBreed || undefined);
+    // Pass multiple breeds as a comma-separated string if selected
+    const breedParam = selectedBreeds.length > 0 ? selectedBreeds.join(',') : undefined;
+    onNavigate('search-results', undefined, citySearch, radiusSearch, undefined, breedParam);
   };
 
   const getRoleBadge = (role: string) => {
@@ -253,15 +270,19 @@ export default function Home({ onNavigate }: Props) {
   return (
     <div className="antialiased" dir="rtl">
       {/* TopNavBar */}
+      <MobileSidebar 
+        isOpen={isSidebarOpen} 
+        onClose={() => setIsSidebarOpen(false)} 
+        onNavigate={onNavigate} 
+      />
       <nav className="fixed top-0 w-full z-50 bg-white/90 backdrop-blur-md border-b border-outline-variant/30">
-        <div className="flex justify-between items-center px-6 h-16 max-w-7xl mx-auto">
+        <div className="flex justify-between items-center px-6 h-16 max-w-7xl mx-auto flex-row-reverse md:flex-row">
           <div className="flex items-center gap-8">
             <button onClick={() => onNavigate('home')} className="flex items-center group">
               <img 
-                src="https://i.ibb.co/Psdn5FfW/logo-removebg-preview.png" 
+                src={logoV2} 
                 alt="KESSABCOM" 
                 className="h-8 md:h-10 w-auto object-contain transition-transform group-hover:scale-105"
-                referrerPolicy="no-referrer"
               />
             </button>
             <div className="hidden md:flex items-center gap-6">
@@ -270,6 +291,16 @@ export default function Home({ onNavigate }: Props) {
             </div>
           </div>
           <div className="flex items-center gap-2 md:gap-4">
+            {/* Hamburger Button (Mobile Only) */}
+            <button 
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className="md:hidden w-10 h-10 flex flex-col items-center justify-center gap-1.5 bg-[#F9F9F6] rounded-xl border border-outline-variant/10 transition-colors hover:border-[#2E7D32]"
+            >
+              <span className="w-5 h-0.5 bg-[#2E7D32] rounded-full"></span>
+              <span className="w-5 h-0.5 bg-[#2E7D32] rounded-full"></span>
+              <span className="w-5 h-0.5 bg-[#2E7D32] rounded-full"></span>
+            </button>
+            
             {user ? (
               <>
                 {/* Notifications */}
@@ -348,56 +379,71 @@ export default function Home({ onNavigate }: Props) {
       </nav>
 
       <main className="pt-16">
-        {/* Hero & Search Section */}
-        <section className="relative min-h-[650px] flex items-center justify-center bg-[#FDFCF8] px-4 py-20 z-20">
-          <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            <div className="absolute inset-0 opacity-50">
-              <img alt="مرعى في جبال الأطلس المغربية" className="w-full h-full object-cover" src="https://i.ibb.co/hxCgrSY7/generated-image.jpg" referrerPolicy="no-referrer" />
-            </div>
+        {/* Hero & Search Section - 100vh with vertical centering */}
+        <section className="relative min-h-[calc(100dvh-64px)] flex items-center justify-center bg-[#FDFCF8] px-4 z-20 overflow-hidden">
+          {/* Enhanced Background with Overlay */}
+          <div className="absolute inset-0 z-0">
+            <img 
+              alt="مرعى أخضر في جبال الأطلس" 
+              className="w-full h-full object-cover" 
+              src="https://i.ibb.co/hxCgrSY7/generated-image.jpg" 
+              fetchPriority="high"
+              referrerPolicy="no-referrer" 
+            />
+            {/* Linear Gradient Overlay for maximum text contrast (WCAG 2.1) */}
+            <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-transparent"></div>
+          </div>
 
-            {/* Floating Elements */}
-            <div className="absolute inset-0 pointer-events-none">
+          {/* Optimized Floating Elements (Visual Storytelling) */}
+          <div className="absolute inset-0 pointer-events-none overflow-hidden hidden md:block">
             <motion.div 
-              animate={{ y: [0, -20, 0], rotate: [0, 5, 0] }}
+              animate={{ y: [0, -15, 0], rotate: [0, 3, 0] }}
               transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-              className="absolute top-1/4 right-[8%] w-32 h-32 md:w-56 md:h-56 opacity-40 md:opacity-80"
+              className="absolute top-[15%] right-[10%] w-48 h-48 lg:w-64 lg:h-64 opacity-90"
             >
-              <img src="https://i.pinimg.com/474x/f1/c4/f3/f1c4f375f585d2c88ef5bf4b453cd01e.jpg" alt="Agneau" className="w-full h-full object-contain rounded-full border-4 border-white/50 shadow-2xl" referrerPolicy="no-referrer" />
+              <img 
+                src="https://i.pinimg.com/474x/f1/c4/f3/f1c4f375f585d2c88ef5bf4b453cd01e.jpg" 
+                alt="خروف صحي ممتاز" 
+                className="w-full h-full object-contain rounded-full border-8 border-white/20 shadow-[0_20px_50px_rgba(0,0,0,0.3)] backdrop-blur-sm" 
+                referrerPolicy="no-referrer" 
+              />
             </motion.div>
+            
             <motion.div 
-              animate={{ y: [0, 20, 0], rotate: [0, -5, 0] }}
-              transition={{ duration: 6, repeat: Infinity, ease: "easeInOut", delay: 1 }}
-              className="absolute top-1/4 left-[8%] w-32 h-32 md:w-56 md:h-56 opacity-40 md:opacity-80"
-            >
-              <img src="https://img12.360buyimg.com/n1/jfs/t1/1057/6/17739/86725/63e0f8fdFd3aacdb6/a637b488004ffee2.jpg" alt="Sheep" className="w-full h-full object-contain rounded-full border-4 border-white/50 shadow-2xl" referrerPolicy="no-referrer" />
-            </motion.div>
-            <motion.div 
-              animate={{ scale: [1, 1.1, 1], opacity: [0.1, 0.2, 0.1] }}
+              animate={{ scale: [1, 1.1, 1], opacity: [0.15, 0.25, 0.15] }}
               transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-              className="absolute top-1/3 left-[5%] w-16 h-16 md:w-32 md:h-32"
+              className="absolute bottom-[20%] left-[5%] w-48 h-48 lg:w-72 lg:h-72"
             >
-              <div className="w-full h-full bg-[#2E7D32] rounded-full blur-3xl"></div>
+              <div className="w-full h-full bg-[#A5D6A7] rounded-full blur-[100px]"></div>
+            </motion.div>
+
+            {/* New Barki Circular Image on the Left */}
+            <motion.div 
+              animate={{ y: [0, -10, 0], rotate: [0, -3, 0] }}
+              transition={{ duration: 6, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+              className="absolute top-[35%] left-[5%] lg:left-[10%] w-40 h-40 lg:w-56 lg:h-56 opacity-95"
+            >
+              <img 
+                src={barkiImage} 
+                alt="حولي بركي" 
+                className="w-full h-full object-cover rounded-full border-8 border-white/40 shadow-[0_20px_50px_rgba(0,0,0,0.4)] backdrop-blur-sm" 
+              />
             </motion.div>
           </div>
-        </div>
 
-        <div className="relative z-10 max-w-4xl w-full text-center">
-            {/* News Ticker moved to top on mobile */}
-            <div className="md:hidden mb-6">
-              <NewsTicker isMobile={true} />
-            </div>
+          {/* Mobile News Ticker attached to top */}
+          <div className="absolute top-0 left-0 w-full z-[100] md:hidden">
+            <NewsTicker isMobile={true} />
+          </div>
 
-            <div className="mb-4 inline-flex items-center gap-2 bg-[#E8F5E9]/80 backdrop-blur-sm px-4 py-2 rounded-full border border-[#2E7D32]/20">
-              <Clock className="w-4 h-4 text-[#2E7D32]" />
-              <span className="text-xs font-bold text-[#1B5E20]">باقي لعيد الأضحى:</span>
-            </div>
+          <div className="relative z-10 max-w-5xl w-full text-center mt-[100px] md:mt-0">
+
             <Countdown />
-            <h1 className="text-4xl md:text-6xl font-black text-[#1A1A1A] mb-2 tracking-tight font-headline leading-tight">
-              شوف الحولي <span className="text-[#2E7D32]">حداك</span> <br /> وزورو فالضيعة
+            <h1 className="text-4xl md:text-7xl font-black text-white mb-6 tracking-tight font-headline leading-[1.1] drop-shadow-lg">
+              شوف الحولي <span className="text-[#2E7D32]" style={{ WebkitTextStroke: '2px white' }}>حداك</span> <br /> وزورو فالضيعة
             </h1>
-            <p className="text-[#2E7D32] font-black tracking-[0.2em] text-sm md:text-base mb-8 uppercase font-headline">منكم وإليكم</p>
-            <p className="text-base md:text-lg text-[#4A4A4A] mb-12 max-w-2xl mx-auto font-medium leading-relaxed md:leading-normal px-4">
-              بلاما تضرب تمارة فالسواق، KESSABCOM كايوريك الكسابة لي قراب ليك. قلب على المدينة، وشوف الكسيبة بعينيك فبلاصتها.
+            <p className="text-base md:text-xl text-white/90 mb-14 max-w-2xl mx-auto font-medium leading-relaxed px-6 drop-shadow-md">
+              منصة kessabcom.ma كايوريك الكسابة لي قراب ليك فبلاصتها بلاما تضرب تمارة. قلب، اختار، وشوف الكسيبة بعينيك.
             </p>
 
             {/* Modern Expert Search Bar */}
@@ -405,89 +451,103 @@ export default function Home({ onNavigate }: Props) {
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.5, duration: 0.8 }}
-              className="mt-12 max-w-5xl mx-auto"
+              className="mt-6 md:mt-12 max-w-fit mx-auto"
             >
               <div 
                 ref={searchBarRef}
-                className="bg-white/80 backdrop-blur-xl p-2 rounded-[2.5rem] shadow-[0_20px_50px_rgba(46,125,50,0.15)] border border-white/40 z-[60] relative"
+                className="bg-white/95 backdrop-blur-xl p-2 md:p-3 rounded-2xl shadow-[0_30px_60px_rgba(0,0,0,0.3)] border border-white/20 z-[60] relative"
               >
-                <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2">
+                <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2 md:gap-3">
                   
-                  {/* City Selector */}
-                  <div className="flex-1 flex items-center px-6 py-4 md:py-0 border-b md:border-b-0 md:border-l border-outline-variant/10 relative group">
-                    <MapPin className="w-6 h-6 text-[#2E7D32] shrink-0" />
-                    <div className="flex flex-col text-right mr-4 flex-1">
-                      <span className="text-[10px] font-black text-[#2E7D32] uppercase tracking-wider mb-0.5">المدينة</span>
-                      <button 
-                        onClick={() => { setIsOpenCity(!isOpenCity); setIsOpenRadius(false); }}
-                        className="bg-transparent border-none outline-none w-full text-lg font-black text-[#1A1A1A] text-right flex items-center justify-between"
-                      >
-                        <span className="truncate">{citySearch || 'فين كتقلب؟'}</span>
-                      </button>
-                      
-                      {isOpenCity && (
-                        <div className={`absolute ${openUpwards ? 'bottom-full mb-4' : 'top-full mt-4'} left-0 right-0 bg-white rounded-3xl shadow-2xl border border-outline-variant/10 max-h-80 overflow-y-auto z-[100] p-4 animate-in ${openUpwards ? 'slide-in-from-bottom-2' : 'slide-in-from-top-2'} duration-200`}>
-                          <div className="grid grid-cols-1 gap-1">
-                            <button 
-                              onClick={() => { setCitySearch(''); setIsOpenCity(false); }}
-                              className={`w-full text-right px-4 py-3 rounded-xl text-sm font-bold transition-colors ${!citySearch ? 'bg-[#2E7D32] text-white' : 'hover:bg-[#F9F9F6] text-[#4A4A4A]'}`}
-                            >
-                              الكل
-                            </button>
-                            {moroccanCities.sort().map(city => (
+                  {/* City Selector & Locate Me Wrapper for Mobile Row */}
+                  <div className="flex flex-row items-stretch gap-2 w-full md:w-auto">
+                    {/* City Selector Block */}
+                    <div className="flex-1 md:w-[200px] flex items-center px-3 md:px-4 py-2 md:py-2 relative group bg-white rounded-xl border border-outline-variant/10 shadow-sm transition-all hover:border-[#2E7D32]/30">
+                      <MapPin className="w-5 h-5 md:w-6 md:h-6 text-[#2E7D32] shrink-0" />
+                      <div className="flex flex-col text-right mr-3 md:mr-4 flex-1">
+                        <span className="text-[10px] font-black text-[#2E7D32] uppercase tracking-wider mb-0.5">المدينة</span>
+                        <input 
+                          type="text"
+                          value={citySearch}
+                          onChange={(e) => { setCitySearch(e.target.value); setIsOpenCity(true); }}
+                          onFocus={() => setIsOpenCity(true)}
+                          placeholder="فين كتقلب؟"
+                          className="bg-transparent border-none outline-none w-full text-lg md:text-xl font-black text-[#1A1A1A] text-right placeholder:text-[#757575]/40"
+                        />
+                        
+                        {isOpenCity && (
+                          <div className={`absolute ${openUpwards ? 'bottom-full mb-4' : 'top-full mt-4'} right-0 left-0 w-full bg-white rounded-xl shadow-2xl border border-outline-variant/10 max-h-80 overflow-y-auto z-[100] p-1 animate-in ${openUpwards ? 'slide-in-from-bottom-2' : 'slide-in-from-top-2'} duration-200`}>
+                            <div className="flex flex-col gap-0.5">
                               <button 
-                                key={city}
-                                onClick={() => { setCitySearch(city); setIsOpenCity(false); }}
-                                className={`w-full text-right px-4 py-3 rounded-xl text-sm font-bold transition-colors ${citySearch === city ? 'bg-[#2E7D32] text-white' : 'hover:bg-[#F9F9F6] text-[#4A4A4A]'}`}
+                                onClick={() => { setCitySearch(''); setIsOpenCity(false); }}
+                                className={`w-full text-right px-4 py-2 rounded-lg text-lg font-bold transition-colors ${!citySearch ? 'bg-[#2E7D32] text-white' : 'hover:bg-[#F9F9F6] text-[#4A4A4A]'}`}
                               >
-                                {city}
+                                الكل
                               </button>
-                            ))}
+                              {moroccanCities.filter(c => c.includes(citySearch)).sort().map(city => (
+                                <button 
+                                  key={city}
+                                  onClick={() => { setCitySearch(city); setIsOpenCity(false); }}
+                                  className={`w-full text-right px-4 py-2 rounded-lg text-lg font-bold transition-colors ${citySearch === city ? 'bg-[#2E7D32] text-white' : 'hover:bg-[#F9F9F6] text-[#4A4A4A]'}`}
+                                >
+                                  {city}
+                                </button>
+                              ))}
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        )}
+                      </div>
+                      <ChevronDown 
+                        onClick={(e) => { e.stopPropagation(); setIsOpenCity(!isOpenCity); }}
+                        className={`w-5 h-5 text-[#757575] ml-2 cursor-pointer transition-transform ${isOpenCity ? 'rotate-180' : ''}`} 
+                      />
                     </div>
-                    <ChevronDown className={`w-4 h-4 text-[#757575] absolute left-14 md:left-16 pointer-events-none transition-transform ${isOpenCity ? 'rotate-180' : ''}`} />
-                    
-                    <button 
-                      onClick={handleLocateMe}
-                      disabled={isLocating}
-                      title="موقعي الحالي"
-                      className={`p-2 rounded-full hover:bg-[#E8F5E9] transition-all transform hover:scale-110 active:scale-95 ${isLocating ? 'animate-pulse text-[#2E7D32]' : 'text-[#757575]'}`}
-                    >
-                      {isLocating ? <Loader2 className="w-5 h-5 animate-spin" /> : <Navigation className="w-5 h-5" />}
-                    </button>
+
+                    {/* Distinct "في مدينتي" Button */}
+                    <div className="flex shrink-0">
+                      <button 
+                        onClick={handleLocateMe}
+                        disabled={isLocating}
+                        className={`flex items-center justify-center gap-1.5 md:gap-2 px-3 md:px-4 py-2 md:py-4 bg-[#F0F0F0] hover:bg-[#E5E5E5] text-[#1B5E20] rounded-xl border border-outline-variant/20 transition-all transform active:scale-95 shadow-sm group/loc`}
+                      >
+                        <Target className={`w-4 h-4 md:w-5 md:h-5 group-hover/loc:scale-110 transition-transform ${isLocating ? 'animate-pulse' : ''}`} />
+                        <span className="text-[11px] md:text-sm font-black whitespace-nowrap">في مدينتي</span>
+                        {isLocating && <Loader2 className="w-4 h-4 animate-spin" />}
+                      </button>
+                    </div>
                   </div>
 
-                  {/* Distance Selector */}
-                  <div className="flex-1 flex items-center px-6 py-4 md:py-0 relative group">
-                    <TrendingUp className="w-6 h-6 text-[#2E7D32] shrink-0" />
+                  {/* Distance Selector Block */}
+                  <div 
+                    onClick={() => { setIsOpenRadius(!isOpenRadius); setIsOpenCity(false); }}
+                    className="w-full md:w-[180px] flex items-center px-3 md:px-4 py-2 md:py-2 relative group bg-white rounded-xl border border-outline-variant/10 shadow-sm transition-all hover:border-[#2E7D32]/30 cursor-pointer"
+                  >
+                    <Route className="w-6 h-6 text-[#2E7D32] shrink-0" />
                     <div className="flex flex-col text-right mr-4 flex-1">
                       <span className="text-[10px] font-black text-[#2E7D32] uppercase tracking-wider mb-0.5">المسافة</span>
                       <button 
                         onClick={() => { setIsOpenRadius(!isOpenRadius); setIsOpenCity(false); }}
-                        className="bg-transparent border-none outline-none w-full text-lg font-black text-[#1A1A1A] text-right flex items-center justify-between"
+                        className="bg-transparent border-none outline-none w-full text-xl font-black text-[#1A1A1A] text-right flex items-center justify-between"
                       >
                         <span className="truncate">
-                          {radiusSearch === '10' ? '10 كلم دايرة بيك' : 
-                           radiusSearch === '20' ? '20 كلم دايرة بيك' : 
-                           radiusSearch === '50' ? '50 كلم دايرة بيك' : 'كاع المغرب'}
+                          {radiusSearch === '10' ? '10 كلم' : 
+                           radiusSearch === '20' ? '20 كلم' : 
+                           radiusSearch === '50' ? '50 كلم' : 'اختيار'}
                         </span>
                       </button>
 
                       {isOpenRadius && (
-                        <div className={`absolute ${openUpwards ? 'bottom-full mb-4' : 'top-full mt-4'} left-0 right-0 bg-white rounded-3xl shadow-2xl border border-outline-variant/10 z-[100] p-4 animate-in ${openUpwards ? 'slide-in-from-bottom-2' : 'slide-in-from-top-2'} duration-200`}>
-                          <div className="grid grid-cols-1 gap-1">
+                        <div className={`absolute ${openUpwards ? 'bottom-full mb-2' : 'top-full mt-2'} left-0 right-0 w-full bg-white rounded-xl shadow-2xl border border-outline-variant/10 z-[100] p-1 animate-in ${openUpwards ? 'slide-in-from-bottom-2' : 'slide-in-from-top-2'} duration-200`}>
+                          <div className="flex flex-col gap-0.5">
                             {[
                               { val: '10', label: '10 كلم دايرة بيك' },
                               { val: '20', label: '20 كلم دايرة بيك' },
-                              { val: '50', label: '50 كلم دايرة بيك' },
-                              { val: 'all', label: 'كاع المغرب' }
+                              { val: '50', label: '50 كلم دايرة بيك' }
                             ].map(dist => (
                               <button 
                                 key={dist.val}
                                 onClick={() => { setRadiusSearch(dist.val); setIsOpenRadius(false); }}
-                                className={`w-full text-right px-4 py-3 rounded-xl text-sm font-bold transition-colors ${radiusSearch === dist.val ? 'bg-[#2E7D32] text-white' : 'hover:bg-[#F9F9F6] text-[#4A4A4A]'}`}
+                                className={`w-full text-right px-4 py-2 rounded-lg text-lg font-bold transition-colors ${radiusSearch === dist.val ? 'bg-[#2E7D32] text-white' : 'hover:bg-[#F9F9F6] text-[#4A4A4A]'}`}
                               >
                                 {dist.label}
                               </button>
@@ -496,32 +556,48 @@ export default function Home({ onNavigate }: Props) {
                         </div>
                       )}
                     </div>
-                    <ChevronDown className={`w-4 h-4 text-[#757575] absolute left-6 pointer-events-none transition-transform ${isOpenRadius ? 'rotate-180' : ''}`} />
+                    <ChevronDown className={`w-6 h-6 text-[#757575] mr-2 transition-transform ${isOpenRadius ? 'rotate-180' : ''}`} />
                   </div>
 
-                  {/* Search Button */}
-                  <button 
-                    onClick={handleSearchNearMe}
-                    className="bg-[#2E7D32] text-white py-5 md:py-6 px-12 rounded-[2rem] font-black text-lg flex items-center justify-center gap-3 shadow-[0_10px_20px_rgba(46,125,50,0.3)] hover:shadow-[0_15px_30px_rgba(46,125,50,0.4)] transform hover:-translate-y-1 active:translate-y-0 transition-all duration-300"
-                  >
-                    <Search className="w-6 h-6" />
-                    <span>قلب دابا</span>
-                  </button>
+                  {/* Search CTA Button */}
+                  <div className="md:pr-1">
+                    <button 
+                      onClick={handleSearchNearMe}
+                      className="w-full md:w-auto bg-[#2E7D32] text-white py-3 md:py-5 px-14 rounded-xl font-black text-lg md:text-xl flex items-center justify-center gap-3 md:gap-4 shadow-[0_10px_25px_rgba(46,125,50,0.4)] hover:shadow-[0_15px_35px_rgba(46,125,50,0.5)] transform hover:-translate-y-1 active:scale-95 transition-all duration-300 group"
+                    >
+                      <Search className="w-5 h-5 md:w-7 md:h-7 group-hover:scale-110 transition-transform" />
+                      <span>قلب دابا</span>
+                    </button>
+                  </div>
 
                 </div>
               </div>
 
-              {/* Quick Tags */}
-              <div className="flex flex-wrap justify-center gap-3 mt-6">
-                {['سردي', 'بركي', 'مستورد'].map((tag) => (
-                  <button 
-                    key={tag}
-                    onClick={() => setSelectedBreed(selectedBreed === tag ? null : tag)}
-                    className={`px-4 py-2 rounded-full text-xs font-bold transition-all shadow-sm ${selectedBreed === tag ? 'bg-[#2E7D32] text-white' : 'bg-white/50 backdrop-blur-sm border border-white/50 text-[#1A1A1A] hover:bg-[#2E7D32] hover:text-white'}`}
-                  >
-                    #{tag}
-                  </button>
-                ))}
+              {/* Categorized Visual Tags with Multi-Selection */}
+              <div className="flex flex-row items-center justify-start md:justify-center gap-3 md:gap-6 mt-6 md:mt-12 overflow-x-auto pb-4 w-full max-w-full no-scrollbar">
+                <div className="flex items-center gap-1.5 md:gap-3 text-white shrink-0">
+                  <PlusCircle className="w-4 h-4 md:w-6 md:h-6 text-[#A5D6A7]" />
+                  <span className="font-black text-sm md:text-xl whitespace-nowrap">اختر الصنف :</span>
+                </div>
+                <div className="flex flex-row items-center gap-2 md:gap-3 shrink-0">
+                  {[
+                    { id: 'سردي', label: 'السردي' },
+                    { id: 'بركي', label: 'البركي' },
+                    { id: 'مستورد', label: 'الأغنام المستوردة' }
+                  ].map((tag) => (
+                    <button 
+                      key={tag.id}
+                      onClick={() => {
+                        setSelectedBreeds(prev => 
+                          prev.includes(tag.id) ? prev.filter(b => b !== tag.id) : [...prev, tag.id]
+                        );
+                      }}
+                      className={`px-3 py-1.5 md:px-6 md:py-3 rounded-xl text-xs md:text-sm font-black transition-all duration-300 border backdrop-blur-md shadow-lg whitespace-nowrap ${selectedBreeds.includes(tag.id) ? 'bg-[#A5D6A7] text-[#1B5E20] border-[#A5D6A7] scale-105 ring-4 ring-[#A5D6A7]/20' : 'bg-white/10 text-white border-white/20 hover:bg-white/20 hover:border-white/40'}`}
+                    >
+                      #{tag.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </motion.div>
           </div>
@@ -544,7 +620,7 @@ export default function Home({ onNavigate }: Props) {
                     <span className="text-sm font-bold">فضاء التضامن</span>
                   </div>
                   <h2 className="text-4xl font-black mb-6 font-headline leading-tight">عيد مبارك للجميع <br /> <span className="text-[#A5D6A7]">تضامن معانا</span></h2>
-                  <p className="text-[#E8F5E9] text-lg mb-10 font-medium">KESSABCOM كايفتح الباب للمحسنين لي بغاو يتبرعو بأضحية العيد، وللناس لي فوضعية صعبة وبغاو يستافدو من المبادرة.</p>
+                  <p className="text-[#E8F5E9] text-lg mb-10 font-medium">منصة kessabcom.ma كايفتح الباب للمحسنين لي بغاو يتبرعو بأضحية العيد، وللناس لي فوضعية صعبة وبغاو يستافدو من المبادرة.</p>
                   <div className="flex flex-wrap gap-4 justify-end">
                     <button onClick={() => onNavigate('solidarity-request')} className="bg-white text-[#1B5E20] px-8 py-4 rounded-xl font-bold border border-transparent hover:bg-transparent hover:text-white hover:border-white transition-colors shadow-xl">أنا محتاج مساعدة</button>
                     <button onClick={() => onNavigate('solidarity-donate')} className="bg-[#A5D6A7] text-[#1B5E20] px-8 py-4 rounded-xl font-bold border border-transparent hover:bg-transparent hover:text-[#A5D6A7] hover:border-[#A5D6A7] transition-colors shadow-xl">بغيت نتبرع</button>
@@ -573,7 +649,7 @@ export default function Home({ onNavigate }: Props) {
                 className={`relative rounded-3xl overflow-hidden shadow-md group cursor-pointer border border-outline-variant/10 ${settings.banners?.banner1Url ? 'hover:opacity-90 transition-opacity' : ''} ${settings.banners?.banner1Mobile ? 'aspect-square' : 'aspect-video'} md:aspect-[24/4.5]`}
               >
                 <picture className="w-full h-full">
-                  {settings.banners?.banner1Mobile && (
+                  {settings.banners?.banner1Mobile && typeof settings.banners.banner1Mobile === 'string' && (
                     <source media="(max-width: 767px)" srcSet={settings.banners.banner1Mobile} />
                   )}
                   <img 
@@ -771,7 +847,7 @@ export default function Home({ onNavigate }: Props) {
           <div className="max-w-7xl mx-auto px-6">
             <div className="text-center mb-16">
               <span className="text-[#2E7D32] font-bold text-sm tracking-widest uppercase mb-2 block">كيفاش تبيع؟</span>
-              <h2 className="text-3xl md:text-4xl font-black text-[#1A1A1A] font-headline">مراحل البيع فـ KESSABCOM</h2>
+              <h2 className="text-3xl md:text-4xl font-black text-[#1A1A1A] font-headline">مراحل البيع فـ منصة kessabcom.ma</h2>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-12 relative">
@@ -878,7 +954,7 @@ export default function Home({ onNavigate }: Props) {
                 <span className="text-[#A5D6A7]">تجيب الناس للضيعة؟</span>
               </h2>
               <p className="text-[#E8F5E9] text-base md:text-xl mb-10 max-w-md mx-auto md:mr-0 md:ml-0 font-medium leading-relaxed">
-                KESSABCOM كايسهل على المشتري يلقاك فخريطة المدينة. حط إعلانك وجيب الكليان حتى لدارك.
+                منصة kessabcom.ma كايسهل على المشتري يلقاك فخريطة المدينة. حط إعلانك وجيب الكليان حتى لدارك.
               </p>
               <button 
                 onClick={() => onNavigate('auth')} 
@@ -983,18 +1059,31 @@ const Countdown = () => {
   }
 
   return (
-    <div className="flex justify-center gap-2 md:gap-4 mb-8" dir="ltr">
-      {[
-        { label: 'أيام', value: timeLeft.days },
-        { label: 'ساعات', value: timeLeft.hours },
-        { label: 'دقائق', value: timeLeft.minutes },
-        { label: 'ثواني', value: timeLeft.seconds }
-      ].map((item, idx) => (
-        <div key={idx} className="bg-white/90 backdrop-blur-md border border-[#2E7D32]/20 rounded-2xl p-3 md:p-4 min-w-[70px] md:min-w-[90px] shadow-xl">
-          <div className="text-2xl md:text-3xl font-black text-[#2E7D32] leading-none mb-1">{item.value}</div>
-          <div className="text-[10px] md:text-xs font-bold text-[#757575] uppercase tracking-wider">{item.label}</div>
+    <div className="flex flex-col items-center mb-8 animate-in fade-in slide-in-from-top-4 duration-1000">
+      <div className="bg-white/10 backdrop-blur-2xl border border-white/20 rounded-[2rem] p-4 md:p-6 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] inline-block">
+        <div className="flex items-center justify-center gap-2 mb-4">
+          <Clock className="w-4 h-4 text-[#A5D6A7]" />
+          <h2 className="text-sm md:text-base font-black text-white tracking-tight font-headline">
+            باقي لعيد الأضحى المبارك
+          </h2>
         </div>
-      ))}
+        
+        <div className="flex justify-center gap-2 md:gap-3" dir="ltr">
+          {[
+            { label: 'أيام', value: timeLeft.days },
+            { label: 'ساعات', value: timeLeft.hours },
+            { label: 'دقائق', value: timeLeft.minutes },
+            { label: 'ثواني', value: timeLeft.seconds }
+          ].map((item, idx) => (
+            <div key={idx} className="flex flex-col items-center">
+              <div className="bg-white/10 backdrop-blur-xl border border-white/30 rounded-xl p-2 md:p-3 min-w-[55px] md:min-w-[65px] shadow-xl relative overflow-hidden group">
+                <div className="text-lg md:text-xl font-black text-white leading-none mb-1 drop-shadow-md">{item.value}</div>
+                <div className="text-[10px] md:text-xs font-black text-white uppercase tracking-wider drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)] mt-1">{item.label}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 };

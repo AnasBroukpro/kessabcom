@@ -156,7 +156,7 @@ const AccountView = ({ user, profile, settings, cities }: AccountViewProps) => {
               type="text" 
               value={newDisplayName}
               onChange={(e) => setNewDisplayName(e.target.value)}
-              className="w-full bg-surface-container-low border border-outline-variant/10 rounded-2xl p-4 pl-12 text-sm font-bold outline-none focus:ring-2 focus:ring-primary transition-all"
+              className="w-full bg-surface-container-low border border-outline-variant/10 rounded-[10px] p-4 pl-12 text-sm font-bold outline-none focus:ring-2 focus:ring-primary transition-all"
               placeholder="مثلا: أحمد بناني"
             />
             <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-on-surface-variant/40" />
@@ -169,7 +169,7 @@ const AccountView = ({ user, profile, settings, cities }: AccountViewProps) => {
               type="tel" 
               value={newPhoneNumber}
               onChange={(e) => setNewPhoneNumber(e.target.value)}
-              className="w-full bg-surface-container-low border border-outline-variant/10 rounded-2xl p-4 pl-12 text-sm font-bold outline-none focus:ring-2 focus:ring-primary transition-all"
+              className="w-full bg-surface-container-low border border-outline-variant/10 rounded-[10px] p-4 pl-12 text-sm font-bold outline-none focus:ring-2 focus:ring-primary transition-all"
               placeholder="06********"
               dir="ltr"
             />
@@ -182,7 +182,7 @@ const AccountView = ({ user, profile, settings, cities }: AccountViewProps) => {
             <select 
               value={newLocation}
               onChange={(e) => setNewLocation(e.target.value)}
-              className="w-full bg-surface-container-low border border-outline-variant/10 rounded-2xl p-4 pl-12 text-sm font-bold outline-none focus:ring-2 focus:ring-primary appearance-none transition-all"
+              className="w-full bg-surface-container-low border border-outline-variant/10 rounded-[10px] p-4 pl-12 text-sm font-bold outline-none focus:ring-2 focus:ring-primary appearance-none transition-all"
             >
               <option value="">اختار المدينة</option>
               {cities.map(city => <option key={city} value={city}>{city}</option>)}
@@ -194,7 +194,7 @@ const AccountView = ({ user, profile, settings, cities }: AccountViewProps) => {
       <button 
         type="submit"
         disabled={loading}
-        className="w-full py-4 bg-primary text-on-primary rounded-2xl font-black text-lg shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all flex items-center justify-center gap-3 disabled:opacity-70"
+        className="w-full py-4 bg-primary text-on-primary rounded-[10px] font-black text-lg shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all flex items-center justify-center gap-3 disabled:opacity-70"
       >
         {loading && <Loader2 className="w-5 h-5 animate-spin" />}
         حفظ التغييرات
@@ -204,7 +204,7 @@ const AccountView = ({ user, profile, settings, cities }: AccountViewProps) => {
 
   const renderSecurityForm = () => (
     <form onSubmit={handleUpdatePassword} className="space-y-6">
-      <div className="bg-orange-50 border border-orange-200 p-4 rounded-2xl flex items-start gap-3">
+      <div className="bg-orange-50 border border-orange-200 p-4 rounded-[10px] flex items-start gap-3">
         <AlertCircle className="w-5 h-5 text-orange-600 shrink-0 mt-0.5" />
         <p className="text-xs text-orange-800 font-medium leading-relaxed">لتغيير كلمة المرور، يجب عليك إدخال كلمة المرور الحالية أولاً لدواعي أمنية.</p>
       </div>
@@ -217,7 +217,7 @@ const AccountView = ({ user, profile, settings, cities }: AccountViewProps) => {
               type={showCurrentPassword ? 'text' : 'password'}
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
-              className="w-full bg-surface-container-low border border-outline-variant/10 rounded-2xl p-4 pl-12 text-sm font-bold outline-none focus:ring-2 focus:ring-primary transition-all"
+              className="w-full bg-surface-container-low border border-outline-variant/10 rounded-[10px] p-4 pl-12 text-sm font-bold outline-none focus:ring-2 focus:ring-primary transition-all"
             />
             <button 
               type="button" 
@@ -237,7 +237,7 @@ const AccountView = ({ user, profile, settings, cities }: AccountViewProps) => {
                 type={showNewPassword ? 'text' : 'password'}
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                className="w-full bg-surface-container-low border border-outline-variant/10 rounded-2xl p-4 pl-12 text-sm font-bold outline-none focus:ring-2 focus:ring-primary transition-all"
+                className="w-full bg-surface-container-low border border-outline-variant/10 rounded-[10px] p-4 pl-12 text-sm font-bold outline-none focus:ring-2 focus:ring-primary transition-all"
               />
               <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant/40" />
             </div>
@@ -249,7 +249,7 @@ const AccountView = ({ user, profile, settings, cities }: AccountViewProps) => {
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full bg-surface-container-low border border-outline-variant/10 rounded-2xl p-4 pl-12 text-sm font-bold outline-none focus:ring-2 focus:ring-primary transition-all"
+                className="w-full bg-surface-container-low border border-outline-variant/10 rounded-[10px] p-4 pl-12 text-sm font-bold outline-none focus:ring-2 focus:ring-primary transition-all"
               />
               <Shield className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant/40" />
             </div>
@@ -260,7 +260,7 @@ const AccountView = ({ user, profile, settings, cities }: AccountViewProps) => {
       <button 
         type="submit"
         disabled={loading || !currentPassword || !newPassword}
-        className="w-full py-4 bg-on-surface text-surface rounded-2xl font-black text-lg shadow-lg hover:opacity-90 transition-all flex items-center justify-center gap-3 disabled:opacity-30"
+        className="w-full py-4 bg-on-surface text-surface rounded-[10px] font-black text-lg shadow-lg hover:opacity-90 transition-all flex items-center justify-center gap-3 disabled:opacity-30"
       >
         {loading && <Loader2 className="w-5 h-5 animate-spin" />}
         تحديث كلمة المرور
@@ -276,13 +276,13 @@ const AccountView = ({ user, profile, settings, cities }: AccountViewProps) => {
             <h2 className="text-2xl font-black text-on-surface font-headline">حسابي الشخصي</h2>
             <p className="text-on-surface-variant text-sm mt-1">إدارة معلوماتك الشخصية وتفضيلاتك في المنصة.</p>
           </div>
-          <div className="bg-primary/10 text-primary p-3 rounded-2xl">
+          <div className="bg-primary/10 text-primary p-3 rounded-[10px]">
             <User className="w-6 h-6" />
           </div>
         </div>
 
         {(success || error) && (
-          <div className={`mb-6 p-4 rounded-2xl flex items-center gap-3 animate-in zoom-in-95 duration-200 ${success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+          <div className={`mb-6 p-4 rounded-[10px] flex items-center gap-3 animate-in zoom-in-95 duration-200 ${success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
             {success ? <CheckCircle2 className="w-5 h-5 shrink-0" /> : <AlertCircle className="w-5 h-5 shrink-0" />}
             <span className="font-bold text-sm">{success || error}</span>
           </div>
@@ -291,11 +291,11 @@ const AccountView = ({ user, profile, settings, cities }: AccountViewProps) => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Sidebar / Profile Card */}
           <div className="space-y-6">
-            <div className="bg-surface rounded-3xl p-8 border border-outline-variant/30 shadow-sm flex flex-col items-center relative overflow-hidden">
+            <div className="bg-surface rounded-[10px] p-8 border border-outline-variant/30 shadow-sm flex flex-col items-center relative overflow-hidden">
               <div className="absolute top-0 left-0 right-0 h-24 bg-gradient-to-br from-primary/10 to-secondary/10 -z-10" />
               
               <div className="relative group mt-4">
-                <div className="w-32 h-32 rounded-3xl overflow-hidden border-4 border-white shadow-xl bg-surface-container-low ring-1 ring-outline-variant/10">
+                <div className="w-32 h-32 rounded-[10px] overflow-hidden border-4 border-white shadow-xl bg-surface-container-low ring-1 ring-outline-variant/10">
                   {newPhotoURL ? (
                     <img src={newPhotoURL} alt="Avatar" className="w-full h-full object-cover" />
                   ) : (
@@ -309,7 +309,7 @@ const AccountView = ({ user, profile, settings, cities }: AccountViewProps) => {
                     </div>
                   )}
                 </div>
-                <label className="absolute bottom-0 left-0 p-2.5 bg-primary text-on-primary rounded-2xl shadow-lg cursor-pointer transform transition-transform hover:scale-110 active:scale-95 border-2 border-white">
+                <label className="absolute bottom-0 left-0 p-2.5 bg-primary text-on-primary rounded-[10px] shadow-lg cursor-pointer transform transition-transform hover:scale-110 active:scale-95 border-2 border-white">
                   <Camera className="w-4 h-4" />
                   <input type="file" className="hidden" accept="image/*" onChange={handlePhotoUpload} disabled={isPhotoUploading} />
                 </label>
@@ -321,7 +321,7 @@ const AccountView = ({ user, profile, settings, cities }: AccountViewProps) => {
               <div className="mt-6 w-full space-y-2">
                 <button 
                   onClick={() => setActiveAccountTab('profile')}
-                  className={`w-full flex items-center justify-between p-4 rounded-2xl transition-all ${activeAccountTab === 'profile' ? 'bg-primary text-on-primary shadow-lg shadow-primary/20' : 'hover:bg-surface-container-low text-on-surface-variant'}`}
+                  className={`w-full flex items-center justify-between p-4 rounded-[10px] transition-all ${activeAccountTab === 'profile' ? 'bg-primary text-on-primary shadow-lg shadow-primary/20' : 'hover:bg-surface-container-low text-on-surface-variant'}`}
                 >
                   <div className="flex items-center gap-3">
                     <User className="w-5 h-5" />
@@ -330,7 +330,7 @@ const AccountView = ({ user, profile, settings, cities }: AccountViewProps) => {
                 </button>
                 <button 
                   onClick={() => setActiveAccountTab('security')}
-                  className={`w-full flex items-center justify-between p-4 rounded-2xl transition-all ${activeAccountTab === 'security' ? 'bg-primary text-on-primary shadow-lg shadow-primary/20' : 'hover:bg-surface-container-low text-on-surface-variant'}`}
+                  className={`w-full flex items-center justify-between p-4 rounded-[10px] transition-all ${activeAccountTab === 'security' ? 'bg-primary text-on-primary shadow-lg shadow-primary/20' : 'hover:bg-surface-container-low text-on-surface-variant'}`}
                 >
                   <div className="flex items-center gap-3">
                     <Shield className="w-5 h-5" />
@@ -339,7 +339,7 @@ const AccountView = ({ user, profile, settings, cities }: AccountViewProps) => {
                 </button>
                 <button 
                   onClick={() => setActiveAccountTab('notifications')}
-                  className={`w-full flex items-center justify-between p-4 rounded-2xl transition-all ${activeAccountTab === 'notifications' ? 'bg-primary text-on-primary shadow-lg shadow-primary/20' : 'hover:bg-surface-container-low text-on-surface-variant'}`}
+                  className={`w-full flex items-center justify-between p-4 rounded-[10px] transition-all ${activeAccountTab === 'notifications' ? 'bg-primary text-on-primary shadow-lg shadow-primary/20' : 'hover:bg-surface-container-low text-on-surface-variant'}`}
                 >
                   <div className="flex items-center gap-3">
                     <Bell className="w-5 h-5" />
@@ -349,14 +349,14 @@ const AccountView = ({ user, profile, settings, cities }: AccountViewProps) => {
               </div>
             </div>
 
-            <div className="bg-surface rounded-3xl p-6 border border-outline-variant/30 shadow-sm">
+            <div className="bg-surface rounded-[10px] p-6 border border-outline-variant/30 shadow-sm">
               <h4 className="font-black text-sm text-on-surface mb-6 flex items-center gap-2">
                 <Info className="w-4 h-4 text-primary" />
                 تفاصيل الحساب
               </h4>
               <div className="space-y-5">
                 <div className="flex items-center gap-4">
-                  <div className="w-8 h-8 rounded-lg bg-surface-container-high flex items-center justify-center text-on-surface-variant">
+                  <div className="w-8 h-8 rounded-[10px] bg-surface-container-high flex items-center justify-center text-on-surface-variant">
                     <Mail className="w-4 h-4" />
                   </div>
                   <div className="flex-1">
@@ -365,7 +365,7 @@ const AccountView = ({ user, profile, settings, cities }: AccountViewProps) => {
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
-                  <div className="w-8 h-8 rounded-lg bg-surface-container-high flex items-center justify-center text-on-surface-variant">
+                  <div className="w-8 h-8 rounded-[10px] bg-surface-container-high flex items-center justify-center text-on-surface-variant">
                     <Smartphone className="w-4 h-4" />
                   </div>
                   <div className="flex-1">
@@ -374,7 +374,7 @@ const AccountView = ({ user, profile, settings, cities }: AccountViewProps) => {
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
-                  <div className="w-8 h-8 rounded-lg bg-surface-container-high flex items-center justify-center text-on-surface-variant">
+                  <div className="w-8 h-8 rounded-[10px] bg-surface-container-high flex items-center justify-center text-on-surface-variant">
                     <Calendar className="w-4 h-4" />
                   </div>
                   <div className="flex-1">
@@ -390,7 +390,7 @@ const AccountView = ({ user, profile, settings, cities }: AccountViewProps) => {
 
           {/* Main Content Area */}
           <div className="lg:col-span-2 space-y-8">
-            <div className="bg-surface rounded-3xl p-8 border border-outline-variant/30 shadow-sm min-h-[400px]">
+            <div className="bg-surface rounded-[10px] p-8 border border-outline-variant/30 shadow-sm min-h-[400px]">
               {activeAccountTab === 'profile' && (
                 <div className="animate-in fade-in slide-in-from-left-4 duration-300">
                   <h4 className="text-xl font-black text-on-surface mb-8 flex items-center gap-3">
@@ -423,7 +423,7 @@ const AccountView = ({ user, profile, settings, cities }: AccountViewProps) => {
                       { label: 'تنبيهات الرسائل', desc: 'إشعارات فاش يجاوبك شي كساب', enabled: true },
                       { label: 'تنبيهات التطبيق', desc: 'إشعارات حول التحديثات والعروض الخاصة', enabled: false },
                     ].map((item, i) => (
-                      <div key={i} className="flex items-center justify-between p-5 bg-surface-container-low rounded-2xl border border-outline-variant/10 group hover:border-primary/30 transition-all">
+                      <div key={i} className="flex items-center justify-between p-5 bg-surface-container-low rounded-[10px] border border-outline-variant/10 group hover:border-primary/30 transition-all">
                         <div className="text-right">
                           <p className="font-bold text-on-surface group-hover:text-primary transition-colors">{item.label}</p>
                           <p className="text-xs text-on-surface-variant font-medium mt-1">{item.desc}</p>
@@ -439,8 +439,8 @@ const AccountView = ({ user, profile, settings, cities }: AccountViewProps) => {
             </div>
 
             {/* Smart Tip */}
-            <div className="bg-primary/5 p-6 rounded-3xl border border-primary/10 flex items-start gap-5">
-              <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-primary shadow-sm border border-primary/10 shrink-0">
+            <div className="bg-primary/5 p-6 rounded-[10px] border border-primary/10 flex items-start gap-5">
+              <div className="w-12 h-12 bg-white rounded-[10px] flex items-center justify-center text-primary shadow-sm border border-primary/10 shrink-0">
                 <Globe className="w-6 h-6" />
               </div>
               <div>

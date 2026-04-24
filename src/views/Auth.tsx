@@ -14,12 +14,13 @@ import { firestoreService } from '../services/firestoreService';
 import { cityCoords } from '../constants/cityMapping';
 
 // Import marketing images
-import img1 from '../assets/marketing/branding/sheep_1.webp';
-import img2 from '../assets/marketing/branding/aid_al_adha.webp';
-import img3 from '../assets/marketing/branding/arton.webp';
-import img4 from '../assets/marketing/branding/sheep_2.jpg';
-import img5 from '../assets/marketing/branding/images_1.jfif';
-import img6 from '../assets/marketing/branding/images_2.jfif';
+import img1 from '../assets/marketing/branding/img1.webp';
+import img2 from '../assets/marketing/branding/img2.webp';
+import img3 from '../assets/marketing/branding/img3.webp';
+import img4 from '../assets/marketing/branding/img4.webp';
+import img5 from '../assets/marketing/branding/img5.webp';
+import img6 from '../assets/marketing/branding/img6.webp';
+import logoV2 from '../assets/marketing/branding/logo v2.png';
 
 const marketingImages = [img1, img2, img3, img4, img5, img6];
 
@@ -358,26 +359,26 @@ export default function Auth({ onNavigate, intendedView }: Props) {
       {/* BACK TO HOME BUTTON */}
       <button 
         onClick={() => onNavigate('home')}
-        className="fixed top-6 right-6 z-50 flex items-center gap-2 bg-white/80 backdrop-blur border border-outline-variant/20 px-6 py-3 rounded-full text-base font-black shadow-xl hover:bg-white transition-all transform hover:scale-105 active:scale-95 group"
+        className="fixed top-6 right-6 z-50 flex flex-row-reverse items-center gap-2 bg-white px-5 py-2.5 rounded-full text-sm font-black shadow-[0_4px_20px_-4px_rgba(0,0,0,0.1)] hover:bg-gray-50 transition-all transform hover:scale-105 active:scale-95 group text-[#1A1A1A]"
       >
-        <ArrowRight className="w-5 h-5 text-primary group-hover:translate-x-1 transition-transform" />
         <span>الرئيسية</span>
+        <ArrowRight className="w-4 h-4 text-[#2E7D32]" />
       </button>
 
       {/* LEFT: AUTH FORM */}
       <div className="flex-[1.2] lg:flex-1 flex flex-col justify-center items-center p-8 lg:p-12 relative">
         <div className="w-full max-w-[360px] animate-in fade-in slide-in-from-bottom-4 duration-700">
 
-          <div className="text-center mb-10">
-            <div className="w-40 h-40 mx-auto mb-6 flex items-center justify-center">
+          <div className="text-center mb-8">
+            <div className="w-48 md:w-56 mx-auto mb-6 flex items-center justify-center">
               <img 
-                src="https://i.ibb.co/Psdn5FfW/logo-removebg-preview.png" 
-                alt="KESSABCOM" 
+                src={logoV2} 
+                alt="منصة kessabcom.ma" 
                 className="w-full h-auto"
               />
             </div>
-            <h1 className="text-4xl font-black text-on-surface mb-2 font-headline">تسجيل الدخول</h1>
-            <p className="text-on-surface-variant text-base font-medium">
+            <h1 className="text-3xl md:text-4xl font-black text-[#1A1A1A] mb-2 font-headline">تسجيل الدخول</h1>
+            <p className="text-[#4A4A4A] text-sm md:text-base font-bold">
               على سلامتك، توحشناك في السوق
             </p>
           </div>
@@ -406,9 +407,9 @@ export default function Auth({ onNavigate, intendedView }: Props) {
             {/* Phone & Password */}
             {/* Phone Input with Inline Error */}
             <div className="space-y-6">
-              <div className="space-y-3">
-                <label className="block text-sm font-black text-on-surface uppercase text-right px-1">رقم الهاتف</label>
-                <div className={`flex w-full overflow-hidden rounded-xl border-2 transition-all ${fieldErrors.phone ? 'border-red-500 shadow-sm shadow-red-100' : 'border-outline-variant/30'}`} dir="ltr" onPaste={handlePaste}>
+              <div className="space-y-2">
+                <label className="block text-xs md:text-sm font-black text-[#1A1A1A] text-right px-1">رقم الهاتف</label>
+                <div className={`flex w-full overflow-hidden rounded-2xl border transition-all ${fieldErrors.phone ? 'border-red-500 shadow-sm shadow-red-100' : 'border-outline-variant/30'}`} dir="ltr" onPaste={handlePaste}>
                   {phoneDigits.map((digit, idx) => (
                     <input
                       key={idx}
@@ -422,8 +423,8 @@ export default function Auth({ onNavigate, intendedView }: Props) {
                       onChange={(e) => handleDigitChange(idx, e.target.value)}
                       onKeyDown={(e) => handleDigitKeyDown(idx, e)}
                       placeholder="-"
-                      className={`w-full h-20 text-center font-black text-4xl transition-all outline-none border-r border-outline-variant/20 last:border-r-0
-                        ${idx === 0 ? 'bg-surface-container-high text-primary' : 'bg-white focus:bg-primary/5 text-on-surface'}
+                      className={`w-full h-12 md:h-14 text-center font-black text-xl md:text-2xl transition-all outline-none border-r border-outline-variant/20 last:border-r-0
+                        ${idx === 0 ? 'bg-[#E6EBE6] text-[#0A5C2F]' : 'bg-white focus:bg-primary/5 text-[#1A1A1A] placeholder:text-gray-300'}
                         ${phoneChecked ? 'opacity-50' : ''}`}
                     />
                   ))}
@@ -436,8 +437,8 @@ export default function Auth({ onNavigate, intendedView }: Props) {
               </div>
 
               {/* Password Input with Inline Error */}
-              <div className="space-y-3">
-                <label className="block text-sm font-black text-on-surface uppercase text-right px-1">كلمة المرور</label>
+              <div className="space-y-2 mt-4">
+                <label className="block text-xs md:text-sm font-black text-[#1A1A1A] text-right px-1">كلمة المرور</label>
                 <div className="relative">
                   <input
                     type={showPassword ? 'text' : 'password'}
@@ -445,7 +446,7 @@ export default function Auth({ onNavigate, intendedView }: Props) {
                     value={password}
                     disabled={phoneChecked && !isNewUser}
                     onChange={(e) => setPassword(e.target.value)}
-                    className={`w-full h-14 bg-surface-container-low border-2 rounded-2xl px-4 text-sm text-center font-black focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all 
+                    className={`w-full h-12 md:h-14 bg-[#F5F5F0] border rounded-2xl px-4 text-sm md:text-base text-center font-bold focus:border-[#2E7D32] focus:ring-2 focus:ring-[#2E7D32]/20 transition-all placeholder:text-[#757575]
                       ${fieldErrors.password ? 'border-red-500 bg-red-50/30' : 'border-outline-variant/20'}
                       ${phoneChecked && !isNewUser ? 'opacity-50 cursor-not-allowed' : ''}`}
                     required
@@ -453,9 +454,9 @@ export default function Auth({ onNavigate, intendedView }: Props) {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute left-4 top-1/2 -translate-y-1/2 text-black/20 hover:text-black/50"
+                    className="absolute left-4 top-1/2 -translate-y-1/2 text-[#757575] hover:text-[#1A1A1A] transition-colors"
                   >
-                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
                 </div>
                 {fieldErrors.password && (
@@ -520,7 +521,7 @@ export default function Auth({ onNavigate, intendedView }: Props) {
             <button
               type="submit"
               disabled={loading}
-              className="w-full h-16 bg-primary text-on-primary rounded-2xl font-black text-xl hover:shadow-xl hover:shadow-primary/20 transition-all flex items-center justify-center active:scale-95"
+              className="w-full h-12 md:h-14 bg-[#115E2C] text-white rounded-2xl font-black text-lg md:text-xl shadow-md hover:shadow-lg hover:bg-[#0E4A22] transition-all flex items-center justify-center active:scale-95 mt-6"
             >
               {loading ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
@@ -537,7 +538,7 @@ export default function Auth({ onNavigate, intendedView }: Props) {
               <button
                 type="button"
                 onClick={handleForgotPassword}
-                className="w-full text-center text-lg text-primary font-black hover:underline mt-4"
+                className="w-full text-center text-sm md:text-base text-[#115E2C] font-black hover:underline mt-6"
               >
                 نسيت كلمة المرور؟
               </button>

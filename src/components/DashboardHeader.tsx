@@ -6,6 +6,7 @@ import { firestoreService } from '../services/firestoreService';
 import { cityMapping, cityCoords, getClosestCity } from '../constants/cityMapping';
 import MobileSidebar from './MobileSidebar';
 import NotificationSidebar from './NotificationSidebar';
+import logoV2 from '../assets/marketing/branding/logo v2.png';
 
 interface Props {
   title?: string;
@@ -28,8 +29,10 @@ export default function DashboardHeader({ title, subtitle, location, showSearch 
   const [isLocating, setIsLocating] = useState(false);
   const [distance, setDistance] = useState('10');
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isOpenCity, setIsOpenCity] = useState(false);
+  const [isOpenRadius, setIsOpenRadius] = useState(false);
   const notificationsRef = useRef<HTMLDivElement>(null);
-  const suggestionsRef = useRef<HTMLDivElement>(null);
+  const searchBarRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
 
   const getMappedCity = (input: string) => {
@@ -47,8 +50,9 @@ export default function DashboardHeader({ title, subtitle, location, showSearch 
       if (notificationsRef.current && !notificationsRef.current.contains(event.target as Node)) {
         setShowNotifications(false);
       }
-      if (suggestionsRef.current && !suggestionsRef.current.contains(event.target as Node)) {
-        setShowSuggestions(false);
+      if (searchBarRef.current && !searchBarRef.current.contains(event.target as Node)) {
+        setIsOpenCity(false);
+        setIsOpenRadius(false);
       }
       if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
         setShowProfileMenu(false);
@@ -106,7 +110,7 @@ export default function DashboardHeader({ title, subtitle, location, showSearch 
     
     return (
       <div className="absolute top-full left-0 pt-2 w-64 z-[60]">
-        <div className="bg-white rounded-2xl shadow-2xl border border-outline-variant/20 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+        <div className="bg-white rounded-[10px] shadow-2xl border border-outline-variant/20 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
           <div className="p-4 border-b border-outline-variant/10 bg-[#F9F9F6]">
             <div className="flex items-center gap-3 mb-2">
               <div className="w-10 h-10 rounded-full bg-[#2E7D32] text-white flex items-center justify-center font-bold overflow-hidden">
@@ -126,11 +130,11 @@ export default function DashboardHeader({ title, subtitle, location, showSearch 
         <div className="p-2">
           {role === 'buyer' && (
             <>
-              <button onClick={() => { onNavigate?.('buyer', undefined, undefined, undefined, 'dashboard'); setShowProfileMenu(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-[#4A4A4A] hover:bg-[#F9F9F6] rounded-xl transition-colors">
+              <button onClick={() => { onNavigate?.('buyer', undefined, undefined, undefined, 'dashboard'); setShowProfileMenu(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-[#4A4A4A] hover:bg-[#F9F9F6] rounded-[10px] transition-colors">
                 <LayoutDashboard className="w-4 h-4" />
                 <span>لوحة التحكم</span>
               </button>
-              <button onClick={() => { onNavigate?.('buyer', undefined, undefined, undefined, 'kessaba-offers'); setShowProfileMenu(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-[#4A4A4A] hover:bg-[#F9F9F6] rounded-xl transition-colors">
+              <button onClick={() => { onNavigate?.('buyer', undefined, undefined, undefined, 'kessaba-offers'); setShowProfileMenu(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-[#4A4A4A] hover:bg-[#F9F9F6] rounded-[10px] transition-colors">
                 <ShoppingBag className="w-4 h-4" />
                 <span>طلباتي</span>
               </button>
@@ -139,15 +143,15 @@ export default function DashboardHeader({ title, subtitle, location, showSearch 
           
           {role === 'seller' && (
             <>
-              <button onClick={() => { onNavigate?.('seller', undefined, undefined, undefined, 'dashboard'); setShowProfileMenu(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-[#4A4A4A] hover:bg-[#F9F9F6] rounded-xl transition-colors">
+              <button onClick={() => { onNavigate?.('seller', undefined, undefined, undefined, 'dashboard'); setShowProfileMenu(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-[#4A4A4A] hover:bg-[#F9F9F6] rounded-[10px] transition-colors">
                 <LayoutDashboard className="w-4 h-4" />
                 <span>لوحة التحكم</span>
               </button>
-              <button onClick={() => { onNavigate?.('seller', undefined, undefined, undefined, 'flock'); setShowProfileMenu(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-[#4A4A4A] hover:bg-[#F9F9F6] rounded-xl transition-colors">
+              <button onClick={() => { onNavigate?.('seller', undefined, undefined, undefined, 'flock'); setShowProfileMenu(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-[#4A4A4A] hover:bg-[#F9F9F6] rounded-[10px] transition-colors">
                 <List className="w-4 h-4" />
                 <span>إعلاناتي</span>
               </button>
-              <button onClick={() => { onNavigate?.('add-listing'); setShowProfileMenu(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-[#4A4A4A] hover:bg-[#F9F9F6] rounded-xl transition-colors">
+              <button onClick={() => { onNavigate?.('add-listing'); setShowProfileMenu(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-[#4A4A4A] hover:bg-[#F9F9F6] rounded-[10px] transition-colors">
                 <PlusCircle className="w-4 h-4" />
                 <span>إضافة إعلان</span>
               </button>
@@ -156,29 +160,29 @@ export default function DashboardHeader({ title, subtitle, location, showSearch 
           
           {role === 'admin' && (
             <>
-              <button onClick={() => { onNavigate?.('admin', undefined, undefined, undefined, 'overview'); setShowProfileMenu(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-[#4A4A4A] hover:bg-[#F9F9F6] rounded-xl transition-colors">
+              <button onClick={() => { onNavigate?.('admin', undefined, undefined, undefined, 'overview'); setShowProfileMenu(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-[#4A4A4A] hover:bg-[#F9F9F6] rounded-[10px] transition-colors">
                 <LayoutDashboard className="w-4 h-4" />
                 <span>لوحة التحكم</span>
               </button>
-              <button onClick={() => { onNavigate?.('admin', undefined, undefined, undefined, 'users'); setShowProfileMenu(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-[#4A4A4A] hover:bg-[#F9F9F6] rounded-xl transition-colors">
+              <button onClick={() => { onNavigate?.('admin', undefined, undefined, undefined, 'users'); setShowProfileMenu(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-[#4A4A4A] hover:bg-[#F9F9F6] rounded-[10px] transition-colors">
                 <Users className="w-4 h-4" />
                 <span>المستخدمين</span>
               </button>
-              <button onClick={() => { onNavigate?.('admin', undefined, undefined, undefined, 'settings'); setShowProfileMenu(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-[#4A4A4A] hover:bg-[#F9F9F6] rounded-xl transition-colors">
+              <button onClick={() => { onNavigate?.('admin', undefined, undefined, undefined, 'settings'); setShowProfileMenu(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-[#4A4A4A] hover:bg-[#F9F9F6] rounded-[10px] transition-colors">
                 <Settings className="w-4 h-4" />
                 <span>الإعدادات</span>
               </button>
             </>
           )}
 
-          <button onClick={() => { onNavigate?.('home'); setShowProfileMenu(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-[#4A4A4A] hover:bg-[#F9F9F6] rounded-xl transition-colors">
+          <button onClick={() => { onNavigate?.('home'); setShowProfileMenu(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-[#4A4A4A] hover:bg-[#F9F9F6] rounded-[10px] transition-colors">
             <ArrowLeft className="w-4 h-4 rotate-180" />
             <span>الرجوع للرئيسية</span>
           </button>
           
           <div className="h-px bg-outline-variant/10 my-2 mx-2"></div>
           
-          <button onClick={handleSignOut} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-bold text-red-600 hover:bg-red-50 rounded-xl transition-colors">
+          <button onClick={handleSignOut} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-bold text-red-600 hover:bg-red-50 rounded-[10px] transition-colors">
             <LogOut className="w-4 h-4" />
             <span>تسجيل الخروج</span>
           </button>
@@ -251,33 +255,20 @@ export default function DashboardHeader({ title, subtitle, location, showSearch 
 
       <div className="max-w-7xl mx-auto px-4 py-3 md:py-0 md:h-20 flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-6">
         
-        {/* Top Mobile Row (Logo + Actions) */}
+        {/* Top Mobile Row (Actions on Right + Logo on Left) */}
         <div className="flex items-center justify-between md:hidden w-full h-14">
           <div className="flex items-center gap-2">
             <div className="flex flex-col items-center justify-center">
-               <button onClick={() => setIsSidebarOpen(true)} className="w-10 h-10 flex flex-col items-center justify-center gap-1.5 bg-[#F9F9F6] rounded-xl border border-outline-variant/10">
+               <button onClick={() => setIsSidebarOpen(true)} className="w-10 h-10 flex flex-col items-center justify-center gap-1.5 bg-[#F9F9F6] rounded-[10px] border border-outline-variant/10">
                   <motion.span animate={isSidebarOpen ? { rotate: 45, y: 8 } : { rotate: 0, y: 0 }} className="w-5 h-0.5 bg-[#2E7D32] rounded-full" />
                   <motion.span animate={isSidebarOpen ? { opacity: 0 } : { opacity: 1 }} className="w-5 h-0.5 bg-[#2E7D32] rounded-full" />
                   <motion.span animate={isSidebarOpen ? { rotate: -45, y: -8 } : { rotate: 0, y: 0 }} className="w-5 h-0.5 bg-[#2E7D32] rounded-full" />
                </button>
             </div>
-          </div>
-
-          <div className="flex-1 flex justify-center">
-            <button onClick={() => onNavigate?.('home')} className="group flex items-center">
-              <img 
-                src="https://i.ibb.co/Psdn5FfW/logo-removebg-preview.png" 
-                alt="كسابكوم" 
-                className="h-8 w-auto object-contain"
-                referrerPolicy="no-referrer"
-              />
-            </button>
-          </div>
-          
-          <div className="flex items-center gap-2">
+            
             <button 
               onClick={() => setIsNotificationSidebarOpen(true)}
-              className={`p-2 rounded-xl border border-transparent transition-colors relative ${isNotificationSidebarOpen ? 'bg-white text-[#2E7D32] border-[#2E7D32]' : 'bg-[#F9F9F6] text-[#757575] hover:bg-white hover:text-[#2E7D32] hover:border-[#2E7D32]'}`}
+              className={`p-2 rounded-[10px] border border-transparent transition-colors relative ${isNotificationSidebarOpen ? 'bg-white text-[#2E7D32] border-[#2E7D32]' : 'bg-[#F9F9F6] text-[#757575] hover:bg-white hover:text-[#2E7D32] hover:border-[#2E7D32]'}`}
             >
               <Bell className="w-5 h-5" />
               {notifications.some(n => !n.read) && (
@@ -285,6 +276,14 @@ export default function DashboardHeader({ title, subtitle, location, showSearch 
               )}
             </button>
           </div>
+
+          <button onClick={() => onNavigate?.('home')} className="flex items-center">
+            <img 
+              src={logoV2} 
+              alt="كسابكوم" 
+              className="h-8 w-auto object-contain"
+            />
+          </button>
         </div>
 
         {/* Desktop Title & Centered Welcome Message / Logo */}
@@ -312,62 +311,100 @@ export default function DashboardHeader({ title, subtitle, location, showSearch 
           )}
         </div>
 
-        {/* Search Bar */}
+        {/* Modern Expert Search Bar - Adapted for Dashboard */}
         {showSearch && (
-          <div className="flex-1 lg:max-w-xl flex flex-col sm:flex-row items-stretch sm:items-center gap-2 bg-[#F9F9F6] border border-outline-variant/20 rounded-xl p-1.5 shadow-sm hover:shadow-md transition-shadow">
-            <div className="flex flex-1 items-center divide-x divide-x-reverse divide-outline-variant/30">
-              <div className="flex-1 relative">
-                <div className="flex items-center px-3 gap-2 group">
-                  <MapPin className="w-4 h-4 text-[#2E7D32] shrink-0" />
-                  <select 
-                    value={citySearch}
-                    onChange={(e) => {
-                      setCitySearch(e.target.value);
-                      onSearch?.(e.target.value, distance);
-                    }}
-                    className="bg-transparent border-none outline-none w-full py-2.5 sm:py-2 text-sm font-bold text-[#1A1A1A] appearance-none cursor-pointer focus:text-[#2E7D32] transition-colors"
-                    style={{ direction: 'rtl' }}
-                  >
-                    <option value="">فين كتقلب؟</option>
-                    {cities.map(city => (
-                      <option key={city} value={city}>{city}</option>
-                    ))}
-                  </select>
-                  <ChevronDown className="w-3 h-3 text-[#757575] absolute left-10 pointer-events-none" />
-                  
-                  <button 
-                    onClick={handleLocateMe}
-                    disabled={isLocating}
-                    title="موقعي الحالي"
-                    className={`p-1.5 rounded-lg hover:bg-[#E8F5E9] transition-colors ${isLocating ? 'animate-pulse text-[#2E7D32]' : 'text-[#757575]'}`}
-                  >
-                    <LocateFixed className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-              
-              <div className="flex-1 flex items-center px-3 gap-2 group relative">
-                <Navigation className="w-4 h-4 text-[#2E7D32] shrink-0 group-hover:scale-110 transition-transform" />
-                <select 
-                  value={distance}
-                  onChange={(e) => setDistance(e.target.value)}
-                  className="bg-transparent border-none outline-none w-full py-2.5 sm:py-2 text-sm font-bold text-[#1A1A1A] appearance-none cursor-pointer focus:text-[#2E7D32] transition-colors"
-                  style={{ direction: 'rtl' }}
+          <div ref={searchBarRef} className="lg:max-w-xl flex flex-row items-center gap-1 sm:gap-2 bg-[#F9F9F6] border border-outline-variant/20 rounded-[10px] p-1 sm:p-1.5 shadow-sm hover:shadow-md transition-shadow relative z-[60] w-fit mx-auto">
+            {/* City Selector */}
+            <div 
+              onClick={() => { setIsOpenCity(!isOpenCity); setIsOpenRadius(false); }}
+              className="w-32 sm:w-48 flex items-center px-2 sm:px-3 py-1.5 relative group bg-white rounded-[10px] border border-outline-variant/10 shadow-sm transition-all hover:border-[#2E7D32]/30 cursor-pointer shrink-0"
+            >
+              <MapPin className="hidden sm:block w-4 h-4 text-[#2E7D32] shrink-0" />
+              <div className="flex flex-col text-right sm:mr-3 flex-1 min-w-0">
+                <button 
+                  onClick={(e) => { e.stopPropagation(); setIsOpenCity(!isOpenCity); setIsOpenRadius(false); }}
+                  className="bg-transparent border-none outline-none w-full text-xs sm:text-sm font-bold text-[#1A1A1A] text-right flex items-center justify-between gap-1"
                 >
-                  <option value="10">10 كلم</option>
-                  <option value="20">20 كلم</option>
-                  <option value="50">50 كلم</option>
-                  <option value="all">كاع لي كاين</option>
-                </select>
-                <ChevronDown className="w-3 h-3 text-[#757575] absolute left-3 pointer-events-none" />
+                  <span className="truncate">{citySearch || 'فين كتقلب؟'}</span>
+                </button>
               </div>
+              <ChevronDown className={`hidden sm:block w-3.5 h-3.5 text-[#757575] transition-transform ${isOpenCity ? 'rotate-180' : ''}`} />
+
+              {isOpenCity && (
+                <div className="absolute top-full mt-1.5 left-0 right-0 w-full bg-white rounded-[10px] shadow-2xl border border-outline-variant/10 z-[100] p-1 animate-in slide-in-from-top-2 duration-200">
+                  <div className="max-h-60 overflow-y-auto custom-scrollbar p-1">
+                    {cities.map(city => (
+                      <button 
+                        key={city}
+                        onClick={(e) => { e.stopPropagation(); setCitySearch(city); setIsOpenCity(false); onSearch?.(city, distance); }}
+                        className={`w-full text-right px-4 py-2 rounded-[10px] text-sm font-bold transition-colors ${citySearch === city ? 'bg-[#2E7D32] text-white' : 'hover:bg-[#F9F9F6] text-[#4A4A4A]'}`}
+                      >
+                        {city}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <button 
+              onClick={(e) => { e.stopPropagation(); handleLocateMe(); }}
+              disabled={isLocating}
+              title="في مدينتي"
+              className={`p-1.5 sm:p-2 rounded-[10px] hover:bg-[#E8F5E9] border border-outline-variant/10 bg-white shadow-sm transition-colors shrink-0 flex items-center justify-center ${isLocating ? 'animate-pulse text-[#2E7D32]' : 'text-[#2E7D32]'}`}
+            >
+              <LocateFixed className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${isLocating ? 'animate-pulse' : ''}`} />
+            </button>
+
+            {/* Distance Selector */}
+            <div 
+              onClick={() => { setIsOpenRadius(!isOpenRadius); setIsOpenCity(false); }}
+              className="w-[85px] sm:w-[120px] flex items-center px-1.5 sm:px-3 py-1.5 relative group bg-white rounded-[10px] border border-outline-variant/10 shadow-sm transition-all hover:border-[#2E7D32]/30 cursor-pointer shrink-0"
+            >
+              <Navigation className="hidden sm:block w-3.5 h-3.5 text-[#2E7D32] shrink-0" />
+              <div className="flex flex-col text-right sm:mr-3 flex-1">
+                <button 
+                  onClick={(e) => { e.stopPropagation(); setIsOpenRadius(!isOpenRadius); setIsOpenCity(false); }}
+                  className="bg-transparent border-none outline-none w-full text-xs sm:text-sm font-bold text-[#1A1A1A] text-right flex items-center justify-between"
+                >
+                  <span className="truncate">
+                    {distance === '10' ? '10 كلم' : 
+                     distance === '20' ? '20 كلم' : 
+                     distance === '50' ? '50 كلم' : 
+                     distance === 'all' ? 'الكل' : 'المسافة'}
+                  </span>
+                </button>
+
+                {isOpenRadius && (
+                  <div className="absolute top-full mt-2 left-0 right-0 w-full bg-white rounded-[10px] shadow-2xl border border-outline-variant/10 z-[100] p-1 animate-in slide-in-from-top-2 duration-200">
+                    <div className="flex flex-col gap-0.5">
+                      {[
+                        { val: '10', label: '10 كلم' },
+                        { val: '20', label: '20 كلم' },
+                        { val: '50', label: '50 كلم' },
+                        { val: 'all', label: 'الكل' }
+                      ].map(dist => (
+                        <button 
+                          key={dist.val}
+                          onClick={(e) => { e.stopPropagation(); setDistance(dist.val); setIsOpenRadius(false); }}
+                          className={`w-full text-right px-4 py-2 rounded-[10px] text-sm font-bold transition-colors ${distance === dist.val ? 'bg-[#2E7D32] text-white' : 'hover:bg-[#F9F9F6] text-[#4A4A4A]'}`}
+                        >
+                          {dist.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+              <ChevronDown className={`hidden sm:block w-3 h-3 text-[#757575] ml-1 transition-transform ${isOpenRadius ? 'rotate-180' : ''}`} />
             </div>
             
             <button 
               onClick={() => onSearch?.(getMappedCity(citySearch), distance)}
-              className="bg-[#2E7D32] text-white p-3 sm:p-2.5 rounded-lg border border-transparent hover:bg-white hover:text-[#2E7D32] hover:border-[#2E7D32] transition-colors shadow-sm flex items-center justify-center shrink-0"
+              className="bg-[#2E7D32] text-white py-1.5 px-4 sm:px-6 rounded-[10px] border border-transparent hover:bg-white hover:text-[#2E7D32] hover:border-[#2E7D32] transition-all shadow-sm flex items-center gap-2 justify-center shrink-0 group"
             >
-              <Search className="w-4 h-4 sm:w-4 sm:h-4" />
+              <span className="text-xs sm:text-sm font-bold">بحث</span>
+              <Search className="w-3.5 h-3.5 sm:w-4 sm:h-4 group-hover:scale-110 transition-transform" />
             </button>
           </div>
         )}
@@ -377,7 +414,7 @@ export default function DashboardHeader({ title, subtitle, location, showSearch 
           <div className="relative" ref={notificationsRef}>
             <button 
               onClick={() => setShowNotifications(!showNotifications)}
-              className={`p-2.5 rounded-xl border border-transparent transition-colors relative ${showNotifications ? 'bg-white text-[#2E7D32] border-[#2E7D32]' : 'bg-[#F9F9F6] text-[#757575] hover:bg-white hover:text-[#2E7D32] hover:border-[#2E7D32]'}`}
+              className={`p-2.5 rounded-[10px] border border-transparent transition-colors relative ${showNotifications ? 'bg-white text-[#2E7D32] border-[#2E7D32]' : 'bg-[#F9F9F6] text-[#757575] hover:bg-white hover:text-[#2E7D32] hover:border-[#2E7D32]'}`}
             >
               <Bell className="w-5 h-5" />
               {notifications.some(n => !n.read) && (

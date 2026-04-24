@@ -4,6 +4,7 @@ import {
   Settings, HeartHandshake, LogOut 
 } from 'lucide-react';
 import { SellerTab } from '../../views/SellerDashboard';
+import logoV2 from '../../assets/marketing/branding/logo v2.png';
 
 interface SellerSidebarProps {
   activeTab: SellerTab;
@@ -32,15 +33,14 @@ export default function SellerSidebar({
   ].filter(item => item.visible !== false);
 
   return (
-    <aside className="w-20 lg:w-64 bg-surface border-r border-outline-variant/20 flex flex-col justify-between hidden md:flex z-20">
+    <aside className="w-20 lg:w-64 bg-surface border-r border-outline-variant/10 flex flex-col justify-between hidden md:flex z-20">
       <div>
-        <div className="h-24 flex flex-col items-center justify-center border-b border-outline-variant/20 gap-2 shrink-0">
+        <div className="h-24 flex flex-col items-center justify-center border-b border-outline-variant/10 gap-2 shrink-0">
           <button onClick={() => onNavigate('home')} className="flex items-center group">
             <img 
-              src="https://i.ibb.co/Psdn5FfW/logo-removebg-preview.png" 
+              src={logoV2} 
               alt="كسابكوم" 
               className="h-12 w-auto object-contain transition-transform group-hover:scale-105" 
-              referrerPolicy="no-referrer" 
             />
           </button>
         </div>
@@ -49,12 +49,12 @@ export default function SellerSidebar({
             <button 
               key={item.id}
               onClick={() => setActiveTab(item.id as SellerTab)}
-              className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl font-bold transition-all ${activeTab === item.id ? 'bg-primary-container text-on-primary-container' : 'text-on-surface-variant hover:bg-surface-variant'}`}
+              className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-[10px] font-black transition-all duration-300 ${activeTab === item.id ? 'bg-[#115E2C] text-white shadow-lg shadow-[#115E2C]/20' : 'text-[#757575] hover:bg-[#F5F5F0] hover:text-[#115E2C]'}`}
             >
               <item.icon className="w-6 h-6" />
               <span className="hidden lg:block">{item.label}</span>
               {item.count !== undefined && item.count > 0 && (
-                <span className="hidden lg:flex mr-auto bg-error text-white text-[10px] w-5 h-5 items-center justify-center rounded-full">
+                <span className={`hidden lg:flex mr-auto text-[10px] w-5 h-5 items-center justify-center rounded-full font-black ${activeTab === item.id ? 'bg-white text-[#115E2C]' : 'bg-red-600 text-white'}`}>
                   {item.count}
                 </span>
               )}
@@ -62,11 +62,11 @@ export default function SellerSidebar({
           ))}
         </nav>
       </div>
-      <div className="p-4 border-t border-outline-variant/20 space-y-2">
+      <div className="p-4 border-t border-outline-variant/10 space-y-2">
         {settings.solidarityDonationEnabled && (
           <button 
             onClick={() => setActiveTab('donations')}
-            className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl font-bold transition-all ${activeTab === 'donations' ? 'bg-primary/10 text-primary' : 'text-primary hover:bg-primary/5'}`}
+            className={`w-full flex items-center gap-4 px-4 py-3 rounded-[10px] font-black transition-all duration-300 ${activeTab === 'donations' ? 'bg-[#E8F5E9] text-[#115E2C]' : 'text-[#115E2C] hover:bg-[#F5F5F0]'}`}
           >
             <HeartHandshake className="w-5 h-5" />
             <span className="hidden lg:block">تبرع تضامني</span>
@@ -74,7 +74,7 @@ export default function SellerSidebar({
         )}
         <button 
           onClick={() => { signOut(); onNavigate('auth'); }} 
-          className="w-full flex items-center justify-center gap-2 bg-error/10 text-error py-3 rounded-xl font-bold hover:bg-error/20 transition-colors"
+          className="w-full flex items-center justify-center gap-2 bg-red-50 text-red-600 py-3.5 rounded-[10px] font-black hover:bg-red-100 transition-colors"
         >
           <LogOut className="w-5 h-5" />
           <span className="hidden lg:block">تسجيل الخروج</span>

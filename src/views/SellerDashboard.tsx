@@ -17,7 +17,7 @@ import SettingsView from '../components/dashboard/SettingsView';
 import SellerSidebar from '../components/dashboard/SellerSidebar';
 import SellerMobileNav from '../components/dashboard/SellerMobileNav';
 import DeleteConfirmationModal from '../components/dashboard/DeleteConfirmationModal';
-import { Star } from 'lucide-react';
+import { Star, Plus } from 'lucide-react';
 import Notifications from './Notifications';
 
 export type SellerTab = 'dashboard' | 'flock' | 'stats' | 'subscription' | 'settings' | 'buyer-requests' | 'donations' | 'notifications';
@@ -185,6 +185,14 @@ export default function SellerDashboard({ onNavigate, activeSubView }: Props) {
         setActiveTab={setActiveTab}
         requestsCount={requests.length}
       />
+
+      {/* Sticky "+" Button */}
+      <button 
+        onClick={() => onNavigate('add-listing')}
+        className="fixed bottom-24 right-6 md:bottom-8 md:right-8 w-14 h-14 md:w-16 md:h-16 bg-[#115E2C] text-white rounded-[10px] shadow-2xl shadow-[#115E2C]/30 flex items-center justify-center hover:scale-110 active:scale-95 transition-all z-50 group border border-white/20"
+      >
+        <Plus className="w-8 h-8 md:w-10 md:h-10 transition-transform group-hover:rotate-90" />
+      </button>
 
       <DeleteConfirmationModal 
         show={showDeleteConfirm}
