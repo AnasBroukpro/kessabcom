@@ -65,9 +65,11 @@ export default function FlockView({
               </div>
               
               <div className="p-8 flex flex-col flex-1">
-                <div className="flex justify-between items-start mb-4 gap-2">
+                <div className="flex flex-col gap-1 mb-4">
                   <h3 className="font-black text-[#1A1A1A] text-xl truncate group-hover:text-[#115E2C] transition-colors">{announcement.title}</h3>
-                  <div className="shrink-0">{renderStars(5)}</div>
+                  <div className="flex items-center gap-2">
+                    {renderStars(5)}
+                  </div>
                 </div>
                 
                 <div className="flex items-center gap-4 text-xs font-black mb-8">

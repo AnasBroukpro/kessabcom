@@ -427,6 +427,27 @@ async function startServer() {
         ...req.body,
         updatedAt: FieldValue.serverTimestamp()
       }, { merge: true });
+
+      // Cascade update to listings if name or pseudo changed
+      if (req.body.fullName || req.body.pseudo || req.body.displayName) {
+        const listingsSnap = await db.collection('announcements').where('sellerId', '==', req.user.uid).get();
+        if (!listingsSnap.empty) {
+          const batch = db.batch();
+          listingsSnap.docs.forEach(doc => {
+            const update: any = {};
+            if (req.body.fullName || req.body.displayName) {
+              update.sellerName = req.body.fullName || req.body.displayName;
+            }
+            if (req.body.pseudo !== undefined) {
+              update.sellerPseudo = req.body.pseudo;
+            }
+            batch.update(doc.ref, update);
+          });
+          await batch.commit();
+          console.log(`🔄 API: Cascaded profile update to ${listingsSnap.size} listings for ${req.user.uid}`);
+        }
+      }
+
       res.json({ message: "Profile updated" });
     } catch (e: any) {
       console.error('❌ API: updateProfile error:', e);
@@ -563,6 +584,10 @@ async function startServer() {
         return res.status(400).json({ error: 'Maximum 10 images autorisées.' });
       }
 
+      // Fetch seller info for denormalization
+      const sellerDoc = await db.collection('users').doc(req.user.uid).get();
+      const sellerData = sellerDoc.data();
+
       const data = {
         title: String(title).trim().slice(0, 200),
         description: description ? String(description).trim().slice(0, 2000) : '',
@@ -585,6 +610,8 @@ async function startServer() {
         deliveryAvailable: Boolean(deliveryAvailable),
         // Controlled server-side fields only:
         sellerId: req.user.uid,
+        sellerName: sellerData?.fullName || sellerData?.displayName || 'كساب',
+        sellerPseudo: sellerData?.pseudo || null,
         status: 'active',
         clicks: { phone: 0, whatsapp: 0 },
         totalClicks: 0,

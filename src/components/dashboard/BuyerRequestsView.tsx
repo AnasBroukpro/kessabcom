@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   ArrowLeft, CheckCircle2, Loader2, Mic, Camera, 
   Clock, MessageCircle, Phone, Navigation, Calculator, Bell,
-  ShoppingBag, ChevronRight, MapPin, Send, Trash2, Video, 
+  ShoppingBag, ChevronRight, ArrowRight, MapPin, Send, Trash2, Video, 
   Upload, X
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -22,7 +22,7 @@ export function BuyerRequestsView({
   hasMore, 
   isLoadingMore 
 }: BuyerRequestsViewProps) {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [selectedRequest, setSelectedRequest] = useState<any | null>(null); // Object = Details, String = Offer Form
   const [offerSent, setOfferSent] = useState(false);
   const [offerDesc, setOfferDesc] = useState('');
@@ -95,6 +95,8 @@ export function BuyerRequestsView({
 
       const offerData = {
         sellerId: user.uid,
+        sellerName: profile?.fullName || profile?.displayName || 'كساب',
+        sellerPseudo: profile?.pseudo || null,
         requestId: request.id,
         price: request.budget,
         description: offerDesc,
@@ -154,14 +156,19 @@ export function BuyerRequestsView({
     const request = requests.find(r => r.id === requestId);
     
     return (
-      <div className="max-w-2xl mx-auto p-4 md:p-8" dir="rtl">
-        <button onClick={() => setSelectedRequest(request)} className="flex items-center gap-2 text-[#0a5c1a] font-black mb-6 hover:gap-3 transition-all">
-          <ArrowLeft className="w-5 h-5" />
-          <span>رجوع لتفاصيل الطلب</span>
-        </button>
+      <div className="max-w-2xl mx-auto p-0" dir="rtl">
+        <div className="flex items-center justify-between mb-8 bg-white/80 backdrop-blur-md p-4 rounded-xl border border-outline-variant/10 sticky top-0 z-10">
+          <button 
+            onClick={() => setSelectedRequest(request)} 
+            className="flex items-center gap-2 text-on-surface-variant hover:text-primary transition-colors group"
+          >
+            <ArrowRight className="w-6 h-6 transition-transform group-hover:translate-x-1" />
+            <span className="font-black text-sm">الرجوع للطلبات</span>
+          </button>
+          <h2 className="text-xl font-black text-on-surface font-headline">تقديم عرض جديد</h2>
+        </div>
 
-        <div className="bg-white rounded-[10px] p-8 shadow-xl border border-outline-variant/20">
-          <h2 className="text-2xl font-black text-on-surface mb-2 font-headline">تقديم عرض للمشتري</h2>
+        <div className="bg-white rounded-[10px] p-8 shadow-xl border border-outline-variant/20 mx-4 md:mx-0">
           <p className="text-on-surface-variant text-sm mb-8">جاوب على طلب <span className="font-bold text-primary">{request?.buyerName}</span> وبين ليه الجودة ديال الحوالا لي عندك.</p>
 
           <form onSubmit={handleSendOffer} className="space-y-6">
@@ -183,13 +190,13 @@ export function BuyerRequestsView({
                    {imagePreview ? (
                      <div className="relative h-32 rounded-[10px] overflow-hidden border border-primary/20">
                        <img src={imagePreview} className="w-full h-full object-cover" />
-                       <button 
-                        type="button"
-                        onClick={() => { setImageFile(null); setImagePreview(null); }}
-                        className="absolute top-2 left-2 p-1.5 bg-black/50 text-white rounded-full hover:bg-red-500 transition-colors"
-                       >
-                         <X className="w-4 h-4" />
-                       </button>
+                        <button 
+                         type="button"
+                         onClick={() => { setImageFile(null); setImagePreview(null); }}
+                         className="absolute top-2 left-2 bg-red-600 text-white p-1.5 rounded-full shadow-lg z-20 hover:scale-110 transition-transform flex items-center justify-center"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
                      </div>
                    ) : (
                      <label className="h-32 rounded-[10px] border-2 border-dashed border-outline-variant/30 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-all">

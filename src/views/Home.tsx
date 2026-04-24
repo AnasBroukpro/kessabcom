@@ -754,7 +754,7 @@ export default function Home({ onNavigate }: Props) {
                 <div className="p-6">
                   <div className="flex flex-col gap-3">
                     <div className="flex items-center justify-between">
-                      <p className="text-[#2E7D32] font-bold">ضيعة {listing.sellerName || 'كساب'}</p>
+                      <p className="text-[#2E7D32] font-bold">ضيعة {listing.sellerPseudo || listing.sellerName || 'كساب'}</p>
                       <div className="flex items-center gap-1.5">
                         <span className="text-[10px] font-bold text-[#757575]">الحجم:</span>
                         <div className="flex gap-1 text-[10px] font-bold text-[#4A4A4A]">

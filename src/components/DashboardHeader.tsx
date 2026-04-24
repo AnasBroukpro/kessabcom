@@ -240,7 +240,7 @@ export default function DashboardHeader({ title, subtitle, location, showSearch 
   };
 
   return (
-    <header className="bg-white/90 backdrop-blur-md border-b border-outline-variant/30 sticky top-0 z-50">
+    <header className="bg-white/90 backdrop-blur-md border-b border-outline-variant/30 sticky top-0 z-[70]">
       <MobileSidebar 
         isOpen={isSidebarOpen} 
         onClose={() => setIsSidebarOpen(false)} 
@@ -288,27 +288,21 @@ export default function DashboardHeader({ title, subtitle, location, showSearch 
 
         {/* Desktop Title & Centered Welcome Message / Logo */}
         <div className="hidden md:flex items-center justify-start flex-1 relative h-full">
-          {profile?.role && (
-            <div className="flex flex-col items-start animate-in fade-in slide-in-from-top-1 duration-700">
-              <span className="text-[10px] font-black text-primary/70 uppercase tracking-wider mb-0.5">
-                {profile.role === 'admin' ? 'لوحة تحكم المسؤول' : 
-                 profile.role === 'seller' ? 'لوحة تحكم الكساب' : 'لوحة تحكم المشتري'}
-              </span>
-              <h2 className="text-sm font-bold text-[#1A1A1A] font-headline tracking-tight">
-                مرحبا بك <span className="text-primary">
-                  {(() => {
-                    const name = profile?.fullName || profile?.displayName;
-                    if (!name || name.toLowerCase() === 'user') return 'أنس';
-                    return name;
-                  })()}
-                </span>، 
-                <span className="text-on-surface-variant/70 text-xs font-medium mr-1">
-                  {profile.role === 'admin' ? 'المدير العام' : 
-                   profile.role === 'seller' ? 'فخورون بعملك وتفانيك' : 'اكتشف أفضل العروض اليوم'}
-                </span>
-              </h2>
-            </div>
-          )}
+          <div className="flex items-center gap-6 animate-in fade-in slide-in-from-top-1 duration-700">
+            <button 
+              onClick={() => onNavigate?.('home')}
+              className="text-lg font-black text-primary hover:text-primary/80 transition-colors font-headline"
+            >
+              الرئيسية
+            </button>
+            <div className="w-px h-4 bg-outline-variant/30" />
+            <button 
+              onClick={() => onNavigate?.('search-results')}
+              className="text-lg font-black text-[#1A1A1A] hover:text-primary transition-colors font-headline"
+            >
+              البحث
+            </button>
+          </div>
         </div>
 
         {/* Modern Expert Search Bar - Adapted for Dashboard */}

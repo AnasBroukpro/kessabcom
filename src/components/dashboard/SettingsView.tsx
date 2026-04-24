@@ -17,6 +17,7 @@ export default function SettingsView({ profile, user }: SettingsViewProps) {
   const [settingsCity, setSettingsCity] = useState('');
   const [settingsPhone, setSettingsPhone] = useState('');
   const [settingsWhatsapp, setSettingsWhatsapp] = useState('');
+  const [settingsPseudo, setSettingsPseudo] = useState('');
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
   const [updateSuccess, setUpdateSuccess] = useState(false);
 
@@ -28,6 +29,7 @@ export default function SettingsView({ profile, user }: SettingsViewProps) {
       setSettingsCity(profile.location || 'سطات');
       setSettingsPhone(profile.phoneNumber || '');
       setSettingsWhatsapp(profile.whatsappNumber || '');
+      setSettingsPseudo(profile.pseudo || '');
     }
   }, [profile]);
 
@@ -41,7 +43,8 @@ export default function SettingsView({ profile, user }: SettingsViewProps) {
         fullName: settingsName,
         location: settingsCity,
         phoneNumber: settingsPhone,
-        whatsappNumber: settingsWhatsapp
+        whatsappNumber: settingsWhatsapp,
+        pseudo: settingsPseudo
       });
       await refreshProfile();
       setUpdateSuccess(true);
@@ -142,6 +145,18 @@ export default function SettingsView({ profile, user }: SettingsViewProps) {
                   className="w-full p-3 bg-surface-container-low border border-outline-variant/20 rounded-[10px] focus:ring-2 focus:ring-primary outline-none" 
                 />
               </div>
+              {profile?.role === 'seller' && (
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-on-surface-variant">اللقب (ضيعة)</label>
+                  <input 
+                    type="text" 
+                    value={settingsPseudo}
+                    onChange={(e) => setSettingsPseudo(e.target.value)}
+                    placeholder="مثلا: الحاج التهامي"
+                    className="w-full p-3 bg-surface-container-low border border-outline-variant/20 rounded-[10px] focus:ring-2 focus:ring-primary outline-none" 
+                  />
+                </div>
+              )}
               <div className="space-y-2">
                 <label className="text-sm font-bold text-on-surface-variant">المدينة</label>
                 <select 
@@ -194,6 +209,7 @@ export default function SettingsView({ profile, user }: SettingsViewProps) {
                     setSettingsCity(profile.location || 'سطات');
                     setSettingsPhone(profile.phoneNumber || '');
                     setSettingsWhatsapp(profile.whatsappNumber || '');
+                    setSettingsPseudo(profile.pseudo || '');
                   }
                 }}
                 className="px-8 py-3 bg-surface-container-high text-on-surface rounded-[10px] font-bold hover:bg-surface-variant transition-all"

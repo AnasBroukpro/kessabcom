@@ -33,7 +33,9 @@ interface Props {
 export default function MobileSidebar({ isOpen, onClose, onNavigate }: Props) {
   const { user, profile, signOut } = useAuth();
   const role = profile?.role || 'buyer';
-  const displayName = profile?.fullName || profile?.displayName || (role === 'admin' ? 'المشرف' : role === 'seller' ? 'الكساب' : 'المشتري');
+  const displayName = (role === 'seller' && profile?.pseudo) 
+    ? profile.pseudo 
+    : (profile?.fullName || profile?.displayName || (role === 'admin' ? 'المشرف' : role === 'seller' ? 'الكساب' : 'المشتري'));
 
   const menuItems = [
     {

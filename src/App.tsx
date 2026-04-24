@@ -153,28 +153,42 @@ function AppContent() {
         }
       }
 
+      // Role-based and Authentication access restrictions
       if (profile && intendedView) {
           const next = intendedView;
           setIntendedView(null);
           handleNavigate(next.view, next.listingId);
       }
 
-      // Bug Fix: Auto-redirect logged-in users who land on auth pages
-      if (profile?.role && (currentView === 'auth' || currentView === 'admin-auth')) {
-        console.log(`🚀 App: Auto-redirecting ${profile.role} to dashboard`);
-        
-        if (profile.role === 'admin') {
-          handleNavigate('admin');
-        } else if (profile.role === 'seller') {
-          // Pure "Found -> Dashboard" logic, but don't interrupt if already on add-listing
-          if (currentView !== 'add-listing') {
-            console.log("🏠 Seller found in database, sending to dashboard");
-            handleNavigate('seller');
-          } else {
-            console.log("✨ Seller is completing their first listing, staying put");
+      // Bug Fix: Auto-redirect logged-in users who land on auth pages or try to access dashboard without listings
+      if (profile?.role) {
+        if (currentView === 'auth' || currentView === 'admin-auth') {
+          console.log(`🚀 App: Auto-redirecting ${profile.role} from auth page`);
+          
+          if (profile.role === 'admin') {
+            handleNavigate('admin');
+          } else if (profile.role === 'seller') {
+            // Check if seller has listings to decide where to send them
+            firestoreService.hasUserListings(profile.uid).then(hasListings => {
+              if (hasListings) {
+                console.log("🏠 Seller has listings, sending to dashboard");
+                handleNavigate('seller');
+              } else {
+                console.log("✨ Seller has no listings, sending to add-listing");
+                handleNavigate('add-listing');
+              }
+            });
+          } else if (profile.role === 'buyer') {
+            handleNavigate('buyer');
           }
-        } else if (profile.role === 'buyer') {
-          handleNavigate('buyer');
+        } else if (profile.role === 'seller' && currentView === 'seller') {
+          // If a seller tries to access the dashboard directly but has no listings, redirect them
+          firestoreService.hasUserListings(profile.uid).then(hasListings => {
+            if (!hasListings) {
+              console.log("⚠️ Seller on dashboard but has no listings, redirecting to add-listing");
+              handleNavigate('add-listing');
+            }
+          });
         }
       }
     }

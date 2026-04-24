@@ -1,7 +1,7 @@
 import React from 'react';
 import { 
   Eye, MapPin, Phone, CheckCircle2, TrendingUp, 
-  ArrowLeft, PlusCircle, User, Settings
+  ArrowLeft, PlusCircle, User, Settings, Trash2
 } from 'lucide-react';
 import { getDisplayCity } from '../../constants/cityMapping';
 import NewsTicker from '../NewsTicker';
@@ -43,7 +43,7 @@ export default function SellerHomeView({
           </div>
           <div>
             <h1 className="text-3xl font-black text-[#1A1A1A] font-headline tracking-tight">
-              مرحبا بك، {profile?.fullName || 'سي محمد'}
+              مرحبا بك، {profile?.pseudo || profile?.fullName || 'سي محمد'}
             </h1>
             <p className="text-[#757575] font-bold">هدا هو الوضع العام ديال القطيع ديالك اليوم</p>
           </div>
@@ -113,16 +113,61 @@ export default function SellerHomeView({
                   <div className={`absolute top-5 right-5 px-4 py-1.5 rounded-[10px] text-[10px] font-black shadow-xl backdrop-blur-md ${announcement.status === 'active' ? 'bg-[#115E2C] text-white' : 'bg-red-600 text-white'}`}>
                     {announcement.status === 'active' ? 'نشط' : 'غير نشط'}
                   </div>
-                </div>
-                <div className="p-6 sm:p-8 text-right">
-                  <h3 className="font-black text-[#1A1A1A] text-lg mb-2 truncate group-hover:text-[#115E2C] transition-colors">{announcement.title}</h3>
-                  <div className="flex items-center gap-2 text-xs text-[#757575] font-bold mb-4 sm:mb-6">
-                    <MapPin className="w-4 h-4 text-[#115E2C]" />
+                  <div className="absolute bottom-5 right-5 bg-white/90 backdrop-blur-xl text-[#1A1A1A] px-4 py-2 rounded-[10px] text-[10px] font-black shadow-lg flex items-center gap-2 cursor-pointer hover:bg-[#115E2C] hover:text-white transition-all transition-colors" onClick={(e) => {
+                    e.stopPropagation();
+                    const url = announcement.coordinates 
+                      ? `https://www.google.com/maps/dir/?api=1&destination=${announcement.coordinates.lat},${announcement.coordinates.lng}`
+                      : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(announcement.location || '')}`;
+                    window.open(url, '_blank');
+                  }}>
+                    <MapPin className="w-3.5 h-3.5" />
                     <span>{getDisplayCity(announcement)}</span>
                   </div>
-                  <div className="flex items-center gap-4 text-[11px] font-black">
+                </div>
+                
+                <div className="p-6 sm:p-8 flex flex-col flex-1">
+                  <div className="flex flex-col gap-1 mb-4">
+                    <h3 className="font-black text-[#1A1A1A] text-lg truncate group-hover:text-[#115E2C] transition-colors">{announcement.title}</h3>
+                    <div className="flex items-center gap-2">
+                      {renderStars(5)}
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-4 text-[10px] font-black mb-6">
                     <span className="flex items-center gap-2 bg-[#E8F5E9] text-[#115E2C] px-3 py-1.5 rounded-[10px]"><Eye className="w-4 h-4" /> {announcement.views || 0}</span>
                     <span className="flex items-center gap-2 bg-orange-50 text-orange-700 px-3 py-1.5 rounded-[10px]"><Phone className="w-4 h-4" /> {announcement.calls || 0}</span>
+                  </div>
+
+                  <div className="flex gap-2 mt-auto">
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onNavigate('add-listing', announcement.id);
+                      }}
+                      className="flex-1 flex items-center justify-center gap-2 py-3 bg-[#F5F5F0] text-[#1A1A1A] font-black rounded-[10px] hover:bg-[#115E2C] hover:text-white transition-all duration-300 text-xs"
+                    >
+                      <PlusCircle className="w-3.5 h-3.5" />
+                      <span>تعديل</span>
+                    </button>
+                    {settings.paymentSystemEnabled && (
+                      <button 
+                        onClick={(e) => e.stopPropagation()}
+                        className="flex-1 py-3 bg-[#115E2C] text-white font-black rounded-[10px] hover:shadow-xl hover:shadow-[#115E2C]/20 transition-all text-xs flex items-center justify-center gap-2"
+                      >
+                        <TrendingUp className="w-3.5 h-3.5" />
+                        <span>ترويج</span>
+                      </button>
+                    )}
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setListingToDelete(announcement.id);
+                        setShowDeleteConfirm(true);
+                      }}
+                      className="w-10 flex items-center justify-center bg-red-50 text-red-600 rounded-[10px] hover:bg-red-600 hover:text-white transition-all duration-300"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
               </div>

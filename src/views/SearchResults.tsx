@@ -403,7 +403,7 @@ export default function SearchResults({ onNavigate, initialCity, initialRadius, 
                         <div className="flex-1 p-2.5 flex flex-col justify-between min-w-0">
                           <div>
                             <div className="flex justify-between items-start mb-0.5 gap-2">
-                              <h3 className="font-black text-[#1A1A1A] text-xs truncate flex-1">ضيعة {listing.sellerName || 'كساب'}</h3>
+                              <h3 className="font-black text-[#1A1A1A] text-xs truncate flex-1">ضيعة {listing.sellerPseudo || listing.sellerName || 'كساب'}</h3>
                               <span className="text-[8px] font-black text-[#2E7D32] bg-[#2E7D32]/10 px-1.5 py-0.5 rounded-md shrink-0">{listing.category || 'سردي'}</span>
                             </div>
                             <div className="flex items-center gap-1 text-[#757575] text-[9px] font-bold">
@@ -514,7 +514,7 @@ export default function SearchResults({ onNavigate, initialCity, initialRadius, 
                   <div className="p-3 sm:p-5 flex-1 flex flex-col justify-between min-w-0">
                     <div className="flex justify-between items-start gap-2">
                       <div className="flex-1 min-w-0">
-                        <h3 className="text-sm sm:text-xl font-black text-[#1A1A1A] group-hover:text-[#2E7D32] transition-colors truncate mb-1">ضيعة {listing.sellerName || 'كساب'}</h3>
+                        <h3 className="text-sm sm:text-xl font-black text-[#1A1A1A] group-hover:text-[#2E7D32] transition-colors truncate mb-1">ضيعة {listing.sellerPseudo || listing.sellerName || 'كساب'}</h3>
                         <div className="flex items-center gap-1 text-[10px] sm:text-sm text-[#757575] font-bold">
                           <MapPin className="w-3 h-3 sm:w-4 sm:h-4 text-[#2E7D32] shrink-0" />
                           <span className="truncate">
@@ -610,7 +610,7 @@ export default function SearchResults({ onNavigate, initialCity, initialRadius, 
                 <div className="p-6">
                   <div className="flex flex-col gap-3">
                     <div className="flex items-center justify-between">
-                      <p className="text-[#2E7D32] font-bold">ضيعة {listing.sellerName || 'كساب'}</p>
+                      <p className="text-[#2E7D32] font-bold">ضيعة {listing.sellerPseudo || listing.sellerName || 'كساب'}</p>
                       <div className="flex items-center gap-1.5">
                         <span className="text-[10px] font-bold text-[#757575]">الحجم:</span>
                         <div className="flex gap-1 text-[10px] font-bold text-[#4A4A4A]">

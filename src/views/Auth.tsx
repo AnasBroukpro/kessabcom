@@ -45,6 +45,7 @@ export default function Auth({ onNavigate, intendedView }: Props) {
   const [showPassword, setShowPassword] = useState(true);
   const [fullName, setFullName] = useState('');
   const [city, setCity] = useState('');
+  const [pseudo, setPseudo] = useState('');
   const [selectedRole, setSelectedRole] = useState<'buyer' | 'seller' | null>(null);
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
   
@@ -245,6 +246,7 @@ export default function Auth({ onNavigate, intendedView }: Props) {
         displayName: fullName.trim(),
         phoneNumber: formattedPhone,
         role: selectedRole,
+        pseudo: selectedRole === 'seller' ? pseudo.trim() : '',
         city,
         location: city,
         status: 'active',
@@ -267,6 +269,7 @@ export default function Auth({ onNavigate, intendedView }: Props) {
           email,
           fullName: fullName.trim(),
           role: selectedRole,
+          pseudo: selectedRole === 'seller' ? pseudo.trim() : '',
           phone: formattedPhone,
           city,
         }),
@@ -499,6 +502,15 @@ export default function Auth({ onNavigate, intendedView }: Props) {
                   className="w-full h-12 bg-black/5 border-0 rounded-xl px-4 text-sm text-center font-bold"
                   required
                 />
+                {selectedRole === 'seller' && (
+                  <input
+                    type="text"
+                    placeholder="اللقب (اختياري) - مثلا: الحاج التهامي"
+                    value={pseudo}
+                    onChange={(e) => setPseudo(e.target.value)}
+                    className="w-full h-12 bg-black/5 border-0 rounded-xl px-4 text-sm text-center font-bold"
+                  />
+                )}
                 <div className="relative">
                   <select
                     value={city}

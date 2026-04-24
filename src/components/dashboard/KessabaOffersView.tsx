@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { 
-  ArrowLeft, ShoppingBag, PlusCircle, History, LogOut, ChevronRight, 
-  Mic, Camera, Bell, CheckCircle2, Loader2, Clock 
+  ArrowLeft, ArrowRight, ShoppingBag, PlusCircle, History, LogOut, ChevronRight, 
+  Mic, Camera, Bell, CheckCircle2, Loader2, Clock, X 
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { firestoreService } from '../../services/firestoreService';
@@ -274,7 +274,7 @@ export default function KessabaOffersView({
                       <div className="flex-1 space-y-4">
                         <div className="flex justify-between items-start">
                           <div>
-                            <h4 className="font-bold text-on-surface text-lg">{offer.sellerName || 'كساب'}</h4>
+                            <h4 className="font-bold text-on-surface text-lg">{offer.sellerPseudo || offer.sellerName || 'كساب'}</h4>
                           </div>
                           {offer.status === 'accepted' && (
                             <div className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-[10px] font-bold flex items-center gap-1">
@@ -363,18 +363,20 @@ export default function KessabaOffersView({
 
   if (showNewRequestForm) {
     return (
-      <div className="flex-1 overflow-y-auto p-4 md:p-8" dir="rtl">
+      <div className="flex-1 overflow-y-auto p-0" dir="rtl">
         <div className="max-w-2xl mx-auto">
-          <button 
-            onClick={() => setShowNewRequestForm(false)}
-            className="flex items-center gap-2 text-primary font-bold mb-6 hover:gap-3 transition-all"
-          >
-            <ArrowLeft className="w-5 h-5" />
-            <span>إلغاء الطلب</span>
-          </button>
+          <div className="flex items-center justify-between mb-8 bg-white/80 backdrop-blur-md p-4 rounded-xl border border-outline-variant/10 sticky top-0 z-10">
+            <button 
+              onClick={() => setShowNewRequestForm(false)} 
+              className="flex items-center gap-2 text-on-surface-variant hover:text-primary transition-colors group"
+            >
+              <ArrowRight className="w-6 h-6 transition-transform group-hover:translate-x-1" />
+              <span className="font-black text-sm">الرجوع للعروض</span>
+            </button>
+            <h2 className="text-xl font-black text-on-surface font-headline">فتح المزاد</h2>
+          </div>
 
-          <div className="bg-surface p-8 rounded-[10px] border border-outline-variant/30 shadow-xl">
-            <h2 className="text-2xl font-black text-on-surface mb-6 font-headline">فتح المزاد</h2>
+          <div className="bg-surface p-8 rounded-[10px] border border-outline-variant/30 shadow-xl mx-4 md:mx-0">
             <form onSubmit={handleCreateRequest} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
@@ -453,9 +455,9 @@ export default function KessabaOffersView({
                         <button 
                           type="button"
                           onClick={deleteRecording}
-                          className="p-2 text-error hover:bg-error/10 rounded-full transition-colors"
+                          className="p-1.5 bg-red-600 text-white rounded-full hover:scale-110 transition-transform shadow-lg flex items-center justify-center"
                         >
-                          <LogOut className="w-5 h-5 rotate-180" />
+                          <X className="w-4 h-4" />
                         </button>
                       </div>
                       <div className="flex items-center justify-center gap-2 text-green-600 text-xs font-bold">

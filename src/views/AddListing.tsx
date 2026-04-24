@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ViewType } from '../App';
-import { ArrowLeft, Video, Camera, Mic, CheckCircle2, MapPin, TrendingUp, AudioLines, Loader2, Award, Mountain, Globe } from 'lucide-react';
+import { ArrowLeft, ArrowRight, X, Video, Camera, Mic, CheckCircle2, MapPin, TrendingUp, AudioLines, Loader2, Award, Mountain, Globe, Trash2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { firestoreService } from '../services/firestoreService';
 import { useSettings } from '../hooks/useSettings';
@@ -85,6 +85,7 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
             }
             setVideoFile(data.videoUrl || null);
             setAudioUrl(data.audioUrl || null);
+            setFarmLocation(data.farmLocation || '');
           }
         } catch (error) {
           console.error("Error fetching listing:", error);
@@ -206,6 +207,7 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
       const announcementData = {
         sellerId: user.uid,
         sellerName: profile?.fullName || profile?.displayName || 'كساب',
+        sellerPseudo: profile?.pseudo || null,
         phone: profile?.phoneNumber || '',
         whatsapp: profile?.whatsappNumber || '',
         title: `${translatedRaces.join(', ')} - ${sheepCount} رأس`,
@@ -432,9 +434,9 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
               />
               <button 
                 onClick={(e) => { e.stopPropagation(); setVideoFile(null); }}
-                className="absolute top-2 right-2 bg-error text-on-error p-1 rounded-full shadow-lg z-20"
+                className="absolute top-2 right-2 bg-red-600 text-white p-1.5 rounded-full shadow-lg z-20 hover:scale-110 transition-transform flex items-center justify-center"
               >
-                <ArrowLeft className="w-4 h-4 rotate-45" />
+                <X className="w-4 h-4" />
               </button>
             </div>
           ) : (
@@ -497,9 +499,9 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
                 />
                 <button 
                   onClick={(e) => { e.stopPropagation(); handlePhotoChange(index, null); }}
-                  className="absolute top-1 right-1 bg-error text-on-error p-1 rounded-full shadow-lg z-20"
+                  className="absolute top-1 right-1 bg-red-600 text-white p-1 rounded-full shadow-lg z-20 hover:scale-110 transition-transform flex items-center justify-center"
                 >
-                  <ArrowLeft className="w-3 h-3 rotate-45" />
+                  <X className="w-3.5 h-3.5" />
                 </button>
               </div>
             ) : (
@@ -715,12 +717,18 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
       <header className="bg-surface/80 backdrop-blur-md border-b border-outline-variant/20 sticky top-0 z-50">
         <div className="max-w-3xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <button onClick={() => onNavigate(profile?.role === 'admin' ? 'admin' : 'seller')} className="p-2 -ml-2 text-on-surface-variant transition-colors border border-transparent hover:border-outline-variant rounded-full">
-              <ArrowLeft className="w-6 h-6" />
+            <button 
+              onClick={() => onNavigate(profile?.role === 'admin' ? 'admin' : 'seller')} 
+              className="flex items-center gap-2 text-on-surface-variant hover:text-primary transition-colors group"
+            >
+              <ArrowRight className="w-6 h-6 transition-transform group-hover:translate-x-1" />
+              <span className="font-black text-sm">الرجوع للوحة التحكم</span>
             </button>
-            <h1 className="text-xl font-black text-on-surface font-headline">{listingId ? 'تعديل القطيع' : 'إضافة قطيع جديد'}</h1>
           </div>
-          <button onClick={handleSaveAsDraft} className="text-primary font-bold text-sm px-3 py-1.5 rounded-[10px] border border-transparent hover:border-primary transition-colors">نكملو من بعد</button>
+          
+          <h1 className="text-xl font-black text-on-surface font-headline">
+            {listingId ? 'تعديل القطيع' : 'إضافة قطيع جديد'}
+          </h1>
         </div>
       </header>
 
@@ -769,9 +777,9 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
             <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6">
               <CheckCircle2 className="w-10 h-10" />
             </div>
-            <h3 className="text-2xl font-black text-[#1a1a1a] mb-2 font-headline">مبروك!</h3>
+            <h3 className="text-2xl font-black text-[#1a1a1a] mb-2 font-headline">{listingId ? 'تم التعديل!' : 'مبروك!'}</h3>
             <p className="text-[#4a4a4a] font-bold leading-relaxed mb-8">
-              صافي الغنم ديالك دخلات , دابا الناس غيلقاو الغنم ديالك
+              {listingId ? 'تم تعديل معلومات القطيع بنجاح.' : 'صافي الغنم ديالك دخلات , دابا الناس غيلقاو الغنم ديالك'}
             </p>
             <button 
               onClick={() => onNavigate('seller')}

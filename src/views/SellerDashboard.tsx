@@ -93,7 +93,7 @@ export default function SellerDashboard({ onNavigate, activeSubView }: Props) {
   const getTitle = () => {
     switch (activeTab) {
       case 'dashboard': return `مرحبا بك، ${(() => {
-        const name = profile?.fullName || profile?.displayName;
+        const name = profile?.pseudo || profile?.fullName || profile?.displayName;
         if (!name || name.toLowerCase() === 'user') return 'سي محمد';
         return name;
       })()}`;
@@ -186,12 +186,12 @@ export default function SellerDashboard({ onNavigate, activeSubView }: Props) {
         requestsCount={requests.length}
       />
 
-      {/* Sticky "+" Button */}
+      {/* Sticky "+" Button - Hidden on Desktop/Tablet */}
       <button 
         onClick={() => onNavigate('add-listing')}
-        className="fixed bottom-24 right-6 md:bottom-8 md:right-8 w-14 h-14 md:w-16 md:h-16 bg-[#115E2C] text-white rounded-[10px] shadow-2xl shadow-[#115E2C]/30 flex items-center justify-center hover:scale-110 active:scale-95 transition-all z-50 group border border-white/20"
+        className="fixed bottom-24 right-6 w-14 h-14 bg-[#115E2C] text-white rounded-[10px] shadow-2xl shadow-[#115E2C]/30 flex items-center justify-center hover:scale-110 active:scale-95 transition-all z-40 group border border-white/20 md:hidden"
       >
-        <Plus className="w-8 h-8 md:w-10 md:h-10 transition-transform group-hover:rotate-90" />
+        <Plus className="w-8 h-8 transition-transform group-hover:rotate-90" />
       </button>
 
       <DeleteConfirmationModal 

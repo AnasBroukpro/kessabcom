@@ -282,7 +282,7 @@ export default function ListingDetails({ onNavigate, listingId }: Props) {
                   <div>
                     <h3 className="font-bold text-lg text-[#1A1A1A]">
                       {(() => {
-                        const name = sellerProfile?.fullName || sellerProfile?.displayName || listing?.sellerName;
+                        const name = sellerProfile?.pseudo || sellerProfile?.fullName || sellerProfile?.displayName || listing?.sellerName;
                         if (!name || name.toLowerCase() === 'user') return 'كساب';
                         return name;
                       })()}
@@ -481,7 +481,7 @@ export default function ListingDetails({ onNavigate, listingId }: Props) {
                 }).join(' - ') || 'إعلان بدون عنوان'}
               </h1>
               <p className="text-[#2E7D32] font-bold text-xl mb-4">
-                ضيعة {sellerProfile?.fullName || sellerProfile?.displayName || listing?.sellerName || 'كساب'}
+                ضيعة {sellerProfile?.pseudo || sellerProfile?.fullName || sellerProfile?.displayName || listing?.sellerName || 'كساب'}
               </p>
               <div className="flex items-center gap-2 text-[#4A4A4A] mb-6">
                 <MapPin className="w-5 h-5 text-[#2E7D32]" />
