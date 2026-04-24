@@ -61,21 +61,7 @@ export default function NewsTicker({ className = "", isMobile = false }: NewsTic
   if (isMobile) {
     return (
       <div className={`w-full ${className}`}>
-        {/* Breaking news standalone banner (mobile only) */}
-        {breakingNews && (
-          <div className="bg-error text-white p-2.5 w-full shadow-sm overflow-hidden">
-            <div className="animate-marquee-fast">
-              {[0, 1].map((i) => (
-                <div key={i} className="flex items-center gap-2 mx-8 shrink-0">
-                  <Zap className="w-4 h-4 fill-current shrink-0" />
-                  <span className="font-black text-xs whitespace-nowrap">عاجل: {breakingNews}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Prices + news ticker */}
+        {/* Prices + news ticker (Breaking news is now seamlessly integrated inside renderSet) */}
         <div className="bg-white/95 backdrop-blur-sm p-3 border-b border-outline-variant/10 flex items-center gap-3 shadow-sm overflow-hidden">
           <div className="font-black text-primary whitespace-nowrap bg-white/95 z-20 pr-1 text-xs border-l border-outline-variant/20 pl-2 shrink-0">
             خبار السوق:
