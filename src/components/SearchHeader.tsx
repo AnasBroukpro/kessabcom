@@ -4,6 +4,7 @@ import { motion } from 'motion/react';
 import { ViewType } from '../App';
 import { useAuth } from '../contexts/AuthContext';
 import MobileSidebar from './MobileSidebar';
+import NotificationSidebar from './NotificationSidebar';
 import { firestoreService } from '../services/firestoreService';
 import { cityCoords, getClosestCity } from '../constants/cityMapping';
 import logoV2 from '../assets/marketing/branding/logo v2.png';
@@ -22,6 +23,7 @@ export default function SearchHeader({ onNavigate, initialCity = '', initialRadi
   const [isLocating, setIsLocating] = useState(false);
   const [radiusSearch, setRadiusSearch] = useState(initialRadius);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isNotificationSidebarOpen, setIsNotificationSidebarOpen] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -237,6 +239,12 @@ export default function SearchHeader({ onNavigate, initialCity = '', initialRadi
         onClose={() => setIsSidebarOpen(false)} 
         onNavigate={onNavigate} 
       />
+      <NotificationSidebar
+        isOpen={isNotificationSidebarOpen}
+        onClose={() => setIsNotificationSidebarOpen(false)}
+        notifications={Array.isArray(notifications) ? notifications : []}
+        onMarkNotificationAsRead={handleMarkNotifAsRead}
+      />
       <header className="bg-white/90 backdrop-blur-md border-b border-outline-variant/30 sticky top-0 z-50">
 
       <div className="max-w-7xl mx-auto px-6 py-3 md:py-0 md:h-20 flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-8">
@@ -283,17 +291,16 @@ export default function SearchHeader({ onNavigate, initialCity = '', initialRadi
                 </button>
 
                 {/* 3. Notification */}
-                <div className="relative" ref={notificationsRef}>
+                <div className="relative">
                   <button 
-                    onClick={() => setShowNotifications(!showNotifications)}
-                    className={`p-2 rounded-lg transition-colors border ${showNotifications ? 'bg-[#E8F5E9] text-[#2E7D32] border-[#2E7D32]' : 'bg-[#F9F9F6] text-[#757575] border-transparent hover:border-[#757575]'}`}
+                    onClick={() => setIsNotificationSidebarOpen(true)}
+                    className={`p-2 rounded-lg transition-colors border ${isNotificationSidebarOpen ? 'bg-[#E8F5E9] text-[#2E7D32] border-[#2E7D32]' : 'bg-[#F9F9F6] text-[#757575] border-transparent hover:border-[#757575]'}`}
                   >
                     <Bell className="w-4.5 h-4.5" />
                     {(Array.isArray(notifications) ? notifications : []).some(n => !n.read) && (
                       <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-red-500 rounded-full border border-white"></span>
                     )}
                   </button>
-                  {showNotifications && renderNotifications()}
                 </div>
               </>
             ) : (
