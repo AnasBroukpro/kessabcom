@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Star, MapPin, Heart } from 'lucide-react';
 import { getDisplayCity } from '../../constants/cityMapping';
+import ContactSellerModal from '../ContactSellerModal';
 
 interface FavoritesViewProps {
   favorites: any[];
@@ -11,6 +12,7 @@ interface FavoritesViewProps {
 }
 
 const FavoritesView = ({ favorites, announcements, listings, onNavigate, handleToggleFavorite }: FavoritesViewProps) => {
+  const [contactData, setContactData] = useState<{ phone?: string, whatsapp?: string, listingId?: string } | null>(null);
   const allListings = [...listings, ...announcements];
   const favoriteListings = allListings.filter(l => favorites.some(f => f.listingId === (l.id || l.listingId)?.toString()));
 
@@ -23,8 +25,18 @@ const FavoritesView = ({ favorites, announcements, listings, onNavigate, handleT
   );
 
   return (
-    <div className="flex-1 overflow-y-auto p-8" dir="rtl">
-      <div className="max-w-4xl mx-auto">
+    <div className="space-y-8 w-full" dir="rtl">
+      {contactData && (
+        <ContactSellerModal 
+          isOpen={!!contactData} 
+          onClose={() => setContactData(null)}
+          sellerPhone={contactData.phone}
+          sellerWhatsapp={contactData.whatsapp}
+          listingId={contactData.listingId}
+        />
+      )}
+      
+      <div className="w-full">
         <h2 className="text-3xl font-black text-on-surface font-headline mb-2">المفضلة ديالك</h2>
         <p className="text-on-surface-variant mb-8 text-lg">هنا غاتلقى كاع الحوالا اللي عجبوك وبغيتي ترجع ليهم من بعد.</p>
         
@@ -93,7 +105,11 @@ const FavoritesView = ({ favorites, announcements, listings, onNavigate, handleT
                     <button 
                       onClick={(e) => {
                         e.stopPropagation();
-                        onNavigate('listing-details', listing.id || listing.listingId);
+                        setContactData({ 
+                          phone: listing.sellerPhone || listing.phone, 
+                          whatsapp: listing.sellerWhatsapp || listing.whatsapp,
+                          listingId: listing.id || listing.listingId 
+                        });
                       }}
                       className="py-2.5 bg-[#2E7D32] text-white font-bold rounded-lg hover:bg-[#1B5E20] transition-colors text-xs"
                     >

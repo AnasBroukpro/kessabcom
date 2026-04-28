@@ -58,8 +58,8 @@ export default function RequestAnimalView({ setActiveView }: RequestAnimalViewPr
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 md:p-8" dir="rtl">
-      <div className="max-w-2xl mx-auto">
+    <div className="space-y-8 w-full" dir="rtl">
+      <div className="w-full">
         <div className="mb-8">
           <h2 className="text-3xl font-black text-on-surface font-headline">تبرع تضامني (Don Solidarité)</h2>
           <p className="text-on-surface-variant">ساهم في إدخال الفرحة على الأسر المعوزة. حدد عدد الأكباش لي بغيتي تبرع بيهم.</p>

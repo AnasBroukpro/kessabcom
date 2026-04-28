@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Bell, User, MapPin, Search, Navigation, ChevronDown, LogOut, LayoutDashboard, ShoppingBag, List, PlusCircle, Users, Settings, ArrowLeft, Menu, X, LocateFixed } from 'lucide-react';
+import { Bell, User, MapPin, Search, Navigation, ChevronDown, LogOut, LayoutDashboard, ShoppingBag, List, PlusCircle, Users, Settings, ArrowLeft, Menu, X, LocateFixed, Star } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useAuth } from '../contexts/AuthContext';
 import { firestoreService } from '../services/firestoreService';
@@ -121,8 +121,16 @@ export default function DashboardHeader({ title, subtitle, location, showSearch 
                 )}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold text-[#1A1A1A] truncate">{displayName}</p>
-                {getRoleBadge(role)}
+                <p className="text-sm font-bold text-[#1A1A1A] truncate max-w-[120px]" title={displayName}>{displayName}</p>
+                <div className="flex items-center gap-1.5">
+                  {getRoleBadge(role)}
+                  {role === 'seller' && (
+                    <div className="flex items-center gap-0.5 text-[#FF9800]">
+                      <Star className="w-3 h-3 fill-current" />
+                      <span className="text-[10px] font-bold">{(profile?.rating || 5).toFixed(1)}</span>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -171,6 +179,10 @@ export default function DashboardHeader({ title, subtitle, location, showSearch 
               <button onClick={() => { onNavigate?.('admin', undefined, undefined, undefined, 'settings'); setShowProfileMenu(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-[#4A4A4A] hover:bg-[#F9F9F6] rounded-[10px] transition-colors">
                 <Settings className="w-4 h-4" />
                 <span>الإعدادات</span>
+              </button>
+              <button onClick={() => { onNavigate?.('admin', undefined, undefined, undefined, 'profile'); setShowProfileMenu(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-[#4A4A4A] hover:bg-[#F9F9F6] rounded-[10px] transition-colors">
+                <User className="w-4 h-4" />
+                <span>ملفي الشخصي</span>
               </button>
             </>
           )}
@@ -282,7 +294,7 @@ export default function DashboardHeader({ title, subtitle, location, showSearch 
             <img 
               src={logoV2} 
               alt="كسابكوم" 
-              className="h-8 w-auto object-contain"
+              className="h-[26px] w-auto object-contain"
             />
           </button>
         </div>
@@ -316,27 +328,36 @@ export default function DashboardHeader({ title, subtitle, location, showSearch 
             >
               <MapPin className="hidden sm:block w-4 h-4 text-[#2E7D32] shrink-0" />
               <div className="flex flex-col text-right sm:mr-3 flex-1 min-w-0">
-                <button 
-                  onClick={(e) => { e.stopPropagation(); setIsOpenCity(!isOpenCity); setIsOpenRadius(false); }}
-                  className="bg-transparent border-none outline-none w-full text-xs sm:text-sm font-bold text-[#1A1A1A] text-right flex items-center justify-between gap-1"
-                >
-                  <span className="truncate">{citySearch || 'فين كتقلب؟'}</span>
-                </button>
+                <input 
+                  type="text"
+                  value={citySearch}
+                  onChange={(e) => { 
+                    setCitySearch(e.target.value); 
+                    setIsOpenCity(true); 
+                  }}
+                  onFocus={() => setIsOpenCity(true)}
+                  placeholder="فين كتقلب؟"
+                  className="bg-transparent border-none outline-none w-full text-xs sm:text-sm font-bold text-[#1A1A1A] text-right placeholder:text-[#757575]"
+                />
               </div>
               <ChevronDown className={`hidden sm:block w-3.5 h-3.5 text-[#757575] transition-transform ${isOpenCity ? 'rotate-180' : ''}`} />
 
               {isOpenCity && (
                 <div className="absolute top-full mt-1.5 left-0 right-0 w-full bg-white rounded-[10px] shadow-2xl border border-outline-variant/10 z-[100] p-1 animate-in slide-in-from-top-2 duration-200">
                   <div className="max-h-60 overflow-y-auto custom-scrollbar p-1">
-                    {cities.map(city => (
-                      <button 
-                        key={city}
-                        onClick={(e) => { e.stopPropagation(); setCitySearch(city); setIsOpenCity(false); onSearch?.(city, distance); }}
-                        className={`w-full text-right px-4 py-2 rounded-[10px] text-sm font-bold transition-colors ${citySearch === city ? 'bg-[#2E7D32] text-white' : 'hover:bg-[#F9F9F6] text-[#4A4A4A]'}`}
-                      >
-                        {city}
-                      </button>
-                    ))}
+                    {filteredCities.length > 0 ? (
+                      filteredCities.map(city => (
+                        <button 
+                          key={city}
+                          onClick={(e) => { e.stopPropagation(); setCitySearch(city); setIsOpenCity(false); onSearch?.(city, distance); }}
+                          className={`w-full text-right px-4 py-2 rounded-[10px] text-sm font-bold transition-colors ${citySearch === city ? 'bg-[#2E7D32] text-white' : 'hover:bg-[#F9F9F6] text-[#4A4A4A]'}`}
+                        >
+                          {city}
+                        </button>
+                      ))
+                    ) : (
+                      <div className="p-4 text-center text-xs text-gray-500 font-bold">لا توجد نتائج</div>
+                    )}
                   </div>
                 </div>
               )}

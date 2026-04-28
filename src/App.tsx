@@ -3,6 +3,7 @@ import { Minus, ChevronUp } from 'lucide-react';
 import { AuthProvider } from './contexts/AuthContext';
 import { SettingsProvider } from './contexts/SettingsContext';
 import { useSettings } from './hooks/useSettings';
+import { GoogleMapsProvider } from './contexts/GoogleMapsProvider';
 
 // Eagerly loaded — appear on first render
 import Home from './views/Home';
@@ -15,6 +16,7 @@ import Maintenance from './views/Maintenance';
 // On mobile 3G/4G, this reduces initial bundle from ~2MB to ~300KB
 const SearchResults = lazy(() => import('./views/SearchResults'));
 const Auth = lazy(() => import('./views/Auth'));
+const ForgotPassword = lazy(() => import('./views/ForgotPassword'));
 const BuyerDashboard = lazy(() => import('./views/BuyerDashboard'));
 const SellerDashboard = lazy(() => import('./views/SellerDashboard'));
 const AddListing = lazy(() => import('./views/AddListing'));
@@ -34,7 +36,7 @@ import { firestoreService } from './services/firestoreService';
 import { useAuth } from './contexts/AuthContext';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation, useParams, Navigate } from 'react-router-dom';
 
-export type ViewType = 'home' | 'auth' | 'admin-auth' | 'buyer' | 'seller' | 'add-listing' | 'admin' | 'listing-details' | 'search-results' | 'solidarity-request' | 'solidarity-donate' | 'price-catalog' | 'tips' | 'contact' | 'terms' | 'privacy' | 'notifications';
+export type ViewType = 'home' | 'auth' | 'forgot-password' | 'admin-auth' | 'buyer' | 'seller' | 'add-listing' | 'admin' | 'listing-details' | 'search-results' | 'solidarity-request' | 'solidarity-donate' | 'price-catalog' | 'tips' | 'contact' | 'terms' | 'privacy' | 'notifications';
 
 function AppContent() {
   const navigate = useNavigate();
@@ -68,6 +70,7 @@ function AppContent() {
     if (pathname === '/terms') return 'terms';
     if (pathname === '/privacy') return 'privacy';
     if (pathname === '/notifications') return 'notifications';
+    if (pathname === '/forgot-password') return 'forgot-password';
     return 'home';
   };
 
@@ -112,6 +115,7 @@ function AppContent() {
       case 'terms': navigate('/terms'); break;
       case 'privacy': navigate('/privacy'); break;
       case 'notifications': navigate('/notifications'); break;
+      case 'forgot-password': navigate('/forgot-password'); break;
       default: navigate('/');
     }
   };
@@ -157,7 +161,15 @@ function AppContent() {
       if (profile && intendedView) {
           const next = intendedView;
           setIntendedView(null);
-          handleNavigate(next.view, next.listingId);
+          
+          // Role safety check
+          if (profile.role === 'buyer' && (next.view === 'seller' || next.view === 'add-listing')) {
+            handleNavigate('buyer', undefined, undefined, undefined, 'dashboard');
+          } else if (profile.role === 'seller' && next.view === 'buyer') {
+            handleNavigate('seller');
+          } else {
+            handleNavigate(next.view, next.listingId);
+          }
       }
 
       // Bug Fix: Auto-redirect logged-in users who land on auth pages or try to access dashboard without listings
@@ -189,6 +201,12 @@ function AppContent() {
               handleNavigate('add-listing');
             }
           });
+        } else if (profile.role === 'seller' && currentView === 'buyer') {
+          console.log("⚠️ Seller on buyer dashboard, redirecting to seller dashboard");
+          handleNavigate('seller');
+        } else if (profile.role === 'buyer' && (currentView === 'seller' || currentView === 'add-listing')) {
+          console.log("⚠️ Buyer on seller dashboard, redirecting to buyer dashboard");
+          handleNavigate('buyer');
         }
       }
     }
@@ -220,6 +238,7 @@ function AppContent() {
           (authLoading && !sessionStorage.getItem('hasSeenLoading')) ? <LoadingScreen /> : <Home onNavigate={handleNavigate} />
         } />
           <Route path="/login" element={<Auth onNavigate={handleNavigate} intendedView={intendedView} />} />
+          <Route path="/forgot-password" element={<ForgotPassword onNavigate={handleNavigate} />} />
           <Route path="/panelaccess" element={<AdminAuth onNavigate={handleNavigate} />} />
           
           {/* Protected Routes */}
@@ -227,21 +246,21 @@ function AppContent() {
             authLoading ? <LoadingScreen /> :
             profile?.role === 'buyer' || profile?.role === 'admin' ? (
               <BuyerDashboard onNavigate={handleNavigate} activeSubView={new URLSearchParams(location.search).get('sub') || undefined} />
-            ) : user ? <LoadingScreen /> : <Navigate to="/login" />
+            ) : user ? <Navigate to="/" /> : <Navigate to="/login" />
           } />
           
           <Route path="/seller" element={
             authLoading ? <LoadingScreen /> :
             profile?.role === 'seller' || profile?.role === 'admin' ? (
               <SellerDashboard onNavigate={handleNavigate} activeSubView={new URLSearchParams(location.search).get('sub') || undefined} />
-            ) : user ? <LoadingScreen /> : <Navigate to="/login" />
+            ) : user ? <Navigate to="/" /> : <Navigate to="/login" />
           } />
           
           <Route path="/add-listing" element={
             authLoading ? <LoadingScreen /> :
             profile?.role === 'seller' || profile?.role === 'admin' ? (
               <AddListing onNavigate={handleNavigate} listingId={new URLSearchParams(location.search).get('id') || undefined} />
-            ) : user ? <LoadingScreen /> : <Navigate to="/login" />
+            ) : user ? <Navigate to="/" /> : <Navigate to="/login" />
           } />
           
           <Route path="/admin" element={
@@ -349,7 +368,9 @@ export default function App() {
       <BrowserRouter>
         <SettingsProvider>
           <AuthProvider>
-            <AppContent />
+            <GoogleMapsProvider>
+              <AppContent />
+            </GoogleMapsProvider>
           </AuthProvider>
         </SettingsProvider>
       </BrowserRouter>

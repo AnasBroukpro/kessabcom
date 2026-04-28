@@ -1,14 +1,18 @@
 import React, { useState, useRef } from 'react';
+import logoV2 from '../assets/marketing/branding/logo v2.png';
 import { ViewType } from '../App';
-import { MapPin, Phone, MessageCircle, Navigation, Star, ArrowLeft, BadgeCheck, Play, Heart, AlertTriangle, X, CheckCircle2, AlertCircle, ChevronRight, ChevronLeft, User } from 'lucide-react';
+import { MapPin, Phone, MessageCircle, Navigation, Star, ArrowLeft, BadgeCheck, Play, Heart, AlertTriangle, X, CheckCircle2, AlertCircle, ChevronRight, ChevronLeft, User, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import SearchHeader from '../components/SearchHeader';
 import { firestoreService } from '../services/firestoreService';
 import { useAuth } from '../contexts/AuthContext';
-import { cityMapping, getDisplayCity } from '../constants/cityMapping';
+import { cityMapping, cityCoords, getDisplayCity, calculateDistance } from '../constants/cityMapping';
 import ContactSellerModal from '../components/ContactSellerModal';
 import LoginRequiredModal from '../components/LoginRequiredModal';
 import { useSettings } from '../hooks/useSettings';
+
+// Assets
+import mapPointIcon from '../assets/marketing/features/map-point-svgrepo-com.svg';
 
 interface Props {
   onNavigate: (view: ViewType, listingId?: string, city?: string, radius?: string, subView?: string, breed?: string) => void;
@@ -38,6 +42,7 @@ export default function ListingDetails({ onNavigate, listingId }: Props) {
   const [newReviewRating, setNewReviewRating] = useState(5);
   const [newReviewComment, setNewReviewComment] = useState('');
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+  const [reviewStatus, setReviewStatus] = useState<'idle' | 'pending' | 'error'>('idle');
   const [reviewToDelete, setReviewToDelete] = useState<string | null>(null);
   const [relatedListings, setRelatedListings] = useState<any[]>([]);
 
@@ -251,84 +256,96 @@ export default function ListingDetails({ onNavigate, listingId }: Props) {
     <div className="min-h-screen bg-[#FDFCF8] font-sans" dir="rtl">
       <SearchHeader onNavigate={onNavigate} />
 
-      <main className="max-w-7xl mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <main className="max-w-7xl mx-auto px-4 py-6 md:py-8 pb-28 md:pb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
           
-          {/* Right Column - Sticky Contact Info (Swapped to Right) */}
-          <div className="lg:col-span-1 order-1 lg:order-1">
+          {/* LEFT COLUMN (Desktop) / BOTTOM (Mobile) — Seller Card + Location */}
+          <div className="lg:col-span-1 order-3 lg:order-1">
             <div className="sticky top-28 space-y-6">
               
               {/* Seller Card */}
               <div className="bg-white rounded-3xl p-6 shadow-sm border border-outline-variant/10">
-                <div className="flex items-center gap-4 mb-6">
-                  <div className="relative">
+                {/* Profile Header */}
+                <div className="flex items-center gap-4 mb-5">
+                  <div className="relative shrink-0">
                     {sellerProfile?.photoURL ? (
-                      <img 
-                        src={sellerProfile.photoURL} 
-                        alt="الكساب" 
-                        className="w-16 h-16 rounded-full object-cover border-2 border-white shadow-sm"
+                      <img
+                        src={sellerProfile.photoURL}
+                        alt="الكساب"
+                        className="w-16 h-16 rounded-2xl object-cover shadow-sm"
                         referrerPolicy="no-referrer"
                       />
                     ) : (
-                      <div className="w-16 h-16 rounded-full bg-[#E8F5E9] flex items-center justify-center border-2 border-white shadow-sm">
+                      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#E8F5E9] to-[#A5D6A7]/40 flex items-center justify-center shadow-sm">
                         <User className="w-8 h-8 text-[#2E7D32]" />
                       </div>
                     )}
                     {sellerProfile?.isCertified && (
-                      <div className="absolute bottom-0 right-0 bg-white rounded-full p-0.5">
+                      <div className="absolute -bottom-1.5 -right-1.5 bg-white rounded-full p-0.5 shadow-sm">
                         <BadgeCheck className="w-5 h-5 text-[#2E7D32] fill-current" />
                       </div>
                     )}
                   </div>
-                  <div>
-                    <h3 className="font-bold text-lg text-[#1A1A1A]">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-black text-lg text-[#1A1A1A] leading-tight truncate">
                       {(() => {
                         const name = sellerProfile?.pseudo || sellerProfile?.fullName || sellerProfile?.displayName || listing?.sellerName;
                         if (!name || name.toLowerCase() === 'user') return 'كساب';
                         return name;
                       })()}
                     </h3>
-                    {sellerProfile?.isCertified ? (
-                      <p className="text-[10px] text-[#2E7D32] font-bold mb-1">
-                        كساب معتمد فـ منصة kessabcom.ma
-                      </p>
-                    ) : (
-                      <p className="text-sm text-[#2E7D32] font-bold mb-1">كساب</p>
-                    )}
-                    {sellerProfile?.reviewsCount > 0 && (
-                      <div className="flex items-center gap-1 text-sm font-bold text-[#1A1A1A]">
-                        <Star className="w-4 h-4 text-[#FF9800] fill-current" />
-                        <span>{(sellerProfile?.rating || 5).toFixed(1)}</span>
-                        <span className="text-[#757575] font-normal">({sellerProfile?.reviewsCount} تقييم)</span>
-                      </div>
-                    )}
+                    <span className={`inline-block text-[10px] font-black px-2 py-0.5 rounded-full mt-0.5 ${sellerProfile?.isCertified ? 'bg-[#E8F5E9] text-[#2E7D32]' : 'bg-[#F9F9F6] text-[#757575]'}`}>
+                      {sellerProfile?.isCertified ? '✓ كساب معتمد من طرف لونصا (ONSSA)' : 'كساب'}
+                    </span>
                   </div>
                 </div>
 
-                <div className="bg-[#F9F9F6] p-3 rounded-xl text-center mb-6">
-                  <p className="text-[11px] text-[#4A4A4A] font-medium whitespace-nowrap overflow-hidden text-ellipsis">الثمن على حساب التفاهم، اتصل بالكساب مباشرة باش تعرف التفاصيل</p>
+                {/* Stars rating — prominently below the role */}
+                {(() => {
+                  const totalReviews = (sellerProfile?.reviews?.length || 0) + (listing?.listingReviews?.length || 0);
+                  const avgRating = sellerProfile?.reviewsCount > 0 ? (sellerProfile?.rating || 5) : (totalReviews > 0 ? 4.5 : null);
+                  if (!avgRating) return null;
+                  return (
+                    <div className="flex items-center gap-3 bg-[#FFFDE7] border border-[#FFE082]/40 rounded-xl px-4 py-3 mb-5">
+                      <div className="text-2xl font-black text-[#FF9800]">{Number(avgRating).toFixed(1)}</div>
+                      <div>
+                        <div className="flex items-center gap-0.5 mb-0.5" dir="ltr">
+                          {[...Array(5)].map((_, i) => (
+                            <Star key={i} className={`w-4 h-4 ${i < Math.round(avgRating) ? 'text-[#FF9800] fill-current' : 'text-[#E0E0E0]'}`} />
+                          ))}
+                        </div>
+                        <p className="text-[10px] text-[#757575] font-bold">
+                          {sellerProfile?.reviewsCount || totalReviews} تقييم من المشترين
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                <div className="bg-[#F9F9F6] p-3 rounded-xl text-center mb-5">
+                  <p className="text-[11px] text-[#4A4A4A] font-medium">الثمن على حساب التفاهم، اتصل بالكساب مباشرة باش تعرف التفاصيل</p>
                 </div>
 
                 <div className="space-y-3">
-                  <button 
+                  <button
                     onClick={() => {
                       setSelectedSellerPhone(sellerProfile?.phoneNumber || listing?.phone);
                       setSelectedSellerWhatsapp(sellerProfile?.whatsappNumber || listing?.whatsapp);
                       setSelectedListingId(listing?.id);
                       setContactModalOpen(true);
                     }}
-                    className="w-full flex items-center justify-center gap-2 bg-[#2E7D32] text-white py-4 rounded-xl font-bold transition-colors border border-transparent hover:bg-transparent hover:text-[#2E7D32] hover:border-[#2E7D32] shadow-lg shadow-[#2E7D32]/20"
+                    className="w-full flex items-center justify-center gap-2 bg-[#2E7D32] text-white py-4 rounded-xl font-black transition-all border border-transparent hover:bg-[#1B5E20] shadow-lg shadow-[#2E7D32]/20 active:scale-95"
                   >
                     <Phone className="w-5 h-5" />
                     <span>تواصل مع الكساب</span>
                   </button>
-                  
-                  <button 
+
+                  <button
                     onClick={() => setShowReportModal(true)}
-                    className="w-full flex items-center justify-center gap-2 text-red-600 py-3 rounded-xl font-bold transition-colors border border-transparent hover:border-red-600"
+                    className="w-full flex items-center justify-center gap-2 text-red-500 py-2.5 rounded-xl font-bold transition-colors border border-transparent hover:border-red-200 hover:bg-red-50 text-sm"
                   >
                     <AlertTriangle className="w-4 h-4" />
-                    <span>تبليغ عن هذه الإعلان</span>
+                    <span>تبليغ عن هذا الإعلان</span>
                   </button>
                 </div>
               </div>
@@ -391,8 +408,8 @@ export default function ListingDetails({ onNavigate, listingId }: Props) {
             </div>
           </div>
 
-          {/* Left Column - Main Content (Swapped to Left) */}
-          <div className="lg:col-span-2 space-y-8 order-2 lg:order-2">
+          {/* RIGHT COLUMN (Desktop) / TOP (Mobile) — Main Content */}
+          <div className="lg:col-span-2 space-y-6 order-1 lg:order-2">
             
             {/* Image Gallery */}
             <div className="space-y-4">
@@ -420,49 +437,29 @@ export default function ListingDetails({ onNavigate, listingId }: Props) {
                     referrerPolicy="no-referrer"
                   />
                 )}
-                <div className="absolute top-4 right-4 bg-[#2E7D32] text-white px-4 py-1.5 rounded-full text-sm font-bold shadow-md z-10 flex items-center gap-1">
-                  <span>ثمن كيبدا من:</span>
-                  <span>{listing?.price || '---'} درهم</span>
-                </div>
               </div>
               
-              <div className="p-4 bg-white rounded-xl shadow-sm border border-outline-variant/10 mt-4">
-                <p className="text-sm font-bold mb-2">قيم هاد الحولي:</p>
-                <div className="flex gap-1">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <button key={star} onClick={async () => {
-                      if (listing?.id) {
-                        await firestoreService.rateAnnouncement(listing.id, star);
-                        const updatedListing = await firestoreService.getAnnouncement(listing.id);
-                        setListing(updatedListing);
-                      }
-                    }}>
-                      <Star className={`w-6 h-6 ${star <= (listing?.rating || 5) ? 'text-[#FF9800] fill-current' : 'text-[#D1D1D1]'}`} />
-                    </button>
-                  ))}
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-5 gap-4">
+
+              <div className="flex gap-3 overflow-x-auto pb-1 no-scrollbar">
                 {/* Video Thumbnail */}
                 {(listing?.videoUrl || listing?.youtubeLink) && (
-                  <div 
+                  <div
                     onClick={() => setActiveMedia({ type: 'video', url: listing?.videoUrl || listing?.youtubeLink })}
-                    className={`aspect-square rounded-xl overflow-hidden bg-surface-variant cursor-pointer relative group border-2 transition-all ${activeMedia?.type === 'video' ? 'border-[#2E7D32]' : 'border-transparent'}`}
+                    className={`shrink-0 w-20 h-20 md:w-24 md:h-24 rounded-xl overflow-hidden bg-black cursor-pointer relative border-2 transition-all ${activeMedia?.type === 'video' ? 'border-[#2E7D32] shadow-lg shadow-[#2E7D32]/20' : 'border-transparent opacity-70 hover:opacity-100'}`}
                   >
-                    <div className="w-full h-full bg-black/50 flex items-center justify-center">
-                      <Play className="w-8 h-8 text-white fill-current" />
+                    <div className="w-full h-full bg-black/60 flex items-center justify-center">
+                      <Play className="w-7 h-7 text-white fill-current" />
                     </div>
                   </div>
                 )}
 
                 {listing?.images?.map((img: string, idx: number) => (
-                  <div 
+                  <div
                     key={idx}
                     onClick={() => setActiveMedia({ type: 'image', url: img })}
-                    className={`aspect-square rounded-xl overflow-hidden bg-surface-variant cursor-pointer border-2 transition-all ${activeMedia?.type === 'image' && activeMedia?.url === img ? 'border-[#2E7D32]' : 'border-transparent hover:opacity-90'}`}
+                    className={`shrink-0 w-20 h-20 md:w-24 md:h-24 rounded-xl overflow-hidden cursor-pointer border-2 transition-all ${activeMedia?.type === 'image' && activeMedia?.url === img ? 'border-[#2E7D32] shadow-lg shadow-[#2E7D32]/20 scale-105' : 'border-transparent opacity-70 hover:opacity-100 hover:scale-105'}`}
                   >
-                    <img src={img} alt={`صورة مصغرة ${idx + 1}`} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    <img src={img} alt={`صورة ${idx + 1}`} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                   </div>
                 ))}
               </div>
@@ -470,24 +467,26 @@ export default function ListingDetails({ onNavigate, listingId }: Props) {
 
             {/* Title & Location */}
             <div className="bg-white rounded-3xl p-8 shadow-sm border border-outline-variant/10">
-              <h1 className="text-3xl font-black text-[#1A1A1A] mb-2 font-headline">
-                {listing?.title?.split(' - ').map((part: string) => {
-                  return part.split(', ').map((subPart: string) => {
-                    const trimmed = subPart.trim();
-                    if (trimmed === 'sardi') return 'سردي';
-                    if (trimmed === 'bargui') return 'بركي';
-                    if (trimmed === 'imported') return 'مستورد';
-                    return subPart;
-                  }).join('، ');
-                }).join(' - ') || 'إعلان بدون عنوان'}
-              </h1>
-              <p className="text-[#2E7D32] font-bold text-xl mb-4">
-                ضيعة {sellerProfile?.pseudo || sellerProfile?.fullName || sellerProfile?.displayName || listing?.sellerName || 'كساب'}
-              </p>
-              <div className="flex items-center gap-2 text-[#4A4A4A] mb-6">
-                <MapPin className="w-5 h-5 text-[#2E7D32]" />
-                <span className="font-medium">
-                  {listing?.farmLocation || getDisplayCity(listing)}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-2">
+                <h1 className="text-2xl md:text-3xl font-black text-[#1A1A1A] font-headline truncate" title={`ضيعة ${sellerProfile?.pseudo || sellerProfile?.fullName || sellerProfile?.displayName || listing?.sellerName || 'كساب'}`}>
+                  ضيعة {sellerProfile?.pseudo || sellerProfile?.fullName || sellerProfile?.displayName || listing?.sellerName || 'كساب'}
+                </h1>
+                <div className="flex items-center gap-1 bg-[#F9F9F6] px-3 py-1.5 rounded-xl border border-outline-variant/10 shadow-sm w-fit shrink-0">
+                  <Star className="w-4 h-4 text-amber-400 fill-current" />
+                  <span className="text-sm font-black text-[#1A1A1A]">
+                    {listing?.ratingCount && listing.ratingCount > 0 ? (listing.rating / listing.ratingCount).toFixed(1) : '5.0'}
+                  </span>
+                  {listing?.ratingCount && listing.ratingCount > 0 && (
+                    <span className="text-[10px] font-bold text-[#757575] mr-1">
+                      ({listing.ratingCount} avis)
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-2 text-[#4A4A4A] mb-6 overflow-hidden">
+                <MapPin className="w-5 h-5 text-[#2E7D32] shrink-0" />
+                <span className="font-medium truncate text-sm md:text-base">
+                  {getDisplayCity(listing)} - {listing?.farmLocation || 'موقع الضيعة'}
                 </span>
               </div>
               
@@ -503,7 +502,7 @@ export default function ListingDetails({ onNavigate, listingId }: Props) {
                   onClick={() => setActiveTab('reviews')}
                   className={`flex-1 py-3 rounded-lg text-sm font-bold transition-colors border ${activeTab === 'reviews' ? 'bg-white text-[#2E7D32] border-[#2E7D32] shadow-sm' : 'text-[#757575] border-transparent hover:border-[#757575]'}`}
                 >
-                  تقييمات الكساب ({sellerProfile?.reviewsCount || 0})
+                  التعليقات ({(sellerProfile?.reviews?.length || 0) + (listing?.listingReviews?.length || 0)})
                 </button>
               </div>
 
@@ -576,170 +575,129 @@ export default function ListingDetails({ onNavigate, listingId }: Props) {
 
               {/* Tab Content: Reviews */}
               {activeTab === 'reviews' && (
-                <div className="animate-in fade-in duration-300 space-y-8">
-                  {/* Add Review Form */}
-                  {user && profile?.role === 'buyer' && (
-                    <div id="review-form" className="bg-[#F9F9F6] p-6 rounded-2xl border border-outline-variant/10">
-                      <h3 className="font-bold text-[#1A1A1A] mb-4">
-                        {sellerProfile?.reviews?.some((r: any) => r.userId === user.uid) 
-                          ? 'عدل التقييم ديالك:' 
-                          : 'خلي تقييمك لهاد الكساب:'}
-                      </h3>
-                      <div className="flex gap-2 mb-4">
-                        {[1, 2, 3, 4, 5].map((star) => (
-                          <button 
-                            key={star} 
-                            onClick={() => setNewReviewRating(star)}
-                            className="transition-colors"
-                          >
-                            <Star className={`w-8 h-8 ${star <= newReviewRating ? 'text-[#FF9800] fill-current' : 'text-[#D1D1D1]'}`} />
-                          </button>
-                        ))}
-                      </div>
-                      <textarea
-                        value={newReviewComment}
-                        onChange={(e) => setNewReviewComment(e.target.value)}
-                        placeholder="اكتب التعليق ديالك هنا..."
-                        className="w-full p-4 rounded-xl border border-outline-variant/20 bg-white min-h-[100px] mb-4 outline-none focus:ring-2 focus:ring-[#2E7D32]"
-                      />
-                      <button
-                        onClick={async () => {
-                          if (!newReviewComment.trim() || isSubmittingReview) return;
-                          setIsSubmittingReview(true);
-                          try {
-                            // Check if user already reviewed
-                            const existingReview = sellerProfile?.reviews?.find((r: any) => r.userId === user.uid);
-                            
-                            if (existingReview) {
-                              // Logic to update review (we'll use the same service but it needs to handle updates)
-                              await firestoreService.addSellerReview(listing.sellerId, {
-                                userId: user.uid,
-                                userName: profile?.fullName || profile?.displayName || 'مشتري',
-                                rating: newReviewRating,
-                                comment: newReviewComment
-                              });
-                            } else {
-                              await firestoreService.addSellerReview(listing.sellerId, {
-                                userId: user.uid,
-                                userName: profile?.fullName || profile?.displayName || 'مشتري',
-                                rating: newReviewRating,
-                                comment: newReviewComment
-                              });
-                            }
-                            
-                            const updatedProfile = await firestoreService.getUserProfile(listing.sellerId);
-                            setSellerProfile(updatedProfile);
-                            setNewReviewComment('');
-                            setNewReviewRating(5);
-                          } catch (error) {
-                            console.error("Failed to add review:", error);
-                          } finally {
-                            setIsSubmittingReview(false);
-                          }
-                        }}
-                        disabled={!newReviewComment.trim() || isSubmittingReview}
-                        className="bg-[#2E7D32] text-white px-6 py-3 rounded-xl font-bold transition-colors border border-transparent hover:bg-transparent hover:text-[#2E7D32] hover:border-[#2E7D32] disabled:opacity-50"
-                      >
-                        {isSubmittingReview ? 'جاري الإرسال...' : (sellerProfile?.reviews?.some((r: any) => r.userId === user.uid) ? 'تحديث التقييم' : 'إرسال التقييم')}
-                      </button>
-                    </div>
-                  )}
+                <div className="animate-in fade-in duration-300 space-y-6">
 
-                  {Array.isArray(sellerProfile?.reviews) && sellerProfile.reviews.length > 0 ? (
-                    <div>
-                      <h2 className="text-xl font-bold text-[#1A1A1A] mb-6">شنو قالو الناس على هاد الكساب</h2>
+                  {/* Review submission form */}
+                  <div className="bg-[#F9F9F6] rounded-2xl p-6 border border-outline-variant/10">
+                    <h3 className="font-black text-[#1A1A1A] text-base mb-1">شارك تجربتك مع هاد الكساب</h3>
+                    <p className="text-xs text-[#757575] mb-5">التقييم ديالك كيساعد المشترين الآخرين باش يختارو بثقة</p>
+
+                    {reviewStatus === 'pending' ? (
+                      <div className="bg-[#E8F5E9] border border-[#A5D6A7] p-4 rounded-xl flex items-center gap-3 text-[#2E7D32] animate-in zoom-in-95">
+                        <CheckCircle2 className="w-5 h-5 shrink-0" />
+                        <p className="text-xs font-bold">شكراً! التقييم ديالك وصل وغادي يبان من بعد موافقة الأدمين.</p>
+                      </div>
+                    ) : (
                       <div className="space-y-4">
-                        {(sellerProfile?.reviews || []).map((review: any, idx: number) => (
-                          <div key={idx} className="bg-[#F9F9F6] p-6 rounded-2xl">
-                            <div className="flex justify-between items-start mb-4">
-                              <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 rounded-full bg-[#FF9800] text-white flex items-center justify-center font-bold text-xl">
-                                  {review.userName?.charAt(0) || 'م'}
+                        <div>
+                          <p className="text-xs font-bold text-[#4A4A4A] mb-2">تقييمك:</p>
+                          <div className="flex gap-2">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <button
+                                key={star}
+                                onClick={() => setNewReviewRating(star)}
+                                className="transition-all active:scale-90 hover:scale-110"
+                              >
+                                <Star className={`w-9 h-9 transition-colors ${star <= newReviewRating ? 'text-[#FF9800] fill-current drop-shadow-sm' : 'text-[#D1D1D1]'}`} />
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <textarea
+                          value={newReviewComment}
+                          onChange={(e) => setNewReviewComment(e.target.value)}
+                          placeholder="كتب تعليق على الكساب... (اختياري)"
+                          className="w-full bg-white border border-outline-variant/20 rounded-xl p-4 text-sm font-medium focus:ring-2 focus:ring-[#2E7D32] outline-none min-h-[90px] resize-none"
+                        />
+                        <button
+                          onClick={async () => {
+                            if (!user) { setLoginModalOpen(true); return; }
+                            setIsSubmittingReview(true);
+                            try {
+                              const res = await firestoreService.rateAnnouncement(listing.id, newReviewRating, newReviewComment);
+                              if (res.status === 'pending_approval') {
+                                setReviewStatus('pending');
+                                setNewReviewComment('');
+                              }
+                            } catch (error) {
+                              console.error("Failed to rate:", error);
+                            } finally {
+                              setIsSubmittingReview(false);
+                            }
+                          }}
+                          disabled={isSubmittingReview}
+                          className="w-full bg-[#2E7D32] text-white py-3.5 rounded-xl font-black text-sm shadow-lg shadow-[#2E7D32]/20 hover:bg-[#1B5E20] active:scale-95 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+                        >
+                          {isSubmittingReview ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Star className="w-4 h-4 fill-current" /><span>إرسال التقييم</span></>}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Seller reviews list */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-black text-[#1A1A1A] flex items-center gap-2">
+                        <span>آراء المشترين</span>
+                        <span className="bg-[#E8F5E9] text-[#2E7D32] text-xs font-bold px-2.5 py-0.5 rounded-full">
+                          {(sellerProfile?.reviews?.length || 0) + (listing?.listingReviews?.length || 0)}
+                        </span>
+                      </h3>
+                      {sellerProfile?.reviewsCount > 0 && (
+                        <div className="flex items-center gap-1.5 text-sm font-bold text-[#FF9800] bg-yellow-50 px-3 py-1 rounded-full">
+                          <Star className="w-4 h-4 fill-current" />
+                          <span>{(sellerProfile?.rating || 5).toFixed(1)}</span>
+                          <span className="text-[#757575] text-xs font-normal">/ 5</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Combined reviews from seller profile + listing */}
+                    {(() => {
+                      const allReviews = [
+                        ...(sellerProfile?.reviews || []),
+                        ...(listing?.listingReviews || [])
+                      ];
+                      if (allReviews.length === 0) {
+                        return (
+                          <div className="bg-[#F9F9F6] p-8 rounded-2xl text-center border border-outline-variant/10">
+                            <Star className="w-10 h-10 text-[#D1D1D1] mx-auto mb-3" />
+                            <p className="font-bold text-[#757575] text-sm">كن أول من يقيّم هاد الكساب!</p>
+                            <p className="text-xs text-[#757575] mt-1">شارك تجربتك وساعد المشترين الآخرين</p>
+                          </div>
+                        );
+                      }
+                      return (
+                        <div className="grid gap-3">
+                          {allReviews.map((review: any, idx: number) => (
+                            <div key={review.id || idx} className="bg-white p-5 rounded-2xl border border-outline-variant/10 shadow-sm hover:shadow-md transition-shadow">
+                              <div className="flex items-start gap-3">
+                                <div className="w-10 h-10 rounded-full bg-[#E8F5E9] flex items-center justify-center text-[#2E7D32] font-black text-base shrink-0">
+                                  {review.authorName?.charAt(0)?.toUpperCase() || '؟'}
                                 </div>
-                                <div>
-                                  <h4 className="font-bold text-[#1A1A1A]">{review.userName || 'مستخدم'}</h4>
-                                  <p className="text-xs text-[#757575]">{new Date(review.date).toLocaleDateString('ar-MA')}</p>
-                                </div>
-                              </div>
-                              <div className="flex flex-col items-end gap-2">
-                                <div className="flex text-[#FF9800]">
-                                  {[...Array(5)].map((_, i) => (
-                                    <Star key={i} className={`w-4 h-4 ${i < review.rating ? 'fill-current' : 'text-[#D1D1D1]'}`} />
-                                  ))}
-                                </div>
-                                <div className="flex gap-3">
-                                  {(user?.uid === review.userId || isAdmin) && (
-                                    <div className="flex items-center gap-2">
-                                      {reviewToDelete === review.userId ? (
-                                        <div className="flex items-center gap-2 animate-in fade-in slide-in-from-left-2">
-                                          <button 
-                                            onClick={async () => {
-                                              try {
-                                                await firestoreService.deleteSellerReview(listing.sellerId, review.userId);
-                                                const updatedProfile = await firestoreService.getUserProfile(listing.sellerId);
-                                                setSellerProfile(updatedProfile);
-                                                setReviewToDelete(null);
-                                              } catch (error) {
-                                                console.error("Failed to delete review:", error);
-                                              }
-                                            }}
-                                            className="bg-red-500 text-white px-2 py-1 rounded text-[10px] font-bold transition-colors border border-transparent hover:bg-transparent hover:text-red-500 hover:border-red-500"
-                                          >
-                                            تأكيد المسح
-                                          </button>
-                                          <button 
-                                            onClick={() => setReviewToDelete(null)}
-                                            className="text-gray-500 text-[10px] font-bold hover:text-gray-900 transition-colors"
-                                          >
-                                            إلغاء
-                                          </button>
-                                        </div>
-                                      ) : (
-                                        <button 
-                                          onClick={() => setReviewToDelete(review.userId)}
-                                          className="text-red-500 hover:bg-red-500 hover:text-white px-2 py-0.5 rounded transition-colors border border-transparent hover:border-red-500 text-xs font-bold"
-                                        >
-                                          مسح
-                                        </button>
-                                      )}
-                                    </div>
-                                  )}
-                                  {user?.uid === review.userId && (
-                                    <button 
-                                      onClick={() => {
-                                        setNewReviewRating(review.rating);
-                                        setNewReviewComment(review.comment);
-                                        // Scroll to form
-                                        const formElement = document.getElementById('review-form');
-                                        if (formElement) {
-                                          formElement.scrollIntoView({ behavior: 'smooth' });
-                                        } else {
-                                          window.scrollTo({ top: 0, behavior: 'smooth' });
-                                        }
-                                      }}
-                                      className="text-[#2E7D32] hover:bg-[#2E7D32] hover:text-white px-2 py-0.5 rounded transition-colors border border-transparent hover:border-[#2E7D32] text-xs font-bold"
-                                    >
-                                      تعديل
-                                    </button>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center justify-between mb-1">
+                                    <h4 className="font-black text-[#1A1A1A] text-sm">{review.authorName || 'مشتري'}</h4>
+                                    <p className="text-[10px] text-[#757575] shrink-0">
+                                      {review.createdAt?.toDate ? review.createdAt.toDate().toLocaleDateString('ar-MA') : 'اليوم'}
+                                    </p>
+                                  </div>
+                                  <div className="flex items-center gap-0.5 mb-2" dir="ltr">
+                                    {[...Array(5)].map((_, i) => (
+                                      <Star key={i} className={`w-3.5 h-3.5 ${i < review.rating ? 'text-[#FF9800] fill-current' : 'text-[#E0E0E0]'}`} />
+                                    ))}
+                                  </div>
+                                  {review.comment && (
+                                    <p className="text-[#4A4A4A] text-sm leading-relaxed">{review.comment}</p>
                                   )}
                                 </div>
                               </div>
                             </div>
-                            <p className="text-[#4A4A4A] text-sm leading-relaxed">
-                              {review.comment}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : (
-                    <div>
-                      <h2 className="text-xl font-bold text-[#1A1A1A] mb-6">تقييمات الكساب</h2>
-                      <div className="bg-[#F9F9F6] p-6 rounded-2xl text-center">
-                        <p className="text-[#757575]">لا توجد تقييمات حالياً.</p>
-                      </div>
-                    </div>
-                  )}
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </div>
                 </div>
               )}
             </div>
@@ -851,13 +809,57 @@ export default function ListingDetails({ onNavigate, listingId }: Props) {
           </div>
         </div>
       )}
+      {/* Mobile Sticky Action Bar */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-[100] bg-white/95 backdrop-blur-md border-t border-outline-variant/10 p-4 pb-safe shadow-[0_-4px_20px_-4px_rgba(0,0,0,0.1)]">
+        <div className="flex gap-3">
+          {/* Contact Button (Right) */}
+          <button 
+            onClick={() => {
+              setSelectedSellerPhone(listing?.phone);
+              setSelectedSellerWhatsapp(listing?.whatsapp);
+              setSelectedListingId(listing?.id);
+              setContactModalOpen(true);
+            }}
+            className="flex-[1.2] bg-[#2E7D32] text-white py-4 rounded-xl font-bold flex flex-row-reverse items-center justify-center gap-3 text-sm shadow-lg shadow-[#2E7D32]/20 transition-all active:scale-95"
+          >
+            <Phone className="w-5 h-5" />
+            <span>تواصل مع الكساب</span>
+          </button>
+
+          {/* Locate Button (Left) */}
+          <a 
+            href={listing?.coordinates ? `https://www.google.com/maps/dir/?api=1&destination=${listing.coordinates.lat},${listing.coordinates.lng}` : listing?.location ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(listing.location)}` : '#'} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            onClick={() => firestoreService.incrementContactClick(listing?.id, 'location')}
+            className="flex-1 bg-[#1A1A1A] text-white py-4 rounded-xl font-bold flex flex-row-reverse items-center justify-center gap-3 text-sm transition-all active:scale-95"
+          >
+            <img src={mapPointIcon} alt="" className="w-5 h-5 brightness-0 invert" style={{ filter: 'brightness(0) invert(1)' }} />
+            <span className="flex items-center gap-1">
+              <span>{listing?.location}</span>
+              {listing?.coordinates && sessionStorage.getItem('last_city') && cityCoords[sessionStorage.getItem('last_city') || ''] && (
+                <span className="text-[10px] opacity-70">
+                  ({Math.round(calculateDistance(
+                    cityCoords[sessionStorage.getItem('last_city') || ''].lat,
+                    cityCoords[sessionStorage.getItem('last_city') || ''].lng,
+                    listing.coordinates.lat,
+                    listing.coordinates.lng
+                  ))} كلم)
+                </span>
+              )}
+            </span>
+          </a>
+        </div>
+      </div>
 
       <ContactSellerModal 
         isOpen={contactModalOpen}
         onClose={() => setContactModalOpen(false)}
-        sellerPhone={selectedSellerPhone}
-        sellerWhatsapp={selectedSellerWhatsapp}
-        listingId={selectedListingId}
+        sellerPhone={selectedSellerPhone || listing?.phone}
+        sellerWhatsapp={selectedSellerWhatsapp || listing?.whatsapp}
+        phones={sellerProfile?.phones}
+        whatsapps={sellerProfile?.whatsapps}
+        listingId={selectedListingId || listing?.id}
         onNavigate={onNavigate}
       />
 

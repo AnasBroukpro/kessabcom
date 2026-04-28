@@ -152,7 +152,7 @@ export const getClosestCity = (lat: number, lng: number): string | null => {
 export const getDisplayCity = (listing: any): string => {
   // Try to use coordinates to find the real city, especially if it fell back to 'سطات'
   if (listing.coordinates && listing.coordinates.lat && listing.coordinates.lng) {
-    if (!listing.location || listing.location === 'سطات' || listing.location === 'موقع على الخريطة') {
+    if (!listing.location || listing.location === 'موقع على الخريطة') {
       const closest = getClosestCity(listing.coordinates.lat, listing.coordinates.lng);
       if (closest) return closest;
     }

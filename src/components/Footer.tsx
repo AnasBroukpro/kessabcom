@@ -12,7 +12,7 @@ export default function Footer({ onNavigate }: FooterProps) {
           <img 
             src={logoV2} 
             alt="منصة kessabcom.ma" 
-            className="h-16 w-auto object-contain brightness-0 invert opacity-90"
+            className="h-[52px] w-auto object-contain brightness-0 invert opacity-90"
           />
           <p className="text-white mt-4 text-lg font-black tracking-tight">منصة kessabcom.ma</p>
         </div>

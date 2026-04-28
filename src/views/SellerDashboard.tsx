@@ -14,13 +14,25 @@ import FlockView from '../components/dashboard/FlockView';
 import { SellerStats } from '../components/dashboard/SellerStats';
 import SubscriptionView from '../components/dashboard/SubscriptionView';
 import SettingsView from '../components/dashboard/SettingsView';
+import AccountView from '../components/dashboard/AccountView';
 import SellerSidebar from '../components/dashboard/SellerSidebar';
 import SellerMobileNav from '../components/dashboard/SellerMobileNav';
 import DeleteConfirmationModal from '../components/dashboard/DeleteConfirmationModal';
-import { Star, Plus } from 'lucide-react';
+import { Star, Plus, LayoutDashboard, Tag, BarChart3, CreditCard, Settings, HeartHandshake, LogOut } from 'lucide-react';
 import Notifications from './Notifications';
 
-export type SellerTab = 'dashboard' | 'flock' | 'stats' | 'subscription' | 'settings' | 'buyer-requests' | 'donations' | 'notifications';
+const SheepIcon = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M15.5 11c0 2.209-1.791 4-4 4s-4-1.791-4-4 1.791-4 4-4 4 1.791 4 4Z" />
+    <path d="M11.5 15v3m-2-3v3m4-3v3" />
+    <path d="M8.5 8.5c-1.5-1.5-3.5-1.5-4.5 0s-.5 3.5 1 4.5" />
+    <path d="M14.5 8.5c1.5-1.5 3.5-1.5 4.5 0s.5 3.5-1 4.5" />
+    <circle cx="10" cy="10.5" r=".5" />
+    <circle cx="13" cy="10.5" r=".5" />
+  </svg>
+);
+
+export type SellerTab = 'dashboard' | 'flock' | 'stats' | 'subscription' | 'account' | 'settings' | 'buyer-requests' | 'donations' | 'notifications';
 
 interface Props {
   onNavigate: (view: any, listingId?: string, city?: string, radius?: string, subView?: string) => void;
@@ -32,11 +44,20 @@ export default function SellerDashboard({ onNavigate, activeSubView }: Props) {
   const { settings } = useSettings();
   const [activeTab, setActiveTab] = useState<SellerTab>('dashboard');
 
+
   useEffect(() => {
     if (activeSubView) {
       setActiveTab(activeSubView as SellerTab);
     }
   }, [activeSubView]);
+
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get('sub') !== activeTab) {
+      url.searchParams.set('sub', activeTab);
+      window.history.replaceState({}, '', url.toString());
+    }
+  }, [activeTab]);
 
   const [activeFilter, setActiveFilter] = useState<'today' | 'week' | 'month'>('today');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -49,6 +70,10 @@ export default function SellerDashboard({ onNavigate, activeSubView }: Props) {
     requests,
     nextCursorRequests,
     isLoadingMoreRequests,
+    dailyLeadsCount,
+    dailyLeadsLimit,
+    dailyOffersCount,
+    dailyOffersLimit,
     fetchRequests
   } = useSellerDashboardData(user);
 
@@ -103,6 +128,7 @@ export default function SellerDashboard({ onNavigate, activeSubView }: Props) {
       case 'settings': return 'الإعدادات';
       case 'buyer-requests': return 'طلبات المشترين';
       case 'donations': return 'تبرع تضامني';
+      case 'account': return 'حسابي';
       default: return 'لوحة التحكم';
     }
   };
@@ -129,8 +155,8 @@ export default function SellerDashboard({ onNavigate, activeSubView }: Props) {
       <main className="flex-1 flex flex-col overflow-y-auto no-scrollbar pb-20 md:pb-0">
         <DashboardHeader 
           title={getTitle()} 
-          subtitle={activeTab === 'dashboard' ? cityMapping[(profile?.location || 'سطات').split(' ')[0].toLowerCase()] : undefined}
-          location={activeTab === 'dashboard' ? cityMapping[(profile?.location || 'سطات').split(' ')[0].toLowerCase()] : undefined}
+          subtitle={activeTab === 'dashboard' ? cityMapping[(profile?.location || '').split(' ')[0].toLowerCase()] : undefined}
+          location={activeTab === 'dashboard' ? cityMapping[(profile?.location || '').split(' ')[0].toLowerCase()] : undefined}
           showSearch={true}
           onSearch={(city, distance) => onNavigate('search-results', undefined, city, distance)}
           onNavigate={onNavigate}
@@ -164,13 +190,25 @@ export default function SellerDashboard({ onNavigate, activeSubView }: Props) {
           )}
           {activeTab === 'stats' && <SellerStats stats={statsModel} />}
           {activeTab === 'subscription' && <SubscriptionView settings={settings} />}
-          {activeTab === 'settings' && <SettingsView profile={profile} user={user} />}
+          {(activeTab === 'account' || activeTab === 'settings') && (
+            <AccountView 
+              user={user} 
+              profile={profile} 
+              settings={settings} 
+              cities={Object.keys(cityMapping)} 
+            />
+          )}
           {activeTab === 'buyer-requests' && (
             <BuyerRequestsView 
               requests={requests} 
+              announcements={announcements}
               onLoadMore={handleLoadMoreRequests}
               hasMore={!!nextCursorRequests}
               isLoadingMore={isLoadingMoreRequests}
+              dailyLeadsCount={dailyLeadsCount}
+              dailyLeadsLimit={dailyLeadsLimit}
+              dailyOffersCount={dailyOffersCount}
+              dailyOffersLimit={dailyOffersLimit}
             />
           )}
           {activeTab === 'donations' && settings.solidarityDonationEnabled && (
@@ -184,6 +222,7 @@ export default function SellerDashboard({ onNavigate, activeSubView }: Props) {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         requestsCount={(requests || []).length}
+        settings={settings}
       />
 
       {/* Sticky "+" Button - Hidden on Desktop/Tablet */}

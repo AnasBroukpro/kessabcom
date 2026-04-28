@@ -1,13 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { ViewType } from '../App';
-import { ArrowLeft, ArrowRight, X, Video, Camera, Mic, CheckCircle2, MapPin, TrendingUp, AudioLines, Loader2, Award, Mountain, Globe, Trash2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, X, Video, Camera, Mic, CheckCircle2, MapPin, TrendingUp, AudioLines, Loader2, Award, Mountain, Globe, Trash2, Info, Scale, Calendar, Ruler, PlusCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { firestoreService } from '../services/firestoreService';
 import { useSettings } from '../hooks/useSettings';
-import { compressImage, checkPayloadSize } from '../lib/imageUtils';
+import { compressImage, checkPayloadSize, compressFileForUpload } from '../lib/imageUtils';
+import * as audioUtils from '../lib/audioUtils';
 import LocationMap from '../components/LocationMap';
-import { cityCoords } from '../constants/cityMapping';
+import { cityCoords, getClosestCity } from '../constants/cityMapping';
 import { ChevronDown } from 'lucide-react';
+import mapMarkerSvg from '../assets/map-marker-001.svg';
 
 interface Props {
   onNavigate: (view: ViewType, listingId?: string, city?: string, radius?: string, subView?: string) => void;
@@ -26,15 +29,19 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
   const [startingPrice, setStartingPrice] = useState('');
   const [description, setDescription] = useState('');
   const [youtubeLink, setYoutubeLink] = useState('');
-  const [videoFile, setVideoFile] = useState<File | string | null>(null);
-  const [photoFiles, setPhotoFiles] = useState<(File | string | null)[]>([null, null, null, null]);
+  const [photoFiles, setPhotoFiles] = useState<(File | string | null)[]>([null, null, null, null, null]);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
-  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+  const [recordingSession, setRecordingSession] = useState<audioUtils.RecordingSession | null>(null);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showErrors, setShowErrors] = useState(false);
+  const [compressionError, setCompressionError] = useState<string | null>(null);
+  const [compressingIndex, setCompressingIndex] = useState<number | null>(null);
   const [currentStep, setCurrentStep] = useState(1);
   const [address, setAddress] = useState('');
   const [coordinates, setCoordinates] = useState<{lat: number, lng: number} | null>(null);
@@ -42,6 +49,52 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
   const [farmLocation, setFarmLocation] = useState('');
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [isUploading, setIsUploading] = useState(false);
+  const [gpsDetermined, setGpsDetermined] = useState(false);
+  const [isOpenCity, setIsOpenCity] = useState(false);
+  const [isMapFullscreen, setIsMapFullscreen] = useState(false);
+  const [mapBounds, setMapBounds] = useState<{top: number; left: number; width: number; height: number} | null>(null);
+  const [dynamicAddress, setDynamicAddress] = useState<string>('');
+  const [dynamicCity, setDynamicCity] = useState<string>('');
+  const [retryTrigger, setRetryTrigger] = useState(0);
+  const [hasListings, setHasListings] = useState<boolean | null>(null);
+  const miniMapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (user) {
+      firestoreService.hasUserListings(user.uid).then(setHasListings);
+    }
+  }, [user]);
+
+  const openMap = useCallback(() => {
+    if (miniMapRef.current) {
+      const r = miniMapRef.current.getBoundingClientRect();
+      setMapBounds({ top: r.top, left: r.left, width: r.width, height: r.height });
+    }
+    // Reset address so bottom sheet shows loading state on each open
+    setDynamicAddress('');
+    setDynamicCity('');
+    setIsMapFullscreen(true);
+  }, []);
+
+  const closeMap = useCallback(() => {
+    setIsMapFullscreen(false);
+  }, []);
+
+  // Stable memoized callback — avoids LocationMap re-renders
+  const handleAddressFetched = useCallback((addr: string, city: string, lat: number, lng: number) => {
+    setDynamicAddress(addr);
+    setDynamicCity(city);
+    
+    // Auto-select city in dropdown based on coordinates
+    const closestCity = getClosestCity(lat, lng);
+    
+    // Use the mapped closest city for UI display if available, else raw city
+    setDynamicCity(closestCity || city);
+    
+    if (closestCity) {
+      setAddress(closestCity);
+    }
+  }, []);
 
   const [mounted, setMounted] = useState(false);
   
@@ -78,12 +131,11 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
             }
             if (data.images) {
               const imgs = [...data.images];
-              while (imgs.length < 4) imgs.push(null);
+              while (imgs.length < 5) imgs.push(null);
               setPhotoFiles(imgs);
             } else {
-              setPhotoFiles([null, null, null, null]);
+              setPhotoFiles([null, null, null, null, null]);
             }
-            setVideoFile(data.videoUrl || null);
             setAudioUrl(data.audioUrl || null);
             setFarmLocation(data.farmLocation || '');
           }
@@ -107,8 +159,7 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
     setYoutubeLink('');
     setAddress('');
     setCoordinates(null);
-    setPhotoFiles([null, null, null, null]);
-    setVideoFile(null);
+    setPhotoFiles([null, null, null, null, null]);
     setAudioUrl(null);
   };
 
@@ -132,7 +183,7 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
         description,
         price: parseInt(startingPrice) || 0,
         category: translatedRaces[0] || 'أغنام',
-        location: address || profile?.location || 'سطات',
+        location: address || profile?.location || (coordinates ? 'موقع على الخريطة' : null),
         coordinates: coordinates || null,
         sheepCount: parseInt(sheepCount),
         sizes: selectedSizes,
@@ -161,6 +212,15 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
 
   const handleSubmit = async () => {
     if (!user) return;
+    
+    // Validate Step 3 mandatory fields
+    if (!sheepCount || !startingPrice || selectedAges.length === 0 || selectedRaces.length === 0) {
+      setShowErrors(true);
+      setError("المرجو ملء جميع الحقول الإجبارية (عدد الرؤوس، الثمن، السن، والسلالة).");
+      window.scrollTo(0, 0);
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       let audioUrlFinal = audioUrl && !audioBlob ? audioUrl : null;
@@ -169,17 +229,6 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
           new File([audioBlob], `audio_${Date.now()}.ogg`, { type: 'audio/ogg' }),
           `announcements/audios/${user.uid}_${Date.now()}.ogg`
         );
-      }
-
-      let videoUrlFinal = typeof videoFile === 'string' ? videoFile : null;
-      if (videoFile && typeof videoFile !== 'string') {
-        setIsUploading(true);
-        videoUrlFinal = await firestoreService.uploadFileWithProgress(
-          videoFile,
-          `announcements/videos/${user.uid}_${Date.now()}_${videoFile.name}`,
-          (p) => setUploadProgress(p)
-        );
-        setIsUploading(false);
       }
 
       setUploadProgress(0);
@@ -216,7 +265,7 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
         category: translatedRaces[0] || 'أغنام',
         // Instead of defaulting to 'سطات', check if they provided coordinates. 
         // If they did but didn't provide address, store "موقع على الخريطة"
-        location: address || profile?.location || (coordinates ? 'موقع على الخريطة' : 'سطات'),
+        location: address || profile?.location || (coordinates ? 'موقع على الخريطة' : null),
         coordinates: coordinates || null,
         images: photoUrls.length > 0 ? (photoUrls as string[]) : ["https://i.ytimg.com/vi/RrkkshRUttw/hq720.jpg?sqp=-oaymwEhCK4FEIIDSFryq4qpAxMIARUAAAAAGAElAADIQj0AgKJD&rs=AOn4CLD92lI4Kxe5liKSwWZaJuLAFopNeA"],
         sheepCount: parseInt(sheepCount),
@@ -225,7 +274,6 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
         age: translatedAges.join(', '),
         audioUrl: audioUrlFinal,
         farmLocation: farmLocation,
-        videoUrl: videoUrlFinal,
         youtubeLink,
         status: settings.autoAcceptSellers ? 'active' : 'pending',
         rating: 5,
@@ -262,9 +310,9 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
       setShowSuccess(true);
     } catch (error: any) {
       console.error("Failed to save announcement:", error);
-      let errorMsg = "وقع خطأ أثناء حفظ القطيع. حاول مرة أخرى.";
+      let errorMsg = error.message || "وقع خطأ أثناء حفظ القطيع. حاول مرة أخرى.";
       
-      // More specific error guidance
+      // More specific error guidance for system/firebase errors
       if (error.code === 'storage/unauthorized') {
         errorMsg = "ماعندكش الصلاحية باش ترفع الملفات. تأكد بلي راك مسجل الدخول.";
       } else if (error.message?.includes('net::ERR_FAILED') || error.name === 'FirebaseError') {
@@ -281,30 +329,34 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
 
   const startRecording = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
-      const chunks: BlobPart[] = [];
-
-      recorder.ondataavailable = (e) => chunks.push(e.data);
-      recorder.onstop = () => {
-        const blob = new Blob(chunks, { type: 'audio/ogg; codecs=opus' });
-        setAudioBlob(blob);
-        setAudioUrl(URL.createObjectURL(blob));
-      };
-
-      recorder.start();
-      setMediaRecorder(recorder);
+      const session = await audioUtils.startRecording();
+      setRecordingSession(session);
       setIsRecording(true);
+      setRecordingTime(0);
+
+      // Visual Timer & Auto-stop at 60s
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingTime(prev => {
+          if (prev >= 59) {
+            stopRecording();
+            return 60;
+          }
+          return prev + 1;
+        });
+      }, 1000);
     } catch (err) {
       console.error("Error accessing microphone:", err);
     }
   };
 
-  const stopRecording = () => {
-    if (mediaRecorder) {
-      mediaRecorder.stop();
+  const stopRecording = async () => {
+    if (recordingSession) {
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+      const blob = await audioUtils.stopRecording(recordingSession);
+      setAudioBlob(blob);
+      setAudioUrl(URL.createObjectURL(blob));
+      setRecordingSession(null);
       setIsRecording(false);
-      mediaRecorder.stream.getTracks().forEach(track => track.stop());
     }
   };
 
@@ -318,11 +370,15 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          setCoordinates({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          });
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
+          setCoordinates({ lat, lng });
+          const closest = getClosestCity(lat, lng);
+          if (closest) {
+            setAddress(closest);
+          }
           setIsLocating(false);
+          setGpsDetermined(true);
           setError(null);
         },
         (error) => {
@@ -348,68 +404,287 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
   const toggleRace = (id: string) => setSelectedRaces(prev => prev.includes(id) ? prev.filter(r => r !== id) : [...prev, id]);
   const toggleSize = (id: string) => setSelectedSizes(prev => prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]);
   const toggleAge = (id: string) => setSelectedAges(prev => prev.includes(id) ? prev.filter(a => a !== id) : [...prev, id]);
-  const handlePhotoChange = (index: number, file: File | string | null) => {
-    const newFiles = [...photoFiles];
-    newFiles[index] = file;
-    setPhotoFiles(newFiles);
+  const handlePhotoChange = async (index: number, file: File | string | null) => {
+    if (!file || typeof file === 'string') {
+      const newFiles = [...photoFiles];
+      newFiles[index] = file;
+      setPhotoFiles(newFiles);
+      return;
+    }
+    setCompressionError(null);
+    setCompressingIndex(index);
+    try {
+      const compressed = await compressFileForUpload(file, 1280, 1280, 0.78);
+      const newFiles = [...photoFiles];
+      newFiles[index] = compressed;
+      setPhotoFiles(newFiles);
+    } catch (err: any) {
+      setCompressionError(err.message || 'فشل ضغط الصورة');
+    } finally {
+      setCompressingIndex(null);
+    }
   };
     
   const renderLocationStep = () => (
-    <section className="bg-surface-container-lowest p-6 rounded-[10px] border border-outline-variant/30 shadow-sm space-y-6">
+    <section className="min-h-0 bg-surface-container-lowest p-6 rounded-[10px] border border-outline-variant/30 shadow-sm space-y-6">
       <h2 className="text-lg font-bold text-on-surface mb-2 flex items-center gap-2">
         <span className="w-6 h-6 rounded-full bg-primary text-on-primary flex items-center justify-center text-xs">1</span>
         تحديد موقع القطيع
       </h2>
-      <div className="space-y-4">
-        <label className="block text-sm font-bold text-on-surface-variant">موقع الضيعة</label>
-        <input 
-          type="text"
-          value={farmLocation}
-          onChange={(e) => setFarmLocation(e.target.value)}
-          placeholder="مثلا: طريق مديونة، قرب مسجد الرضوان"
-          className="w-full h-12 px-4 bg-surface-container-high border-none rounded-[10px] text-on-surface focus:ring-2 focus:ring-primary transition-all text-right outline-none font-medium"
-        />
+      <div className="space-y-6">
         
-        <div className="h-[300px] w-full rounded-[10px] overflow-hidden border border-outline-variant/30">
-          <LocationMap 
-            lat={coordinates?.lat} 
-            lng={coordinates?.lng} 
-            onLocationSelect={(lat, lng) => setCoordinates({ lat, lng })}
-          />
-        </div>
-
-        <div className="flex flex-col sm:flex-row gap-4">
+        {/* 1 & 2. GPS Button and City Selector in one row for mobile */}
+        <div className="grid grid-cols-2 gap-3">
+          {/* GPS Button (Right in RTL) */}
           <button
             type="button"
             onClick={handleGetLocation}
-            disabled={isLocating}
-            className="flex-1 flex items-center justify-center gap-2 bg-primary-container text-on-primary-container py-3 px-4 rounded-[10px] font-bold transition-colors border border-transparent hover:bg-transparent hover:text-on-primary-container hover:border-on-primary-container"
+            disabled={isLocating || gpsDetermined}
+            className={`flex items-center justify-center gap-2 py-3 px-2 rounded-[10px] font-black text-sm shadow-lg transition-all border border-transparent ${gpsDetermined ? 'bg-green-600 text-white shadow-green-200' : 'bg-primary text-white shadow-primary/20 hover:scale-[1.02] active:scale-95'}`}
           >
-            {isLocating ? <Loader2 className="w-5 h-5 animate-spin" /> : <MapPin className="w-5 h-5" />}
-            استعمل موقعي الحالي (GPS)
+            {isLocating ? <Loader2 className="w-5 h-5 animate-spin" /> : gpsDetermined ? <CheckCircle2 className="w-5 h-5" /> : <MapPin className="w-5 h-5" />}
+            <span className="whitespace-nowrap">{gpsDetermined ? 'تم تحديد الموقع' : 'موقعي (GPS)'}</span>
           </button>
-          <div className="flex-1 relative">
-            <div className="relative group">
-              <select 
-                className="w-full h-12 px-4 bg-surface-container-high border-none rounded-[10px] text-on-surface focus:ring-2 focus:ring-primary transition-all text-right outline-none font-bold appearance-none cursor-pointer"
-                value={address || profile?.location || ''}
-                onChange={(e) => setAddress(e.target.value)}
+
+          {/* City Selector (Expert Hero Style) */}
+          <div className="flex-1 flex items-center px-3 py-2 relative group bg-white rounded-[10px] border-2 border-outline-variant/30 hover:border-primary/50 shadow-sm">
+            <MapPin className="w-5 h-5 text-primary shrink-0" />
+            <div className="flex flex-col text-right mr-3 flex-1">
+              <span className="text-[9px] font-black text-primary uppercase tracking-wider mb-0.5">المدينة</span>
+              <input
+                type="text"
+                value={address}
+                onChange={(e) => { 
+                  const val = e.target.value;
+                  setAddress(val); 
+                  setIsOpenCity(true); 
+                  setGpsDetermined(false);
+                  if (cityCoords[val]) {
+                    setCoordinates(cityCoords[val]);
+                  }
+                }}
+                onFocus={() => setIsOpenCity(true)}
+                placeholder="فين؟"
+                className="bg-transparent border-none outline-none w-full text-sm font-black text-on-surface text-right placeholder:text-on-surface-variant/40"
+              />
+
+              {isOpenCity && (
+                <div className="absolute top-full right-0 left-0 w-full bg-white rounded-xl shadow-2xl border border-outline-variant/20 max-h-60 overflow-y-auto z-[100] p-1 mt-2 animate-in fade-in slide-in-from-top-2">
+                  <div className="flex flex-col gap-0.5">
+                    {Object.keys(cityCoords).filter(c => c.includes(address)).sort().map(city => (
+                      <button
+                        key={city}
+                        type="button"
+                        onClick={() => { 
+                          setAddress(city); 
+                          setIsOpenCity(false); 
+                          setGpsDetermined(false); 
+                          setCoordinates(cityCoords[city]);
+                        }}
+                        className={`w-full text-right px-4 py-2 rounded-lg text-sm font-bold transition-colors ${address === city ? 'bg-primary text-white' : 'hover:bg-surface-container-low text-on-surface'}`}
+                      >
+                        {city}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            <ChevronDown
+              onClick={(e) => { e.stopPropagation(); setIsOpenCity(!isOpenCity); }}
+              className={`w-4 h-4 text-on-surface-variant ml-1 cursor-pointer transition-transform ${isOpenCity ? 'rotate-180' : ''}`}
+            />
+          </div>
+        </div>
+        
+        {/* Farm location text */}
+        <div className="space-y-2">
+          <label className="block text-sm font-bold text-on-surface-variant">موقع الضيعة بالتفصيل</label>
+          <input 
+            type="text"
+            value={farmLocation}
+            onChange={(e) => setFarmLocation(e.target.value)}
+            placeholder="مثلا: طريق مديونة، قرب مسجد الرضوان"
+            className="w-full h-14 px-4 bg-surface-container-high border-none rounded-[10px] text-on-surface focus:ring-2 focus:ring-primary transition-all text-right outline-none font-medium"
+          />
+        </div>
+
+        {/* 3. The Map — Reveal Morph Transition */}
+        {/* Static mini-map, never animates */}
+        <div
+          ref={miniMapRef}
+          onClick={openMap}
+          className="h-[250px] w-full rounded-[12px] overflow-hidden border border-outline-variant/30 shadow-inner cursor-pointer relative"
+        >
+          <LocationMap
+            lat={coordinates?.lat || (address ? cityCoords[address]?.lat : undefined)}
+            lng={coordinates?.lng || (address ? cityCoords[address]?.lng : undefined)}
+            onLocationSelect={(lat, lng) => {
+              setCoordinates({ lat, lng });
+              const closest = getClosestCity(lat, lng);
+              if (closest) setAddress(closest);
+            }}
+            onAddressFetched={handleAddressFetched}
+          />
+          {/* Tap hint — pin visual instead of text */}
+          <div className="absolute inset-0 bg-black/[0.04] z-10 flex flex-col items-center justify-center pointer-events-none gap-0">
+            {/* Frame + icon */}
+            <div className="bg-white rounded-[14px] shadow-xl p-2 border border-black/5 flex items-center justify-center">
+              <div className="w-9 h-9 rounded-[10px] bg-[#f0f0f0] flex items-center justify-center">
+                <img src={mapMarkerSvg} className="w-5 h-5 opacity-80" alt="pin" />
+              </div>
+            </div>
+            {/* Stick */}
+            <div className="w-[5px] h-5 bg-[#1c1c1e] rounded-b-full shadow-sm" />
+            {/* Shadow */}
+            <div className="w-4 h-[5px] bg-black/20 rounded-full mt-[-2px]" />
+          </div>
+        </div>
+
+        {/* Fullscreen reveal overlay — expands from mini-map bounds */}
+        <AnimatePresence>
+          {isMapFullscreen && mapBounds && (
+            <motion.div
+              initial={{
+                top: mapBounds.top,
+                left: mapBounds.left,
+                width: mapBounds.width,
+                height: mapBounds.height,
+                borderRadius: 12,
+              }}
+              animate={{
+                top: 0,
+                left: 0,
+                width: window.innerWidth,
+                height: window.innerHeight,
+                borderRadius: 0,
+              }}
+              exit={{
+                top: mapBounds.top,
+                left: mapBounds.left,
+                width: mapBounds.width,
+                height: mapBounds.height,
+                borderRadius: 12,
+              }}
+              transition={{ duration: 0.38, ease: [0.4, 0, 0.2, 1] }}
+              style={{ position: 'fixed', zIndex: 200, overflow: 'hidden' }}
+              className="bg-white"
+            >
+              {/* Full map — fills container */}
+              <div className="absolute inset-0">
+                <LocationMap
+                  isFullscreen
+                  sellerInfo={{ name: profile?.pseudo || profile?.fullName || 'كساب', rating: 5 }}
+                  lat={coordinates?.lat || (address ? cityCoords[address]?.lat : undefined)}
+                  lng={coordinates?.lng || (address ? cityCoords[address]?.lng : undefined)}
+                  onLocationSelect={(lat, lng) => {
+                    setCoordinates({ lat, lng });
+                    const closest = getClosestCity(lat, lng);
+                    if (closest) setAddress(closest);
+                  }}
+                  onAddressFetched={handleAddressFetched}
+                  retryTrigger={retryTrigger}
+                />
+              </div>
+
+              {/* Back button — fades in after morph */}
+              <motion.button
+                initial={{ opacity: 0, x: 16 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 16 }}
+                transition={{ delay: 0.22, duration: 0.2 }}
+                onClick={(e) => { e.stopPropagation(); closeMap(); }}
+                className="absolute top-12 right-4 z-50 w-12 h-12 bg-[#115e2c] rounded-full flex items-center justify-center shadow-2xl active:scale-90 transition-transform"
               >
-                <option value="" disabled>اختار المدينة...</option>
-                {Object.keys(cityCoords).sort().map(city => (
-                  <option key={city} value={city}>{city}</option>
-                ))}
-              </select>
-              <ChevronDown className="w-4 h-4 text-on-surface-variant absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none group-hover:scale-110 transition-transform" />
+                <ArrowRight className="w-6 h-6 text-white" />
+              </motion.button>
+
+              {/* Bottom confirmation — slides up after morph */}
+              <motion.div
+                initial={{ y: '100%' }}
+                animate={{ y: 0 }}
+                exit={{ y: '100%' }}
+                transition={{ delay: 0.2, duration: 0.32, ease: [0.4, 0, 0.2, 1] }}
+                onClick={(e) => e.stopPropagation()}
+                className="absolute bottom-0 left-0 right-0 bg-white rounded-t-[28px] shadow-[0_-12px_40px_rgba(0,0,0,0.12)] z-50 px-5 pt-4 pb-8"
+              >
+                <div className="w-10 h-1 bg-outline-variant/30 rounded-full mx-auto mb-6" />
+                
+                {/* Information Fiche */}
+                <div className="mb-5 text-right" dir="rtl">
+                  <h4 className="text-xs font-bold text-[#115e2c] tracking-widest uppercase mb-3">عنوان الوجهة</h4>
+
+                  {dynamicAddress ? (
+                    <div className="space-y-2">
+                      <p className="text-sm font-black text-on-surface leading-snug line-clamp-2" dir="rtl">{dynamicAddress}</p>
+                      {dynamicCity && (
+                        <div className="inline-flex items-center gap-1.5 bg-[#115e2c]/8 rounded-full px-3 py-1">
+                          <MapPin className="w-3 h-3 text-[#115e2c]" />
+                          <span className="text-xs font-black text-[#115e2c]">المدينة : {dynamicCity}</span>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-end gap-2 text-on-surface-variant">
+                      <span className="text-sm font-medium">جار البحث عن العنوان...</span>
+                      <Loader2 className="w-4 h-4 animate-spin text-[#115e2c]" />
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex justify-center w-full">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); closeMap(); }}
+                    className="w-full md:w-auto md:px-16 h-14 bg-[#115e2c] text-white rounded-2xl font-black text-base tracking-wide shadow-xl shadow-green-900/20 active:scale-[0.98] transition-transform"
+                  >
+                    تأكيد موقع ضيعتي
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* 4. GPS Success & Tweak (Style matched to Hero Search) */}
+        <div className="bg-surface-container-low border border-outline-variant/30 p-4 rounded-[10px] shadow-sm">
+          <div className="flex items-center gap-4">
+            <div className="text-on-surface text-sm font-black shrink-0 whitespace-nowrap">إحداثيات الموقع</div>
+            
+            <div className="flex-1 grid grid-cols-2 gap-3">
+              {/* Latitude Field */}
+              <div className="flex items-center px-3 py-1.5 bg-white rounded-lg border border-outline-variant/20 shadow-sm transition-all focus-within:border-primary">
+                <div className="flex flex-col text-right flex-1">
+                  <span className="text-[8px] font-black text-primary uppercase tracking-wider mb-0.5">Latitude</span>
+                  <input 
+                    type="number" 
+                    step="any"
+                    value={coordinates?.lat || ''}
+                    onChange={(e) => { setCoordinates({ lat: parseFloat(e.target.value) || 0, lng: coordinates?.lng || 0 }); setGpsDetermined(false); }}
+                    className="bg-transparent border-none outline-none w-full text-xs font-black text-on-surface text-left"
+                    placeholder="0.0000"
+                    dir="ltr"
+                  />
+                </div>
+              </div>
+
+              {/* Longitude Field */}
+              <div className="flex items-center px-3 py-1.5 bg-white rounded-lg border border-outline-variant/20 shadow-sm transition-all focus-within:border-primary">
+                <div className="flex flex-col text-right flex-1">
+                  <span className="text-[8px] font-black text-primary uppercase tracking-wider mb-0.5">Longitude</span>
+                  <input 
+                    type="number" 
+                    step="any"
+                    value={coordinates?.lng || ''}
+                    onChange={(e) => { setCoordinates({ lat: coordinates?.lat || 0, lng: parseFloat(e.target.value) || 0 }); setGpsDetermined(false); }}
+                    className="bg-transparent border-none outline-none w-full text-xs font-black text-on-surface text-left"
+                    placeholder="0.0000"
+                    dir="ltr"
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </div>
-        {coordinates && (
-          <div className="bg-green-50 text-green-800 p-3 rounded-[10px] text-sm font-medium flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4" />
-            تم تحديد الموقع بنجاح: {coordinates.lat.toFixed(4)}, {coordinates.lng.toFixed(4)}
-          </div>
-        )}
       </div>
     </section>
   );
@@ -418,22 +693,28 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
     <section className="bg-surface-container-lowest p-6 rounded-[10px] border border-outline-variant/30 shadow-sm space-y-6">
       <h2 className="text-lg font-bold text-on-surface mb-2 flex items-center gap-2">
         <span className="w-6 h-6 rounded-full bg-primary text-on-primary flex items-center justify-center text-xs">2</span>
-        الصور والفيديو (مهم بزاف)
+        صور القطيع (مهم بزاف)
       </h2>
-      <p className="text-sm text-on-surface-variant">الكليان كايبغي يشوف الحولي مزيان قبل ما يجي. صور من الجناب، القدام، وفيديو كايتحرك.</p>
+      <p className="text-sm text-on-surface-variant">الكليان كايبغي يشوف الحولي مزيان قبل ما يجي. ضروري تحط على الأقل صورة رئيسية للقطيع ديالك.</p>
       
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {/* Main Video/Photo */}
+        {/* Main Photo (Required) */}
         <div className="col-span-2 row-span-2 relative bg-surface-container-low rounded-[10px] border-2 border-dashed border-outline-variant/50 flex flex-col items-center justify-center aspect-square cursor-pointer hover:bg-surface-variant/50 transition-colors group overflow-hidden">
-          {videoFile ? (
+          {compressingIndex === 0 ? (
+            <div className="flex flex-col items-center gap-2">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              <span className="text-xs font-bold text-on-surface-variant">جاري ضغط الصورة...</span>
+            </div>
+          ) : photoFiles[0] ? (
             <div className="absolute inset-0">
-              <video 
-                src={typeof videoFile === 'string' ? videoFile : URL.createObjectURL(videoFile)} 
+              <img 
+                src={typeof photoFiles[0] === 'string' ? photoFiles[0] : URL.createObjectURL(photoFiles[0] as File)} 
                 className="w-full h-full object-cover" 
-                controls={typeof videoFile === 'string'}
+                alt="Image principale" 
               />
+              <div className="absolute bottom-2 left-2 bg-black/60 text-white text-[9px] font-black px-2 py-0.5 rounded-full">WebP ✔</div>
               <button 
-                onClick={(e) => { e.stopPropagation(); setVideoFile(null); }}
+                onClick={(e) => { e.stopPropagation(); handlePhotoChange(0, null); }}
                 className="absolute top-2 right-2 bg-red-600 text-white p-1.5 rounded-full shadow-lg z-20 hover:scale-110 transition-transform flex items-center justify-center"
               >
                 <X className="w-4 h-4" />
@@ -443,60 +724,38 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
             <>
               <input 
                 type="file" 
-                accept="video/*" 
+                accept="image/*" 
                 capture="environment"
                 className="absolute inset-0 opacity-0 cursor-pointer z-10" 
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-
-                  // 1. Check size (10MB = 10485760 bytes)
-                  if (file.size > 10 * 1024 * 1024) {
-                    setError("الفيديو كبير بزاف (أكثر من 10 ميغا). حاول تنقص من الجودة ديالو.");
-                    e.target.value = '';
-                    return;
-                  }
-
-                  // 2. Check duration
-                  const video = document.createElement('video');
-                  video.preload = 'metadata';
-                  video.onloadedmetadata = () => {
-                    window.URL.revokeObjectURL(video.src);
-                    if (video.duration > 20) {
-                      setError("الفيديو طويل بزاف (أكثر من 20 ثانية). خاصو يكون فيديو قصير.");
-                      setVideoFile(null);
-                    } else {
-                      setVideoFile(file);
-                      setError(null);
-                    }
-                  };
-                  video.onerror = () => {
-                    setError("وقع مشكل في قراءة هاد الفيديو. جرب واحد آخر.");
-                  };
-                  video.src = URL.createObjectURL(file);
-                }}
+                onChange={(e) => handlePhotoChange(0, e.target.files?.[0] || null)}
               />
-              <div className="w-12 h-12 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                <Video className="w-6 h-6" />
+              <div className="w-12 h-12 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center mb-3 group-hover:scale-110 transition-transform shadow-md">
+                <Camera className="w-6 h-6" />
               </div>
               <div className="flex flex-col items-center">
-                <span className="font-bold text-on-surface text-sm text-center px-2">فيديو رئيسي (أقل من 20 ثانية)</span>
-                <span className="text-[10px] text-primary font-black mt-1 uppercase">Max 10 MB</span>
+                <span className="font-black text-on-surface text-sm text-center px-2">صورة رئيسية (إجبارية)</span>
+                <span className="text-[10px] text-error font-bold mt-1 bg-red-50 px-2 py-0.5 rounded">مطلوب</span>
               </div>
             </>
           )}
         </div>
         
-        {/* Photo Slots */}
-        {[0, 1, 2, 3].map((index) => (
+        {/* Secondary Photo Slots */}
+        {[1, 2, 3, 4].map((index) => (
           <div key={index} className="relative bg-surface-container-low rounded-[10px] border-2 border-dashed border-outline-variant/50 flex flex-col items-center justify-center aspect-square cursor-pointer hover:bg-surface-variant/50 transition-colors overflow-hidden group">
-            {photoFiles[index] ? (
+            {compressingIndex === index ? (
+              <div className="flex flex-col items-center gap-1">
+                <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                <span className="text-[10px] font-bold text-on-surface-variant">ضغط...</span>
+              </div>
+            ) : photoFiles[index] ? (
               <div className="absolute inset-0">
                 <img 
                   src={typeof photoFiles[index] === 'string' ? photoFiles[index] as string : URL.createObjectURL(photoFiles[index] as File)} 
                   className="w-full h-full object-cover" 
                   alt={`Photo ${index + 1}`} 
                 />
+                <div className="absolute bottom-1 left-1 bg-black/60 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full">WebP</div>
                 <button 
                   onClick={(e) => { e.stopPropagation(); handlePhotoChange(index, null); }}
                   className="absolute top-1 right-1 bg-red-600 text-white p-1 rounded-full shadow-lg z-20 hover:scale-110 transition-transform flex items-center justify-center"
@@ -513,13 +772,22 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
                   className="absolute inset-0 opacity-0 cursor-pointer z-10" 
                   onChange={(e) => handlePhotoChange(index, e.target.files?.[0] || null)}
                 />
-                <Camera className="w-6 h-6 text-on-surface-variant mb-2" />
-                <span className="text-xs font-medium text-on-surface-variant">أضف صورة رقم {index + 1}</span>
+                <Camera className="w-6 h-6 text-on-surface-variant/50 mb-2 group-hover:text-primary transition-colors" />
+                <span className="text-xs font-medium text-on-surface-variant">صورة {index + 1}</span>
               </>
             )}
           </div>
         ))}
       </div>
+
+      {/* Compression error banner */}
+      {compressionError && (
+        <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700">
+          <X className="w-5 h-5 shrink-0" />
+          <p className="text-sm font-bold">{compressionError}</p>
+          <button onClick={() => setCompressionError(null)} className="mr-auto text-red-500 hover:text-red-700"><X className="w-4 h-4" /></button>
+        </div>
+      )}
 
       {/* YouTube Link Field */}
       <div className="mt-6 space-y-2">
@@ -529,7 +797,7 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
         </label>
         <div className="relative">
           <input 
-            className="w-full h-12 px-4 bg-surface-container-high border-none rounded-[10px] text-on-surface focus:ring-2 focus:ring-primary transition-all text-left" 
+            className="w-full h-12 px-4 bg-surface-container-high border-none rounded-[10px] text-on-surface focus:ring-2 focus:ring-primary transition-all text-left font-medium" 
             placeholder="https://www.youtube.com/watch?v=..." 
             type="url" 
             dir="ltr"
@@ -537,100 +805,130 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
             onChange={(e) => setYoutubeLink(e.target.value)}
           />
         </div>
-        <p className="text-[10px] text-on-surface-variant">إلا عندك فيديو ف يوتيوب، حط الرابط هنا باش يشوفوه الناس.</p>
+        <p className="text-[10px] text-on-surface-variant font-medium">إلا عندك فيديو ف يوتيوب، حط الرابط هنا باش يشوفوه الناس.</p>
       </div>
     </section>
   );
 
   const renderInfoStep = () => (
-    <section className="bg-surface-container-lowest p-6 rounded-[10px] border border-outline-variant/30 shadow-sm space-y-6">
-      <h2 className="text-lg font-bold text-on-surface mb-6 flex items-center gap-2">
-        <span className="w-6 h-6 rounded-full bg-primary text-on-primary flex items-center justify-center text-xs">3</span>
-        معلومات القطيع
-      </h2>
+    <section className="bg-surface-container-lowest p-5 rounded-2xl border border-outline-variant/30 shadow-xl space-y-8 animate-in fade-in duration-500">
+      <div className="flex items-center justify-between border-b border-outline-variant/10 pb-4">
+        <h2 className="text-xl font-black text-on-surface flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-primary text-on-primary flex items-center justify-center text-sm shadow-lg shadow-primary/20">3</div>
+          معلومات القطيع
+        </h2>
+        <span className="text-[10px] font-bold text-on-surface-variant bg-surface-container-high px-3 py-1 rounded-full">الخطوة الأخيرة</span>
+      </div>
       
-      <div className="space-y-6">
-        <div className="space-y-2 relative">
-          <label className="block text-sm font-bold text-on-surface-variant">عدد رؤوس الغنم المتوفرة</label>
-          <div className="relative">
-            <input 
-              className="w-full h-14 px-4 bg-surface-container-high border-none rounded-[10px] text-on-surface focus:ring-2 focus:ring-primary transition-all text-right font-medium text-lg" 
-              placeholder="مثلا: 25" 
-              type="number" 
-              required
-              value={sheepCount}
-              onChange={(e) => setSheepCount(e.target.value)}
-            />
-            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm font-bold">
-              رأس
+      <div className="space-y-8">
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2 relative">
+            <label className="block text-[11px] font-black text-on-surface-variant flex items-center gap-1.5 mr-1">
+              <PlusCircle className="w-3.5 h-3.5 text-primary" />
+              عدد الرؤوس
+              {showErrors && !sheepCount && <span className="text-[8px] text-error animate-pulse bg-red-50 px-1 py-0.5 rounded">مطلوب</span>}
+            </label>
+            <div className="relative group">
+              <input 
+                className="w-full h-14 px-3 bg-surface-container-low border-2 border-transparent rounded-xl text-on-surface focus:bg-white focus:border-primary focus:ring-4 focus:ring-primary/5 transition-all text-right font-black text-xl shadow-sm" 
+                placeholder="0" 
+                type="number" 
+                required
+                value={sheepCount}
+                onChange={(e) => setSheepCount(e.target.value)}
+              />
+              <div className="absolute left-2 top-1/2 -translate-y-1/2 text-on-surface-variant font-black text-[10px] bg-surface-container-high px-2 py-0.5 rounded-md">
+                رأس
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-2 relative">
+            <label className="block text-[11px] font-black text-on-surface-variant flex items-center gap-1.5 mr-1">
+              <Scale className="w-3.5 h-3.5 text-primary" />
+              أقل ثمن
+              {showErrors && !startingPrice && <span className="text-[8px] text-error animate-pulse bg-red-50 px-1 py-0.5 rounded">مطلوب</span>}
+            </label>
+            <div className="relative group">
+              <input 
+                className="w-full h-14 px-3 bg-surface-container-low border-2 border-transparent rounded-xl text-on-surface focus:bg-white focus:border-primary focus:ring-4 focus:ring-primary/5 transition-all text-right font-black text-xl shadow-sm" 
+                placeholder="0" 
+                type="number" 
+                required
+                value={startingPrice}
+                onChange={(e) => setStartingPrice(e.target.value)}
+              />
+              <div className="absolute left-2 top-1/2 -translate-y-1/2 text-on-surface-variant font-black text-[10px] bg-surface-container-high px-2 py-0.5 rounded-md">
+                درهم
+              </div>
             </div>
           </div>
         </div>
 
-        <div className="space-y-2 relative">
-          <label className="block text-sm font-bold text-on-surface-variant">أقل ثمن كيبدا من</label>
-          <div className="relative">
-            <input 
-              className="w-full h-14 px-4 bg-surface-container-high border-none rounded-[10px] text-on-surface focus:ring-2 focus:ring-primary transition-all text-right font-medium text-lg" 
-              placeholder="مثلا: 1500" 
-              type="number" 
-              required
-              value={startingPrice}
-              onChange={(e) => setStartingPrice(e.target.value)}
-            />
-            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm font-bold">
-              درهم
-            </div>
+        <div className="space-y-4">
+          <label className="block text-sm font-black text-on-surface-variant flex items-center gap-2 mr-1">
+            <Calendar className="w-4 h-4 text-primary" />
+            السن (الأعمار المتوفرة)
+            {showErrors && selectedAges.length === 0 && <span className="text-[10px] text-error animate-pulse bg-red-50 px-2 py-0.5 rounded">مطلوب</span>}
+          </label>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+            {ages.map((age) => {
+              const isSelected = selectedAges.includes(age.id);
+              return (
+                <button
+                  key={age.id}
+                  type="button"
+                  onClick={() => toggleAge(age.id)}
+                  className={`px-3 py-4 font-black rounded-xl transition-all border-2 text-sm text-center flex flex-col items-center justify-center gap-1 ${
+                    isSelected
+                      ? 'bg-primary text-on-primary border-primary shadow-lg shadow-primary/20 scale-[1.02]'
+                      : 'bg-white text-on-surface border-outline-variant/30 hover:border-primary/50'
+                  }`}
+                >
+                  <span className={isSelected ? 'text-white' : 'text-primary/70'}>{age.label}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        <div className="space-y-3">
-          <label className="block text-sm font-bold text-on-surface-variant">السن (الأعمار)</label>
-          <div className="flex flex-wrap gap-2">
-            {ages.map((age) => (
-              <button
-                key={age.id}
-                type="button"
-                onClick={() => toggleAge(age.id)}
-                className={`px-5 py-2.5 font-bold rounded-[10px] transition-colors border text-sm flex-1 sm:flex-none text-center ${
-                  selectedAges.includes(age.id)
-                    ? 'bg-primary text-on-primary border-primary shadow-md hover:bg-transparent hover:text-primary'
-                    : 'bg-surface-container-high text-on-surface border-outline-variant/30 hover:border-primary'
-                }`}
-              >
-                {age.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="space-y-3">
-          <label className="block text-sm font-bold text-on-surface-variant">حجم الحولي</label>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        <div className="space-y-4">
+          <label className="block text-sm font-black text-on-surface-variant flex items-center gap-2 mr-1">
+            <Ruler className="w-4 h-4 text-primary" />
+            حجم الحولي
+          </label>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
               { id: 'small', label: 'صغير' },
               { id: 'medium', label: 'متوسط' },
               { id: 'large', label: 'كبير' },
               { id: 'extra-large', label: 'كبير جداً' }
-            ].map((size) => (
-              <button
-                key={size.id}
-                type="button"
-                onClick={() => toggleSize(size.id)}
-                className={`px-4 py-3 font-bold rounded-[10px] transition-colors border text-sm ${
-                  selectedSizes.includes(size.id)
-                    ? 'bg-primary text-on-primary border-primary shadow-md hover:bg-transparent hover:text-primary'
-                    : 'bg-surface-container-high text-on-surface border-outline-variant/30 hover:border-primary'
-                }`}
-              >
-                {size.label}
-              </button>
-            ))}
+            ].map((size) => {
+              const isSelected = selectedSizes.includes(size.id);
+              return (
+                <button
+                  key={size.id}
+                  type="button"
+                  onClick={() => toggleSize(size.id)}
+                  className={`px-4 py-4 font-black rounded-xl transition-all border-2 text-sm text-center flex items-center justify-center gap-2 ${
+                    isSelected
+                      ? 'bg-primary text-on-primary border-primary shadow-lg shadow-primary/20 scale-[1.02]'
+                      : 'bg-white text-on-surface border-outline-variant/30 hover:border-primary/50'
+                  }`}
+                >
+                  {size.label}
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        <div className="space-y-3">
-          <label className="block text-sm font-bold text-on-surface-variant">سلالة الغنم</label>
+        <div className="space-y-4">
+          <label className="block text-sm font-black text-on-surface-variant flex items-center gap-2 mr-1">
+            <Globe className="w-4 h-4 text-primary" />
+            سلالة الغنم
+            {showErrors && selectedRaces.length === 0 && <span className="text-[10px] text-error animate-pulse bg-red-50 px-2 py-0.5 rounded">مطلوب</span>}
+          </label>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             {[
               { id: 'sardi', label: 'سردي', icon: Award },
@@ -644,64 +942,77 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
                   key={race.id}
                   type="button"
                   onClick={() => toggleRace(race.id)}
-                  className={`px-4 py-3 font-bold rounded-[10px] transition-colors border flex items-center justify-center gap-2 ${
+                  className={`px-4 py-5 font-black rounded-xl transition-all border-2 flex items-center justify-center gap-3 ${
                     isSelected
-                      ? 'bg-primary text-on-primary border-primary shadow-md hover:bg-transparent hover:text-primary'
-                      : 'bg-surface-container-high text-on-surface border-outline-variant/30 hover:border-primary'
+                      ? 'bg-primary text-on-primary border-primary shadow-lg shadow-primary/20 scale-[1.02]'
+                      : 'bg-white text-on-surface border-outline-variant/30 hover:border-primary/50'
                   }`}
                 >
-                  <Icon className={`w-5 h-5 ${isSelected ? 'text-on-primary group-hover:text-primary' : 'text-primary/70'}`} />
-                  {race.label}
+                  <Icon className={`w-6 h-6 ${isSelected ? 'text-white' : 'text-primary'}`} />
+                  <span className="text-base">{race.label}</span>
                 </button>
               );
             })}
           </div>
         </div>
 
-        <div className="space-y-4 relative">
-          <label className="block text-sm font-bold text-on-surface-variant">وصف إضافي (اختياري)</label>
-          <div className={`p-4 rounded-[10px] flex items-center justify-between border shadow-sm mb-4 transition-all ${isRecording ? 'bg-red-50 border-red-100 animate-pulse' : 'bg-[#e8f3e8] border-green-100'}`}>
-            <div className="flex items-center gap-4">
-              <div className={isRecording ? 'text-red-500' : 'text-green-800/40'}>
-                <AudioLines className="w-10 h-10" />
-              </div>
-            </div>
-            
-            <div className="flex-1 text-right px-4">
+        <div className="space-y-4 pt-4">
+          <label className="block text-sm font-black text-on-surface-variant flex items-center gap-2 mr-1">
+            <AudioLines className="w-4 h-4 text-primary" />
+            وصف مسموع وكتابي
+          </label>
+          
+          <div className={`p-5 rounded-2xl flex items-center justify-between border-2 shadow-sm transition-all duration-300 ${isRecording ? 'bg-red-50 border-red-200 ring-4 ring-red-100' : 'bg-green-50/50 border-green-100'}`}>
+            <div className="flex-1 text-right">
               {audioUrl ? (
-                <div className="flex flex-col items-end gap-1">
-                  <p className="text-[#1a4d1a] font-bold text-sm">تم تسجيل الأوديو</p>
-                  <div className="flex items-center gap-2">
-                    <audio src={audioUrl} controls className="h-8 w-40" />
-                    <button type="button" onClick={deleteAudio} className="text-error text-xs font-bold hover:underline">حذف</button>
+                  <div className="flex flex-col items-start gap-4 w-full">
+                    <div className="flex items-center justify-between w-full">
+                      <div className="flex items-center gap-2 text-primary font-black">
+                        <CheckCircle2 className="w-5 h-5" />
+                        <span>تم تسجيل الوصف الصوتي</span>
+                      </div>
+                      <button type="button" onClick={deleteAudio} className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors">
+                        <span className="text-xs font-black">حذف</span>
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <audio src={audioUrl} controls className="h-10 w-full" />
                   </div>
-                </div>
               ) : (
-                <>
-                  <h3 className={`font-bold text-lg ${isRecording ? 'text-red-800' : 'text-[#1a4d1a]'}`}>
-                    {isRecording ? 'جاري التسجيل...' : 'إضافة أوديو لوصف القطيع'}
+                <div className="space-y-1">
+                  <h3 className={`font-black text-lg ${isRecording ? 'text-red-700' : 'text-green-900'}`}>
+                    {isRecording ? `جاري تسجيل صوتك... (${60 - recordingTime}ث)` : 'إضافة وصف صوتي'}
                   </h3>
-                  <p className={`text-sm ${isRecording ? 'text-red-600' : 'text-[#1a4d1a]/60'}`}>
-                    {isRecording ? 'كليكي باش تحبس' : 'هضر على السن، المكلة، والنوع'}
+                  {isRecording && (
+                    <div className="w-full bg-red-200 h-1.5 rounded-full mt-2 overflow-hidden">
+                      <motion.div 
+                        initial={{ width: 0 }}
+                        animate={{ width: `${(recordingTime / 60) * 100}%` }}
+                        className="bg-red-600 h-full"
+                      />
+                    </div>
+                  )}
+                  <p className={`text-sm font-medium ${isRecording ? 'text-red-500' : 'text-green-800/60'}`}>
+                    {isRecording ? 'تكلم دابا، كنسمعوك (الحد الأقصى دقيقة واحدة)...' : 'هضر لينا على المكلة، السن، والجودة'}
                   </p>
-                </>
+                </div>
               )}
             </div>
 
             {!audioUrl && (
               <button 
                 type="button"
-                className={`w-16 h-16 rounded-[10px] flex items-center justify-center text-white shadow-lg transition-colors border border-transparent ${isRecording ? 'bg-red-600 hover:bg-transparent hover:text-red-600 hover:border-red-600' : 'bg-[#0a5c1a] hover:bg-transparent hover:text-[#0a5c1a] hover:border-[#0a5c1a]'}`}
+                className={`w-16 h-16 rounded-full flex items-center justify-center text-white shadow-xl transition-all transform active:scale-95 ${isRecording ? 'bg-red-600 ring-8 ring-red-100 animate-pulse' : 'bg-primary hover:bg-primary-dark ring-8 ring-primary/10'}`}
                 onClick={isRecording ? stopRecording : startRecording}
               >
-                {isRecording ? <div className="w-4 h-4 bg-white rounded-sm" /> : <Mic className="w-8 h-8" />}
+                {isRecording ? <div className="w-5 h-5 bg-white rounded-sm" /> : <Mic className="w-8 h-8" />}
               </button>
             )}
           </div>
 
           <textarea 
-            className="w-full p-4 bg-surface-container-high border-none rounded-[10px] text-on-surface focus:ring-2 focus:ring-primary transition-all resize-none h-32" 
-            placeholder="كتب أي حاجة خرى بغيتي الكليان يعرفها على هاد الحولي..."
+            className="w-full p-5 bg-surface-container-low border-2 border-transparent rounded-2xl text-on-surface focus:bg-white focus:border-primary focus:ring-4 focus:ring-primary/5 transition-all resize-none h-40 font-bold text-lg shadow-inner" 
+            placeholder="زيد شي معلومات خرى بغيتي الكليان يعرفها (مثلا: واش كاين النقل، واش الثمن قابل للتفاوض...)"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
           ></textarea>
@@ -717,13 +1028,15 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
       <header className="bg-surface/80 backdrop-blur-md border-b border-outline-variant/20 sticky top-0 z-50">
         <div className="max-w-3xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <button 
-              onClick={() => onNavigate(profile?.role === 'admin' ? 'admin' : 'seller')} 
-              className="flex items-center gap-2 text-on-surface-variant hover:text-primary transition-colors group"
-            >
-              <ArrowRight className="w-6 h-6 transition-transform group-hover:translate-x-1" />
-              <span className="font-black text-sm">الرجوع للوحة التحكم</span>
-            </button>
+            {hasListings !== false && (
+              <button 
+                onClick={() => onNavigate(profile?.role === 'admin' ? 'admin' : 'seller')} 
+                className="flex items-center gap-2 text-on-surface-variant hover:text-primary transition-colors group"
+              >
+                <ArrowRight className="w-6 h-6 transition-transform group-hover:translate-x-1" />
+                <span className="font-black text-sm">الرجوع للوحة التحكم</span>
+              </button>
+            )}
           </div>
           
           <h1 className="text-xl font-black text-on-surface font-headline">
@@ -741,8 +1054,16 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
         )}
 
         <div className="">
-          {currentStep === 1 && renderLocationStep()}
-          {currentStep === 2 && renderMediaStep()}
+          {currentStep === 1 && (
+            <div className="min-h-0 flex flex-col">
+               {renderLocationStep()}
+            </div>
+          )}
+          {currentStep === 2 && (
+            <div className="md:min-h-0 min-h-[calc(100dvh-150px)] flex flex-col">
+               {renderMediaStep()}
+            </div>
+          )}
           {currentStep === 3 && renderInfoStep()}
         </div>
 
@@ -751,7 +1072,30 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
             <button onClick={() => setCurrentStep(prev => prev - 1)} className="flex-1 py-4 bg-surface-container-high rounded-[10px] font-bold transition-colors border border-transparent hover:bg-transparent hover:text-on-surface hover:border-outline-variant">رجوع</button>
           )}
           {currentStep < 3 ? (
-            <button onClick={() => setCurrentStep(prev => prev + 1)} className="flex-1 py-4 bg-primary text-on-primary rounded-[10px] font-bold transition-colors border border-transparent hover:bg-transparent hover:text-primary hover:border-primary">التالي</button>
+            <button 
+              onClick={() => {
+                setError(null);
+                if (currentStep === 1) {
+                  // Validate Step 1
+                  if (!address && !coordinates) {
+                    setError("المرجو تحديد المدينة أو استعمال موقعي الحالي (GPS) باش المشترين يلقاو الغنم ديالك بسهولة.");
+                    window.scrollTo(0, 0);
+                    return;
+                  }
+                } else if (currentStep === 2) {
+                  // Validate Step 2
+                  if (!photoFiles[0]) {
+                    setError("ضروري تحط على الأقل صورة رئيسية للقطيع ديالك.");
+                    window.scrollTo(0, 0);
+                    return;
+                  }
+                }
+                setCurrentStep(prev => prev + 1);
+              }} 
+              className="flex-1 py-4 bg-primary text-on-primary rounded-[10px] font-bold transition-colors border border-transparent hover:bg-transparent hover:text-primary hover:border-primary"
+            >
+              التالي
+            </button>
           ) : (
             <button 
               onClick={handleSubmit} 

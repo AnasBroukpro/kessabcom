@@ -1,9 +1,8 @@
-import React, { useMemo, useCallback } from 'react';
-import { GoogleMap, useJsApiLoader, OverlayView, InfoWindowF, Circle } from '@react-google-maps/api';
+import React, { useMemo } from 'react';
+import { GoogleMap, OverlayView, Circle } from '@react-google-maps/api';
 import { MapPin, Star } from 'lucide-react';
-import { cityMapping } from '../constants/cityMapping';
-
 import { useSettings } from '../hooks/useSettings';
+import { useGoogleMaps } from '../contexts/GoogleMapsProvider';
 
 interface Listing {
   id: string;
@@ -28,9 +27,7 @@ interface Props {
   setHoveredListingId: (id: string | null) => void;
 }
 
-interface MapContentProps extends Props {
-  apiKey: string;
-}
+interface MapContentProps extends Props {}
 
 const mapContainerStyle = {
   width: '100%',
@@ -54,11 +51,8 @@ const mapOptions = {
   ],
 };
 
-const MapContent: React.FC<MapContentProps> = ({ listings, onListingClick, hoveredListingId, setHoveredListingId, apiKey }) => {
-  const { isLoaded, loadError } = useJsApiLoader({
-    id: 'google-map-script',
-    googleMapsApiKey: apiKey,
-  });
+const MapContent: React.FC<MapContentProps> = ({ listings, onListingClick, hoveredListingId, setHoveredListingId }) => {
+  const { isLoaded, loadError } = useGoogleMaps();
 
   const mapCenter = useMemo(() => {
     if (listings.length > 0) {
@@ -214,7 +208,7 @@ const GoogleMapComponent: React.FC<Props> = (props) => {
     );
   }
 
-  const apiKey = settings.googleMapsApiKey || import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+  const { apiKey } = useGoogleMaps();
 
   if (!apiKey) {
     return (
@@ -224,13 +218,13 @@ const GoogleMapComponent: React.FC<Props> = (props) => {
             <MapPin className="w-8 h-8" />
           </div>
           <h3 className="text-lg font-bold text-gray-900">مفتاح الخريطة غير متوفر</h3>
-          <p className="text-sm text-gray-600">يرجى إضافة مفتاح Google Maps API (VITE_GOOGLE_MAPS_API_KEY) في إعدادات التطبيق لتفعيل الخريطة.</p>
+          <p className="text-sm text-gray-600">يرجى إضافة مفتاح Google Maps API في إعدادات التطبيق لتفعيل الخريطة.</p>
         </div>
       </div>
     );
   }
 
-  return <MapContent {...props} apiKey={apiKey} />;
+  return <MapContent {...props} />;
 };
 
 export default React.memo(GoogleMapComponent);

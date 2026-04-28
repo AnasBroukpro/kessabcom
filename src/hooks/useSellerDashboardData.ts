@@ -9,6 +9,10 @@ export function useSellerDashboardData(user: any) {
   const [nextCursorRequests, setNextCursorRequests] = useState<string | null>(null);
   const [isLoadingRequests, setIsLoadingRequests] = useState(false);
   const [isLoadingMoreRequests, setIsLoadingMoreRequests] = useState(false);
+  const [dailyLeadsCount, setDailyLeadsCount] = useState(0);
+  const [dailyLeadsLimit, setDailyLeadsLimit] = useState(6);
+  const [dailyOffersCount, setDailyOffersCount] = useState(0);
+  const [dailyOffersLimit, setDailyOffersLimit] = useState(6);
 
   const fetchRequests = async (isLoadMore = false) => {
     if (isLoadMore) {
@@ -31,6 +35,12 @@ export function useSellerDashboardData(user: any) {
           setRequests(response.data);
         }
         setNextCursorRequests(response.nextCursor);
+        
+        // Store daily limits info
+        if (response.dailyLeadsCount !== undefined) setDailyLeadsCount(response.dailyLeadsCount);
+        if (response.dailyLeadsLimit !== undefined) setDailyLeadsLimit(response.dailyLeadsLimit);
+        if (response.dailyOffersCount !== undefined) setDailyOffersCount(response.dailyOffersCount);
+        if (response.dailyOffersLimit !== undefined) setDailyOffersLimit(response.dailyOffersLimit);
       }
     } catch (error) {
       console.error("Error fetching requests:", error);
@@ -56,6 +66,10 @@ export function useSellerDashboardData(user: any) {
     nextCursorRequests,
     isLoadingRequests,
     isLoadingMoreRequests,
+    dailyLeadsCount,
+    dailyLeadsLimit,
+    dailyOffersCount,
+    dailyOffersLimit,
     fetchRequests
   };
 }

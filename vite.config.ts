@@ -1,5 +1,6 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
+// Triggering reload to fix 500 error on index.css
 import path from 'path';
 import {defineConfig, loadEnv} from 'vite';
 

@@ -1,7 +1,8 @@
 import React from 'react';
-import { Lightbulb, CheckCircle2, AlertTriangle, ArrowLeft, Heart, Search, ShoppingCart } from 'lucide-react';
-import { motion } from 'motion/react';
+import { motion } from 'framer-motion';
+import { Search, ShoppingCart, Heart, CheckCircle2, AlertTriangle, Lightbulb } from 'lucide-react';
 import { ViewType } from '../App';
+import SearchHeader from '../components/SearchHeader';
 
 interface Props {
   onNavigate: (view: ViewType) => void;
@@ -37,15 +38,11 @@ export default function TipsPage({ onNavigate }: Props) {
   ];
 
   return (
-    <div className="min-h-screen bg-[#FDFCF8] py-12 px-6" dir="rtl">
-      <div className="max-w-4xl mx-auto">
-        <button 
-          onClick={() => onNavigate('home')}
-          className="flex items-center gap-2 text-[#2E7D32] font-bold mb-8 px-4 py-2 rounded-xl border border-transparent hover:bg-[#2E7D32] hover:text-white transition-colors"
-        >
-          <ArrowLeft className="w-5 h-5 ml-1" />
-          الرجوع للرئيسية
-        </button>
+    <div className="min-h-screen bg-[#FDFCF8] antialiased" dir="rtl">
+      <SearchHeader onNavigate={onNavigate} />
+      
+      <div className="max-w-4xl mx-auto py-12 px-6">
+
 
         <motion.div 
           initial={{ opacity: 0, y: 20 }}

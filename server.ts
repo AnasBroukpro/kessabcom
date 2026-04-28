@@ -136,6 +136,19 @@ const verifyRecaptcha = async (token: string, action: string) => {
   }
 };
 
+// Helper: Calculate distance in KM between two points
+const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+  if (!lat1 || !lon1 || !lat2 || !lon2) return 9999;
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+};
+
 // Middleware: Verify Token (Optional)
 const optionalVerifyToken = async (req: any, res: Response, next: NextFunction) => {
   const header = req.headers.authorization;
@@ -244,7 +257,6 @@ async function startServer() {
 
   // --- SETTINGS ENDPOINTS ---
   app.get("/api/settings", async (req, res) => {
-    console.log('📡 API: Fetching settings...');
     try {
       const snap = await db.collection('settings').get();
       console.log(`✅ API: Settings fetched (${snap.size} docs)`);
@@ -455,25 +467,28 @@ async function startServer() {
     }
   });
 
-  app.get("/api/users/:id", optionalVerifyToken, async (req: any, res) => {
+  app.get("/api/users/:id", async (req: any, res) => {
     try {
       const doc = await db.collection('users').doc(req.params.id).get();
-      if (!doc.exists) return res.status(404).json({ error: "Not found" });
-      const data = doc.data() || {};
-      
-      let isOwner = false;
-      let isAdminUser = false;
-      
-      if (req.user) {
-        isOwner = req.user.uid === req.params.id;
-        const callerDoc = await db.collection('users').doc(req.user.uid).get();
-        isAdminUser = callerDoc.data()?.role === 'admin';
-      }
-      
-      if (!isOwner && !isAdminUser && data.role !== 'seller') {
-        delete data.email;
-        delete data.phoneNumber;
-        delete data.whatsappNumber;
+      if (!doc.exists) return res.status(404).json({ error: "User not found" });
+      const data = doc.data() as any;
+
+      // Fetch approved reviews if it's a seller
+      if (data.role === 'seller') {
+        try {
+          const reviewsSnap = await db.collection('users').doc(req.params.id).collection('reviews')
+            .where('status', '==', 'approved')
+            .orderBy('createdAt', 'desc')
+            .get();
+          data.reviews = reviewsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        } catch (e) {
+          // Silent fallback to manual filter if composite index is missing
+          const allReviews = await db.collection('users').doc(req.params.id).collection('reviews').get();
+          data.reviews = allReviews.docs
+            .map(doc => ({ id: doc.id, ...doc.data() }))
+            .filter((r: any) => r.status === 'approved')
+            .sort((a: any, b: any) => (b.createdAt?.toDate?.()?.getTime() || 0) - (a.createdAt?.toDate?.()?.getTime() || 0));
+        }
       }
       
       res.json({ id: doc.id, ...data });
@@ -490,7 +505,7 @@ async function startServer() {
       const { category, sellerId } = req.query;
       const limitVal = Math.min(parseInt(req.query.limit as string) || 20, 100);
       const startAfterId = req.query.startAfter as string;
-      
+
       let queryRef: any = db.collection('announcements').where('status', '==', 'active').orderBy('createdAt', 'desc');
       
       if (category) queryRef = queryRef.where('category', '==', category);
@@ -540,10 +555,37 @@ async function startServer() {
     }
   });
 
-  app.get("/api/listings/:id", async (req, res) => {
-    const doc = await db.collection('announcements').doc(req.params.id).get();
-    if (!doc.exists) return res.status(404).json({ error: "Not found" });
-    res.json({ id: doc.id, ...doc.data() });
+  app.get("/api/listings/:id", async (req: any, res) => {
+    try {
+      const doc = await db.collection('announcements').doc(req.params.id).get();
+      if (!doc.exists) return res.status(404).json({ error: "Not found" });
+      const data: any = { id: doc.id, ...doc.data() };
+      
+      // Fetch approved reviews for this listing
+      try {
+        const reviewsSnap = await db.collection('announcements').doc(req.params.id).collection('reviews')
+          .where('status', '==', 'approved')
+          .orderBy('createdAt', 'desc')
+          .get();
+        data.listingReviews = reviewsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      } catch (innerError) {
+        // Silent fallback to manual filter if composite index is missing
+        try {
+          const allReviews = await db.collection('announcements').doc(req.params.id).collection('reviews').get();
+          data.listingReviews = allReviews.docs
+            .map(doc => ({ id: doc.id, ...doc.data() }))
+            .filter((r: any) => r.status === 'approved')
+            .sort((a: any, b: any) => (b.createdAt?.toDate?.()?.getTime() || 0) - (a.createdAt?.toDate?.()?.getTime() || 0));
+        } catch (fallbackError) {
+          data.listingReviews = [];
+        }
+      }
+      
+      res.json(data);
+    } catch (e: any) {
+      console.error('❌ API: Error fetching listing details:', e.message);
+      res.status(500).json({ error: e.message });
+    }
   });
 
   app.post("/api/listings", verifyToken, async (req: any, res) => {
@@ -582,6 +624,23 @@ async function startServer() {
       }
       if (Array.isArray(images) && images.length > 10) {
         return res.status(400).json({ error: 'Maximum 10 images autorisées.' });
+      }
+
+      // Check listing limits if payment system is disabled
+      const settingsDoc = await db.collection('settings').doc('global').get();
+      const settings = settingsDoc.data();
+      if (settings && !settings.paymentSystemEnabled) {
+        const maxListings = settings.maxListingsPerFreeUser || 5;
+        const userListingsCount = (await db.collection('announcements')
+          .where('sellerId', '==', req.user.uid)
+          .where('status', '==', 'active')
+          .count().get()).data().count;
+        
+        if (userListingsCount >= maxListings) {
+          return res.status(403).json({ 
+            error: `لقد وصلت إلى الحد الأقصى للإعلانات المجانية (${maxListings}). يرجى تفعيل نظام الدفع أو حذف بعض الإعلانات.` 
+          });
+        }
       }
 
       // Fetch seller info for denormalization
@@ -691,24 +750,64 @@ async function startServer() {
   });
 
   app.post("/api/listings/:id/rate", verifyToken, async (req: any, res) => {
-    const { rating } = req.body;
-    await db.collection('announcements').doc(req.params.id).update({ 
-      rating: FieldValue.increment(rating),
-      ratingCount: FieldValue.increment(1)
-    });
-    res.json({ status: "ok" });
+    const { rating, comment } = req.body;
+    const data = {
+      rating: Number(rating),
+      comment: String(comment || '').trim().slice(0, 500),
+      authorId: req.user.uid,
+      authorName: req.user.name || 'مشتري',
+      status: 'pending',
+      createdAt: FieldValue.serverTimestamp()
+    };
+    
+    // Check if user already reviewed this listing
+    const existing = await db.collection('announcements').doc(req.params.id).collection('reviews')
+      .where('authorId', '==', req.user.uid)
+      .limit(1)
+      .get();
+      
+    if (!existing.empty) {
+      await existing.docs[0].ref.update({
+        ...data,
+        updatedAt: FieldValue.serverTimestamp()
+      });
+    } else {
+      await db.collection('announcements').doc(req.params.id).collection('reviews').add(data);
+    }
+    
+    res.json({ status: "pending_approval" });
   });
+
+
 
   // --- REQUESTS ENDPOINTS ---
 
-  app.get("/api/offer-requests", async (req, res) => {
+  app.get("/api/offer-requests", verifyToken, async (req: any, res) => {
     try {
-      console.log('📡 API: Fetching open requests...');
-      const limitVal = Math.min(parseInt(req.query.limit as string) || 12, 100);
+      console.log(`📡 API: Fetching requests for seller ${req.user.uid}...`);
+      
+      // 0. Get Settings
+      const settingsSnap = await db.collection('settings').doc('global').get();
+      const brSettings = settingsSnap.data()?.buyerRequests || {};
+      const requestsPerPage = brSettings.requestsPerPage || 6;
+      const dailyOffersLimit = brSettings.maxDailyOffersPerSeller || 6;
+      const expirationDays = brSettings.requestExpirationDays || 7;
+
+      const limitVal = Math.min(parseInt(req.query.limit as string) || requestsPerPage, 100);
       const startAfterId = req.query.startAfter as string;
 
-      let queryRef: any = db.collection('offerRequests')
-        .where('status', '==', 'Open')
+      // 1. Get daily leads for this seller
+      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+      const dailyLeadsRef = db.collection('dailyLeads').doc(`${req.user.uid}_${today}`);
+      const dailyLeadsSnap = await dailyLeadsRef.get();
+      let seenIds = dailyLeadsSnap.exists ? (dailyLeadsSnap.data()?.requestIds || []) : [];
+
+      // 2. Fetch requests (filtering by expiration)
+      const expirationTime = Date.now() - (expirationDays * 24 * 60 * 60 * 1000);
+      const expirationDate = Timestamp.fromMillis(expirationTime);
+
+      let queryRef = db.collection('offerRequests')
+        .where('createdAt', '>=', expirationDate)
         .orderBy('createdAt', 'desc');
 
       if (startAfterId) {
@@ -718,57 +817,87 @@ async function startServer() {
         }
       }
 
-      const snap = await queryRef.limit(limitVal).get();
-      const data = snap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
+      const snap = await queryRef.limit(limitVal * 5).get(); // Fetch even more for geo-filtering
+      let allRequests = snap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
+      
+      // 2.5 Geo-Filtering (if seller has coordinates)
+      const userDoc = await db.collection('users').doc(req.user.uid).get();
+      const userData = userDoc.data();
+      const searchRadius = brSettings.searchRadiusKm || 10;
+
+      if (userData?.coordinates?.lat && userData?.coordinates?.lng) {
+        const uLat = userData.coordinates.lat;
+        const uLng = userData.coordinates.lng;
+        allRequests = allRequests.filter((r: any) => {
+          if (!r.lat || !r.lng) return true; // Keep requests without coordinates as fallback
+          const dist = calculateDistance(uLat, uLng, r.lat, r.lng);
+          return dist <= searchRadius;
+        });
+      }
+
+      // 3. Filter/Update seen requests
+      // If we haven't reached requestsPerPage yet, we can add new ones
+      let changed = false;
+      for (const r of allRequests) {
+        if (seenIds.length >= requestsPerPage) break;
+        if (!seenIds.includes(r.id)) {
+          seenIds.push(r.id);
+          changed = true;
+        }
+      }
+
+      if (changed) {
+        await dailyLeadsRef.set({ requestIds: seenIds, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+      }
+
+      // 4. Return only seen requests
+      const data = allRequests.filter((r: any) => seenIds.includes(r.id));
+      
+      // Sort in memory
+      data.sort((a: any, b: any) => {
+        const dateA = a.createdAt?.toDate?.() || (a.createdAt?._seconds ? new Date(a.createdAt._seconds * 1000) : new Date(0));
+        const dateB = b.createdAt?.toDate?.() || (b.createdAt?._seconds ? new Date(b.createdAt._seconds * 1000) : new Date(0));
+        return dateB.getTime() - dateA.getTime();
+      });
+
+      // 5. Count daily offers sent by this seller
+      let dailyOffersCount = 0;
+      try {
+        const recentOffersSnap = await db.collection('offers')
+          .where('sellerId', '==', req.user.uid)
+          .orderBy('createdAt', 'desc')
+          .limit(20)
+          .get();
+
+        const todayStart = new Date(today).getTime();
+        const tomorrowStart = todayStart + 86400000;
+
+        dailyOffersCount = recentOffersSnap.docs.filter(doc => {
+          const createdAt = doc.data().createdAt;
+          const time = createdAt?.toDate ? createdAt.toDate().getTime() : (createdAt?._seconds ? createdAt._seconds * 1000 : 0);
+          return time >= todayStart && time < tomorrowStart;
+        }).length;
+      } catch (offerErr: any) {
+        // Fallback
+      }
+
       const lastDoc = snap.docs[snap.docs.length - 1];
 
       res.json({
         data,
-        nextCursor: snap.docs.length === limitVal ? lastDoc?.id : null
+        nextCursor: snap.docs.length >= limitVal ? lastDoc?.id : null,
+        dailyLeadsCount: seenIds.length,
+        dailyLeadsLimit: requestsPerPage,
+        dailyOffersCount: dailyOffersCount,
+        dailyOffersLimit: dailyOffersLimit
       });
     } catch (e: any) {
-      console.error('❌ API: Error fetching requests:', e.message);
+      console.error('❌ API: Error fetching requests:', e);
       res.status(500).json({ error: e.message });
     }
   });
 
-  app.post("/api/offer-requests", verifyToken, async (req: any, res) => {
-    try {
-      // Bug #3 FIX: sanitize inputs — no raw ...req.body spread
-      const { category, location, sheepCount, maxBudget, needsDelivery, description, urgency } = req.body;
 
-      if (!category || typeof category !== 'string' || category.trim().length === 0) {
-        return res.status(400).json({ error: 'La catégorie est requise.' });
-      }
-      if (maxBudget !== undefined && (isNaN(Number(maxBudget)) || Number(maxBudget) < 0)) {
-        return res.status(400).json({ error: 'Le budget maximum doit être un nombre positif.' });
-      }
-      if (sheepCount !== undefined && (isNaN(Number(sheepCount)) || Number(sheepCount) < 0)) {
-        return res.status(400).json({ error: 'Le nombre de moutons doit être un nombre positif.' });
-      }
-
-      const ALLOWED_URGENCY = ['normal', 'urgent', 'very_urgent'];
-      const data = {
-        category: String(category).trim(),
-        location: location ? String(location).trim() : null,
-        sheepCount: sheepCount !== undefined ? Number(sheepCount) : null,
-        maxBudget: maxBudget !== undefined ? Number(maxBudget) : null,
-        needsDelivery: Boolean(needsDelivery),
-        description: description ? String(description).trim().slice(0, 1000) : '',
-        urgency: ALLOWED_URGENCY.includes(urgency) ? urgency : 'normal',
-        buyerId: req.user.uid,
-        status: 'Open',
-        offersCount: 0,
-        createdAt: FieldValue.serverTimestamp()
-      };
-      const docRef = await db.collection('offerRequests').add(data);
-      console.log(`✅ offerRequest created: ${docRef.id} by ${req.user.uid}`);
-      res.status(201).json({ id: docRef.id });
-    } catch (e: any) {
-      console.error('❌ POST /api/offer-requests error:', e.message);
-      res.status(500).json({ error: e.message || 'Internal server error' });
-    }
-  });
 
   app.get("/api/offer-requests/:id", async (req, res) => {
     const doc = await db.collection('offerRequests').doc(req.params.id).get();
@@ -797,34 +926,155 @@ async function startServer() {
     res.json({ status: "deleted" });
   });
 
+
+
+  app.get("/api/offer-requests/:id", async (req, res) => {
+    try {
+      const doc = await db.collection('offerRequests').doc(req.params.id).get();
+      if (!doc.exists) return res.status(404).json({ error: "Not found" });
+      res.json({ id: doc.id, ...doc.data() });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.post("/api/offer-requests", verifyToken, async (req: any, res) => {
+    try {
+      const data = {
+        ...req.body,
+        buyerId: req.user.uid,
+        status: 'Open',
+        offersCount: 0,
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp()
+      };
+      const docRef = await db.collection('offerRequests').add(data);
+      res.status(201).json({ id: docRef.id, message: "Offer request created" });
+    } catch (e: any) {
+      console.error("❌ Error creating offer request:", e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.put("/api/offer-requests/:id", verifyToken, async (req: any, res) => {
+    try {
+      const docRef = db.collection('offerRequests').doc(req.params.id);
+      const doc = await docRef.get();
+      if (!doc.exists) return res.status(404).json({ error: "Not found" });
+      
+      const isAdminDoc = await db.collection('users').doc(req.user.uid).get();
+      const isAdmin = isAdminDoc.data()?.role === 'admin';
+
+      if (doc.data()?.buyerId !== req.user.uid && !isAdmin) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      
+      const updateData = {
+        ...req.body,
+        updatedAt: FieldValue.serverTimestamp()
+      };
+      delete updateData.buyerId;
+      
+      await docRef.update(updateData);
+      res.json({ status: "ok" });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.delete("/api/offer-requests/:id", verifyToken, async (req: any, res) => {
+    try {
+      const docRef = db.collection('offerRequests').doc(req.params.id);
+      const doc = await docRef.get();
+      if (!doc.exists) return res.status(404).json({ error: "Not found" });
+
+      const isAdminDoc = await db.collection('users').doc(req.user.uid).get();
+      const isAdmin = isAdminDoc.data()?.role === 'admin';
+
+      if (doc.data()?.buyerId !== req.user.uid && !isAdmin) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      await docRef.delete();
+      res.json({ status: "ok" });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   // --- OFFERS ENDPOINTS ---
 
   app.post("/api/offers", verifyToken, async (req: any, res) => {
-    const { requestId, price, message, deliveryIncluded } = req.body;
+    const { requestId } = req.body;
     const requestRef = db.collection('offerRequests').doc(requestId);
     
     try {
+      // 0. Get Settings
+      const settingsSnap = await db.collection('settings').doc('global').get();
+      const brSettings = settingsSnap.data()?.buyerRequests || {};
+      const maxOffers = brSettings.maxOffersPerRequest || 6;
+      const dailyOffersLimit = brSettings.maxDailyOffersPerSeller || 6;
+
       await db.runTransaction(async (transaction) => {
         const requestSnap = await transaction.get(requestRef);
         if (!requestSnap.exists) throw new Error("Request not found");
         
         const requestData = requestSnap.data();
-        if (requestData?.offersCount >= 6) throw new Error("Maximum offers reached (6)");
+        const currentOffersCount = requestData?.offersCount || 0;
+
+        if (currentOffersCount >= maxOffers || requestData?.status === 'FULL') {
+          throw new Error(`Maximum offers reached for this request (${maxOffers})`);
+        }
+
+        // 1. Check if seller already made an offer for this request
+        const requestOffersSnap = await db.collection('offers')
+          .where('requestId', '==', requestId)
+          .get();
+        
+        const hasExisting = requestOffersSnap.docs.some(doc => doc.data().sellerId === req.user.uid);
+        if (hasExisting) {
+          throw new Error("You have already submitted an offer for this request.");
+        }
+
+        // 2. Check daily limit
+        const recentOffersSnap = await db.collection('offers')
+          .where('sellerId', '==', req.user.uid)
+          .orderBy('createdAt', 'desc')
+          .limit(10)
+          .get();
+
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        const todayStartTime = todayStart.getTime();
+
+        const dailyCount = recentOffersSnap.docs.filter(doc => {
+          const createdAt = doc.data().createdAt;
+          const time = createdAt?.toDate ? createdAt.toDate().getTime() : (createdAt?._seconds ? createdAt._seconds * 1000 : 0);
+          return time >= todayStartTime;
+        }).length;
+
+        if (dailyCount >= dailyOffersLimit) {
+          throw new Error(`Daily limit reached (${dailyOffersLimit} offers per day). Please try again tomorrow.`);
+        }
 
         const offerRef = db.collection('offers').doc();
         transaction.set(offerRef, {
-          requestId,
+          ...req.body,
           sellerId: req.user.uid,
-          price,
-          message,
-          deliveryIncluded,
           status: 'pending',
           createdAt: FieldValue.serverTimestamp()
         });
 
-        transaction.update(requestRef, {
-          offersCount: FieldValue.increment(1)
-        });
+        const nextOffersCount = currentOffersCount + 1;
+        const updates: any = {
+          offersCount: nextOffersCount,
+          updatedAt: FieldValue.serverTimestamp()
+        };
+
+        if (nextOffersCount >= maxOffers) {
+          updates.status = 'FULL';
+        }
+
+        transaction.update(requestRef, updates);
       });
       res.status(201).json({ status: "ok" });
     } catch (e: any) {
@@ -846,6 +1096,19 @@ async function startServer() {
       res.json(offers);
     } catch (e: any) {
       console.error('❌ API: Error fetching offers:', e.message);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.get("/api/offers/seller/:sellerId", verifyToken, async (req: any, res) => {
+    try {
+      const snap = await db.collection('offers')
+        .where('sellerId', '==', req.params.sellerId)
+        .get();
+      const offers = snap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
+      res.json(offers);
+    } catch (e: any) {
+      console.error('❌ API: Error fetching seller offers:', e.message);
       res.status(500).json({ error: e.message });
     }
   });
@@ -975,67 +1238,272 @@ async function startServer() {
     const data = {
       ...req.body,
       authorId: req.user.uid,
+      authorName: req.user.name || req.body.authorName || 'مشتري',
+      status: 'pending',
       createdAt: FieldValue.serverTimestamp()
     };
-    await db.collection('users').doc(req.params.sellerId).collection('reviews').add(data);
-    res.json({ status: "ok" });
+    
+    // Check if user already reviewed this seller
+    const existing = await db.collection('users').doc(req.params.sellerId).collection('reviews')
+      .where('authorId', '==', req.user.uid)
+      .limit(1)
+      .get();
+      
+    if (!existing.empty) {
+      await existing.docs[0].ref.update({
+        ...data,
+        updatedAt: FieldValue.serverTimestamp()
+      });
+    } else {
+      await db.collection('users').doc(req.params.sellerId).collection('reviews').add(data);
+    }
+    
+    res.json({ status: "pending_approval" });
   });
 
   app.delete("/api/users/:sellerId/reviews/:reviewId", verifyToken, async (req: any, res) => {
-    await db.collection('users').doc(req.params.sellerId).collection('reviews').doc(req.params.reviewId).delete();
-    res.json({ status: "ok" });
+    try {
+      const reviewRef = db.collection('users').doc(req.params.sellerId).collection('reviews').doc(req.params.reviewId);
+      const snap = await reviewRef.get();
+      
+      if (snap.exists) {
+        const reviewData = snap.data();
+        // If was approved, decrement counters
+        if (reviewData?.status === 'approved') {
+          await db.collection('users').doc(req.params.sellerId).update({
+            rating: FieldValue.increment(-Number(reviewData.rating || 0)),
+            reviewsCount: FieldValue.increment(-1)
+          });
+        }
+        await reviewRef.delete();
+      }
+      res.json({ message: "Review deleted" });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // GET ALL REVIEWS BY A BUYER (for their dashboard)
+  app.get("/api/buyer/reviews", verifyToken, async (req: any, res) => {
+    const buyerId = req.user.uid;
+    try {
+      let snap;
+      try {
+        snap = await db.collectionGroup('reviews').where('authorId', '==', buyerId).get();
+        
+        const reviews = snap.docs.map(doc => {
+          const data = doc.data();
+          const pathParts = doc.ref.path.split('/');
+          const targetType = pathParts[0] === 'users' ? 'seller' : 'announcement';
+          const targetId = pathParts[1];
+          
+          return {
+            id: doc.id,
+            ...data,
+            targetType,
+            targetId
+          };
+        });
+        
+        reviews.sort((a: any, b: any) => {
+          const dateA = a.createdAt?.toDate?.()?.getTime() || 0;
+          const dateB = b.createdAt?.toDate?.()?.getTime() || 0;
+          return dateB - dateA;
+        });
+
+        return res.json(reviews);
+      } catch (innerError: any) {
+        // Fallback for missing index
+        if (innerError.message.includes('FAILED_PRECONDITION') || innerError.code === 9) {
+          console.warn("⚠️ API: Missing Index for collectionGroup('reviews'). Falling back to manual filter.");
+          const allReviews = await db.collectionGroup('reviews').get();
+          
+          const reviews = allReviews.docs
+            .map(doc => {
+              const data = doc.data();
+              const pathParts = doc.ref.path.split('/');
+              return {
+                id: doc.id,
+                ...data,
+                targetType: pathParts[0] === 'users' ? 'seller' : 'announcement',
+                targetId: pathParts[1]
+              };
+            })
+            .filter((r: any) => r.authorId === buyerId);
+            
+          reviews.sort((a: any, b: any) => {
+            const dateA = a.createdAt?.toDate?.()?.getTime() || 0;
+            const dateB = b.createdAt?.toDate?.()?.getTime() || 0;
+            return dateB - dateA;
+          });
+
+          return res.json(reviews);
+        }
+        throw innerError;
+      }
+    } catch (e: any) {
+      console.error("❌ API: Error fetching buyer reviews:", e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // --- ADMIN REVIEWS MODERATION ---
+  app.get("/api/admin/reviews/pending", verifyToken, isAdmin, async (req, res) => {
+    try {
+      let snap;
+      try {
+        // Try the optimized query first
+        snap = await db.collectionGroup('reviews').where('status', '==', 'pending').get();
+      } catch (e) {
+        console.warn("⚠️ Admin API: Filtered collectionGroup(reviews) failed, falling back to full scan + JS filter. (Missing index?)");
+        // Fallback: fetch all and filter in JS
+        const allSnap = await db.collectionGroup('reviews').get();
+        // Since we can't filter in Firestore without index, we filter here
+        const filteredDocs = allSnap.docs.filter(doc => doc.data().status === 'pending');
+        snap = { docs: filteredDocs };
+      }
+
+      const results = snap.docs.map(doc => {
+        const path = doc.ref.path.split('/');
+        return {
+          id: doc.id,
+          type: path[0] === 'users' ? 'seller' : 'listing',
+          targetId: path[1],
+          ...doc.data()
+        };
+      });
+      res.json(results);
+    } catch (error: any) {
+      console.error("❌ Admin API: Failed to fetch pending reviews:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.put("/api/admin/reviews/:type/:targetId/:reviewId/approve", verifyToken, isAdmin, async (req, res) => {
+    try {
+      const { type, targetId, reviewId } = req.params;
+      const collectionName = type === 'seller' ? 'users' : 'announcements';
+      const reviewRef = db.collection(collectionName).doc(targetId).collection('reviews').doc(reviewId);
+      const reviewSnap = await reviewRef.get();
+      
+      if (!reviewSnap.exists) return res.status(404).json({ error: "Review not found" });
+      
+      const reviewData = reviewSnap.data();
+      if (reviewData?.status === 'approved') return res.json({ status: "already_approved" });
+
+      await db.runTransaction(async (transaction) => {
+        transaction.update(reviewRef, { status: 'approved' });
+        
+        const targetRef = db.collection(collectionName).doc(targetId);
+        if (type === 'seller') {
+          transaction.update(targetRef, {
+            rating: FieldValue.increment(Number(reviewData?.rating || 0)),
+            reviewsCount: FieldValue.increment(1)
+          });
+        } else {
+          transaction.update(targetRef, {
+            rating: FieldValue.increment(Number(reviewData?.rating || 0)),
+            ratingCount: FieldValue.increment(1)
+          });
+        }
+      });
+      
+      res.json({ status: "approved" });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
   });
 
   // --- ADMIN ENDPOINTS ---
 
   app.get("/api/admin/stats", verifyToken, isAdmin, async (req, res) => {
     try {
+      const { period } = req.query;
+      let startDate: Date | null = null;
+      const now = new Date();
+
+      if (period === 'today') {
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      } else if (period === 'week') {
+        startDate = new Date(now);
+        startDate.setDate(now.getDate() - now.getDay());
+      } else if (period === 'month') {
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      }
+
+      const applyPeriod = (query: any) => {
+        if (startDate) {
+          return query.where('createdAt', '>=', startDate);
+        }
+        return query;
+      };
+
+      const safeCount = async (query: any) => {
+        try {
+          const snap = await query.count().get();
+          return snap.data().count;
+        } catch (e: any) {
+          // If it's an index error, try to fetch and count manually (only for small sets)
+          if (e.message?.includes('index') || e.code === 9) {
+            try {
+              // Try to fetch up to 1000 docs to count manually
+              const snap = await query.limit(1001).get();
+              if (snap.size > 1000) {
+                console.warn("⚠️ Data too large for manual count fallback. Returning 0.");
+                return 0;
+              }
+              return snap.size;
+            } catch (innerE) {
+              console.error("⚠️ Manual count fallback failed:", e.message);
+              return 0;
+            }
+          }
+          console.error("⚠️ Firestore Count Failed:", e.message);
+          return 0;
+        }
+      };
+
       // ── Parallel count queries ────────────────────────────────────────────
       const [
-        totalUsersSnap, sellersSnap, buyersSnap, verifiedSnap, blockedSnap,
-        totalAdsSnap, activeAdsSnap, pendingAdsSnap, inactiveAdsSnap, boostedAdsSnap,
-        totalRequestsSnap, openRequestsSnap, closedRequestsSnap,
-        totalOffersSnap, reportsSnap, donationsSnap,
+        totalUsers, sellers, buyers, verified, blocked,
+        totalAds, activeAds, pendingAds, inactiveAds, boostedAds,
+        totalRequests, openRequests, closedRequests,
+        totalOffers, reports, donations,
       ] = await Promise.all([
-        db.collection('users').count().get(),
-        db.collection('users').where('role', '==', 'seller').count().get(),
-        db.collection('users').where('role', '==', 'buyer').count().get(),
-        db.collection('users').where('isVerified', '==', true).count().get(),
-        db.collection('users').where('status', '==', 'blocked').count().get(),
-        db.collection('announcements').count().get(),
-        db.collection('announcements').where('status', '==', 'active').count().get(),
-        db.collection('announcements').where('status', '==', 'pending').count().get(),
-        db.collection('announcements').where('status', '==', 'inactive').count().get(),
-        db.collection('announcements').where('boosted', '==', true).count().get(),
-        db.collection('offerRequests').count().get(),
-        db.collection('offerRequests').where('status', '==', 'Open').count().get(),
-        db.collection('offerRequests').where('status', '==', 'Closed').count().get(),
-        db.collection('offers').count().get(),
-        db.collection('reports').count().get(),
-        db.collection('donations').count().get(),
+        safeCount(applyPeriod(db.collection('users'))),
+        safeCount(applyPeriod(db.collection('users').where('role', '==', 'seller'))),
+        safeCount(applyPeriod(db.collection('users').where('role', '==', 'buyer'))),
+        safeCount(applyPeriod(db.collection('users').where('isVerified', '==', true))),
+        safeCount(applyPeriod(db.collection('users').where('status', '==', 'blocked'))),
+        safeCount(applyPeriod(db.collection('announcements'))),
+        safeCount(applyPeriod(db.collection('announcements').where('status', '==', 'active'))),
+        safeCount(applyPeriod(db.collection('announcements').where('status', '==', 'pending'))),
+        safeCount(applyPeriod(db.collection('announcements').where('status', '==', 'inactive'))),
+        safeCount(applyPeriod(db.collection('announcements').where('boosted', '==', true))),
+        safeCount(applyPeriod(db.collection('offerRequests'))),
+        safeCount(applyPeriod(db.collection('offerRequests').where('status', '==', 'Open'))),
+        safeCount(applyPeriod(db.collection('offerRequests').where('status', '==', 'Closed'))),
+        safeCount(applyPeriod(db.collection('offers'))),
+        safeCount(applyPeriod(db.collection('reports'))),
+        safeCount(applyPeriod(db.collection('donations'))),
       ]);
 
       // ── Last 6 months growth (users + listings per month) ────────────────
-      const now = new Date();
       const monthlyGrowth: { month: string; users: number; listings: number }[] = [];
       for (let i = 5; i >= 0; i--) {
         const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
         const start = new Date(d.getFullYear(), d.getMonth(), 1);
         const end = new Date(d.getFullYear(), d.getMonth() + 1, 1);
-        const [uSnap, lSnap] = await Promise.all([
-          db.collection('users')
-            .where('createdAt', '>=', start)
-            .where('createdAt', '<', end)
-            .count().get(),
-          db.collection('announcements')
-            .where('createdAt', '>=', start)
-            .where('createdAt', '<', end)
-            .count().get(),
+        
+        const [uCount, lCount] = await Promise.all([
+          safeCount(db.collection('users').where('createdAt', '>=', start).where('createdAt', '<', end)),
+          safeCount(db.collection('announcements').where('createdAt', '>=', start).where('createdAt', '<', end)),
         ]);
+        
         monthlyGrowth.push({
           month: start.toLocaleDateString('ar-MA', { month: 'short', year: '2-digit' }),
-          users: uSnap.data().count,
-          listings: lSnap.data().count,
+          users: uCount,
+          listings: lCount,
         });
       }
 
@@ -1044,7 +1512,7 @@ async function startServer() {
       const categoryBreakdown = await Promise.all(
         categories.map(async (cat) => ({
           name: cat,
-          count: (await db.collection('announcements').where('category', '==', cat).where('status', '==', 'active').count().get()).data().count,
+          count: await safeCount(applyPeriod(db.collection('announcements').where('category', '==', cat).where('status', '==', 'active'))),
         }))
       );
 
@@ -1053,45 +1521,43 @@ async function startServer() {
       const planBreakdown = await Promise.all(
         plans.map(async (plan) => ({
           name: plan,
-          count: (await db.collection('users').where('plan', '==', plan).count().get()).data().count,
+          count: await safeCount(applyPeriod(db.collection('users').where('plan', '==', plan))),
         }))
       );
       planBreakdown.push({
         name: 'مجاني',
-        count: Math.max(0, sellersSnap.data().count - planBreakdown.reduce((s, p) => s + p.count, 0)),
+        count: Math.max(0, sellers - planBreakdown.reduce((s, p) => s + p.count, 0)),
       });
 
       // ── Recent activity (last 7 days listings) ────────────────────────────
       const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-      const recentListingsSnap = await db.collection('announcements')
-        .where('createdAt', '>=', sevenDaysAgo).count().get();
-      const recentUsersSnap = await db.collection('users')
-        .where('createdAt', '>=', sevenDaysAgo).count().get();
+      const recentListings = await safeCount(db.collection('announcements').where('createdAt', '>=', sevenDaysAgo));
+      const recentUsers = await safeCount(db.collection('users').where('createdAt', '>=', sevenDaysAgo));
 
       res.json({
         // Core counts
-        totalUsers: totalUsersSnap.data().count,
-        sellers: sellersSnap.data().count,
-        buyers: buyersSnap.data().count,
-        verifiedSellers: verifiedSnap.data().count,
-        blockedUsers: blockedSnap.data().count,
+        totalUsers,
+        sellers,
+        buyers,
+        verifiedSellers: verified,
+        blockedUsers: blocked,
         // Listings
-        totalAds: totalAdsSnap.data().count,
-        activeAds: activeAdsSnap.data().count,
-        pendingAds: pendingAdsSnap.data().count,
-        inactiveAds: inactiveAdsSnap.data().count,
-        boostedAds: boostedAdsSnap.data().count,
+        totalAds,
+        activeAds,
+        pendingAds,
+        inactiveAds,
+        boostedAds,
         // Marketplace
-        totalRequests: totalRequestsSnap.data().count,
-        openRequests: openRequestsSnap.data().count,
-        closedRequests: closedRequestsSnap.data().count,
-        totalOffers: totalOffersSnap.data().count,
+        totalRequests,
+        openRequests,
+        closedRequests,
+        totalOffers,
         // Moderation
-        pendingReports: reportsSnap.data().count,
-        donations: donationsSnap.data().count,
+        pendingReports: reports,
+        donations,
         // Recent (7 days)
-        newListingsThisWeek: recentListingsSnap.data().count,
-        newUsersThisWeek: recentUsersSnap.data().count,
+        newListingsThisWeek: recentListings,
+        newUsersThisWeek: recentUsers,
         // Growth chart
         monthlyGrowth,
         // Breakdowns
@@ -1164,16 +1630,99 @@ async function startServer() {
   app.post("/api/admin/listings/import", verifyToken, isAdmin, async (req: any, res) => {
     const { data } = req.body;
     const batch = db.batch();
-    data.forEach((item: any) => {
-      const ref = db.collection('announcements').doc();
-      batch.set(ref, { 
-        ...item, 
-        createdAt: FieldValue.serverTimestamp(),
-        status: 'active'
-      });
-    });
-    await batch.commit();
-    res.json({ status: "ok" });
+    
+    // To handle large imports, we might need multiple batches, but for now let's stick to one
+    // or assume the data size is within Firestore limits (500 per batch).
+    
+    const phoneToUid: Record<string, string> = {};
+
+    try {
+      for (const item of data) {
+        let sellerId = item.sellerId;
+        
+        // If no sellerId, try to find or create by phone
+        if (!sellerId && item.phone) {
+          // Normalize phone for lookup (basic normalization)
+          let clean = item.phone.replace(/\D/g, '');
+          if (clean.startsWith('0')) clean = clean.substring(1);
+          if (clean.startsWith('212')) clean = clean.substring(3);
+          const fullPhone = `+212${clean}`;
+          
+          if (phoneToUid[fullPhone]) {
+            sellerId = phoneToUid[fullPhone];
+          } else {
+            // 1. Check Firestore
+            const userSnap = await db.collection('users')
+              .where('phoneNumber', 'in', [item.phone, `0${clean}`, `+212${clean}`, clean])
+              .limit(1)
+              .get();
+              
+            if (!userSnap.empty) {
+              sellerId = userSnap.docs[0].id;
+              phoneToUid[fullPhone] = sellerId;
+            } else {
+              // 2. Try to find in Auth (maybe Firestore doc is missing)
+              try {
+                const userRecord = await auth.getUserByPhoneNumber(fullPhone);
+                sellerId = userRecord.uid;
+                // Sync to Firestore
+                await db.collection('users').doc(sellerId).set({
+                  fullName: item.sellerName || 'كساب',
+                  phoneNumber: item.phone,
+                  role: 'seller',
+                  status: 'active',
+                  createdAt: FieldValue.serverTimestamp(),
+                  updatedAt: FieldValue.serverTimestamp()
+                }, { merge: true });
+                phoneToUid[fullPhone] = sellerId;
+              } catch (authErr: any) {
+                if (authErr.code === 'auth/user-not-found') {
+                  // 3. Create new user
+                  const email = `user_${clean}@kessabcom.ma`;
+                  const userRecord = await auth.createUser({
+                    phoneNumber: fullPhone,
+                    displayName: item.sellerName || 'كساب جديد',
+                    email: email
+                  });
+                  sellerId = userRecord.uid;
+                  await db.collection('users').doc(sellerId).set({
+                    fullName: item.sellerName || 'كساب جديد',
+                    phoneNumber: item.phone,
+                    email: email,
+                    role: 'seller',
+                    status: 'active',
+                    createdAt: FieldValue.serverTimestamp(),
+                    updatedAt: FieldValue.serverTimestamp()
+                  });
+                  phoneToUid[fullPhone] = sellerId;
+                } else {
+                  console.error(`Auth error for ${fullPhone}:`, authErr.message);
+                  continue; // Skip this item
+                }
+              }
+            }
+          }
+        }
+
+        if (sellerId) {
+          const ref = db.collection('announcements').doc();
+          // Ensure we don't pass sellerName/phone in the listing doc if we want it to be dynamic,
+          // but usually it's denormalized for performance.
+          batch.set(ref, { 
+            ...item, 
+            sellerId,
+            createdAt: FieldValue.serverTimestamp(),
+            status: 'active'
+          });
+        }
+      }
+
+      await batch.commit();
+      res.json({ status: "ok", message: `Imported ${data.length} listings successfully.` });
+    } catch (e: any) {
+      console.error("Import failed:", e);
+      res.status(500).json({ error: e.message });
+    }
   });
 
   app.put("/api/admin/listings/:id/approve", verifyToken, isAdmin, async (req, res) => {
@@ -1186,6 +1735,12 @@ async function startServer() {
     const updateData: any = { status };
     if (reason) updateData.rejectReason = reason;
     await db.collection('announcements').doc(req.params.id).update(updateData);
+    res.json({ status: "ok" });
+  });
+
+  app.put("/api/admin/listings/:id/pin", verifyToken, isAdmin, async (req, res) => {
+    const { isPinnedToHome } = req.body;
+    await db.collection('announcements').doc(req.params.id).update({ isPinnedToHome: !!isPinnedToHome });
     res.json({ status: "ok" });
   });
 

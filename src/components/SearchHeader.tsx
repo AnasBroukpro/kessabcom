@@ -205,7 +205,7 @@ export default function SearchHeader({ onNavigate, initialCity = '', initialRadi
       />
       <header className="bg-white/90 backdrop-blur-md border-b border-outline-variant/30 sticky top-0 z-50">
 
-      <div className="max-w-7xl mx-auto px-6 py-3 md:py-0 md:h-20 flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-8">
+      <div className="max-w-7xl mx-auto px-6 pt-1.5 pb-1 md:py-0 md:h-20 flex flex-col md:flex-row md:items-center justify-between gap-1.5 md:gap-8">
         
         {/* Top Mobile Row: Actions (Right) + Logo (Left) */}
         <div className="flex items-center justify-between md:hidden w-full">
@@ -282,7 +282,7 @@ export default function SearchHeader({ onNavigate, initialCity = '', initialRadi
 
           {/* Logo (Left in RTL) */}
           <button onClick={() => onNavigate('home')} className="flex items-center">
-            <img src={logoV2} alt="منصة kessabcom.ma" className="h-7 w-auto object-contain" />
+            <img src={logoV2} alt="منصة kessabcom.ma" className="h-[22px] w-auto object-contain" />
           </button>
         </div>
 
@@ -291,7 +291,7 @@ export default function SearchHeader({ onNavigate, initialCity = '', initialRadi
             <img 
               src={logoV2} 
               alt="منصة kessabcom.ma" 
-              className="h-8 md:h-10 w-auto object-contain transition-transform group-hover:scale-105"
+              className="h-[26px] md:h-8 w-auto object-contain transition-transform group-hover:scale-105"
             />
           </button>
           <div className="flex items-center gap-4">
@@ -303,32 +303,39 @@ export default function SearchHeader({ onNavigate, initialCity = '', initialRadi
         {/* Modern Expert Search Bar - Copied from Dashboard for consistency */}
         <div ref={searchBarRef} className="lg:max-w-xl flex flex-row items-center gap-1 sm:gap-2 bg-[#F9F9F6] border border-outline-variant/20 rounded-[10px] p-1 sm:p-1.5 shadow-sm hover:shadow-md transition-shadow relative z-[60] w-fit mx-auto">
           {/* City Selector */}
-          <div 
-            onClick={() => { setIsOpenCity(!isOpenCity); setIsOpenRadius(false); }}
-            className="w-32 sm:w-48 flex items-center px-2 sm:px-3 py-1.5 relative group bg-white rounded-[10px] border border-outline-variant/10 shadow-sm transition-all hover:border-[#2E7D32]/30 cursor-pointer shrink-0"
+          {/* City Selector with text input */}
+          <div
+            className="w-32 sm:w-48 flex items-center px-2 sm:px-3 py-1.5 relative group bg-white rounded-[10px] border border-outline-variant/10 shadow-sm transition-all hover:border-[#2E7D32]/30 shrink-0"
           >
             <MapPin className="hidden sm:block w-4 h-4 text-[#2E7D32] shrink-0" />
-            <div className="flex flex-col text-right sm:mr-3 flex-1 min-w-0">
-              <button 
-                onClick={(e) => { e.stopPropagation(); setIsOpenCity(!isOpenCity); setIsOpenRadius(false); }}
-                className="bg-transparent border-none outline-none w-full text-xs sm:text-sm font-bold text-[#1A1A1A] text-right flex items-center justify-between gap-1"
+            <input
+              type="text"
+              value={citySearch}
+              onChange={(e) => { setCitySearch(e.target.value); setIsOpenCity(true); setIsOpenRadius(false); }}
+              onFocus={() => { setIsOpenCity(true); setIsOpenRadius(false); }}
+              placeholder="فين كتقلب؟"
+              className="bg-transparent border-none outline-none w-full text-xs sm:text-sm font-bold text-[#1A1A1A] text-right sm:mr-3 placeholder:text-[#ABABAB] placeholder:font-normal"
+            />
+            {citySearch && (
+              <button
+                onClick={(e) => { e.stopPropagation(); setCitySearch(''); setIsOpenCity(false); onNavigate('search-results', undefined, '', radiusSearch); }}
+                className="shrink-0 text-[#ABABAB] hover:text-[#1A1A1A] transition-colors"
               >
-                <span className="truncate">{citySearch || 'فين كتقلب؟'}</span>
+                <X className="w-3.5 h-3.5" />
               </button>
-            </div>
-            <ChevronDown className={`hidden sm:block w-3.5 h-3.5 text-[#757575] transition-transform ${isOpenCity ? 'rotate-180' : ''}`} />
+            )}
 
             {isOpenCity && (
-              <div className="absolute top-full mt-1.5 left-0 right-0 w-full bg-white rounded-[10px] shadow-2xl border border-outline-variant/10 z-[100] p-1 animate-in slide-in-from-top-2 duration-200">
+              <div className="absolute top-full mt-1.5 left-0 right-0 w-full bg-white rounded-[10px] shadow-2xl border border-outline-variant/10 z-[100] p-1 animate-in slide-in-from-top-2 duration-200" style={{minWidth: '180px'}}>
                 <div className="max-h-60 overflow-y-auto custom-scrollbar p-1">
-                  <button 
+                  <button
                     onClick={(e) => { e.stopPropagation(); setCitySearch(''); setIsOpenCity(false); onNavigate('search-results', undefined, '', radiusSearch); }}
                     className={`w-full text-right px-4 py-2 rounded-[10px] text-sm font-bold transition-colors ${!citySearch ? 'bg-[#2E7D32] text-white' : 'hover:bg-[#F9F9F6] text-[#4A4A4A]'}`}
                   >
                     الكل
                   </button>
-                  {moroccanCities.map(city => (
-                    <button 
+                  {filteredCities.slice(0, 20).map(city => (
+                    <button
                       key={city}
                       onClick={(e) => { e.stopPropagation(); setCitySearch(city); setIsOpenCity(false); onNavigate('search-results', undefined, city, radiusSearch); }}
                       className={`w-full text-right px-4 py-2 rounded-[10px] text-sm font-bold transition-colors ${citySearch === city ? 'bg-[#2E7D32] text-white' : 'hover:bg-[#F9F9F6] text-[#4A4A4A]'}`}

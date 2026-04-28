@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import logoV2 from '../assets/marketing/branding/logo v2.png';
 import { ViewType } from '../App';
 import { useAuth } from '../contexts/AuthContext';
 import { firestoreService } from '../services/firestoreService';
@@ -8,16 +9,16 @@ import {
   LayoutDashboard, Users, Tag, Layers, Settings, Bell, User, Search, 
   CheckCircle2, Ban, Eye, TrendingUp, DollarSign, ShieldCheck, BadgeCheck,
   AlertCircle, ArrowUpRight, Filter, MoreVertical, Download, Upload, FileText, Database, X,
-  Clock, ChevronLeft, LogOut, MapPin, Heart, HeartHandshake, Zap, Megaphone, Loader2,
-  Lock, Camera, Shield, Globe, Mail, Phone, Calendar, Info, Flag,
-  ShoppingBag, CreditCard, BarChart3, PieChart, Monitor, Smartphone, Star, RefreshCw,
+  Clock, ChevronLeft, ChevronDown, LogOut, MapPin, Heart, HeartHandshake, Zap, Megaphone, Loader2,
+  Lock, Camera, Shield, Globe, Mail, Phone, Calendar, Info, Flag, Trash2,
+  ShoppingBag, CreditCard, BarChart3, PieChart, Monitor, Smartphone, Star, RefreshCw, History,
   Link as LinkIcon
 } from 'lucide-react';
 import { updatePassword, updateProfile, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { useSettings } from '../hooks/useSettings';
 import DashboardHeader from '../components/DashboardHeader';
 import { cityMapping } from '../constants/cityMapping';
-import { compressImage } from '../lib/imageUtils';
+import { compressImage, compressFileForUpload } from '../lib/imageUtils';
 import Notifications from './Notifications';
 
 interface Props {
@@ -25,7 +26,7 @@ interface Props {
   activeSubView?: string;
 }
 
-type AdminTab = 'overview' | 'stats' | 'users' | 'listings' | 'monetization' | 'ads' | 'settings' | 'stock-market' | 'donations' | 'reports' | 'support_requests' | 'profile' | 'notifications';
+type AdminTab = 'overview' | 'stats' | 'users' | 'farms' | 'auctions' | 'listings' | 'reviews' | 'monetization' | 'ads' | 'settings' | 'stock-market' | 'donations' | 'reports' | 'support_requests' | 'profile' | 'notifications';
 
 interface StockMarketViewProps {
   settings: any;
@@ -310,18 +311,229 @@ function StockMarketView({ settings, updateSettings }: StockMarketViewProps) {
   );
 }
 
+
+function ReviewsModerationView() {
+  const [pendingReviews, setPendingReviews] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [rejectModalReview, setRejectModalReview] = useState<any | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
+  const [isRejecting, setIsRejecting] = useState(false);
+
+  useEffect(() => {
+    const fetchReviews = async () => {
+      try {
+        const data = await firestoreService.adminGetPendingReviews();
+        setPendingReviews(data || []);
+      } catch (err: any) {
+        console.error("Failed to fetch pending reviews:", err);
+        setError(err.message || "Une erreur est survenue lors du chargement des avis.");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchReviews();
+  }, []);
+
+  const handleApprove = async (review: any) => {
+    try {
+      await firestoreService.adminApproveReview(review.type, review.targetId, review.id);
+      setPendingReviews(prev => prev.filter(r => r.id !== review.id));
+    } catch (error) {
+      console.error("Failed to approve review:", error);
+    }
+  };
+
+  const handleRejectConfirm = async () => {
+    if (!rejectModalReview) return;
+    setIsRejecting(true);
+    try {
+      await firestoreService.adminDeleteReview(rejectModalReview.type, rejectModalReview.targetId, rejectModalReview.id);
+      setPendingReviews(prev => prev.filter(r => r.id !== rejectModalReview.id));
+      setRejectModalReview(null);
+      setRejectReason('');
+    } catch (error) {
+      console.error("Failed to reject review:", error);
+    } finally {
+      setIsRejecting(false);
+    }
+  };
+
+  const formatPhone = (phone: string) => {
+    if (!phone) return '';
+    const clean = phone.replace(/\D/g, '');
+    if (clean.startsWith('212')) return '0' + clean.slice(3);
+    if (clean.startsWith('0')) return clean;
+    return '0' + clean;
+  };
+
+  return (
+    <div className="space-y-8 animate-in fade-in duration-500" dir="rtl">
+      {/* Rejection Modal */}
+      {rejectModalReview && (
+        <div className="fixed inset-0 bg-black/60 z-[300] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full space-y-6">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-red-100 text-red-600 rounded-2xl flex items-center justify-center">
+                <X className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-xl font-black text-on-surface">رفض التقييم</h3>
+                <p className="text-sm text-on-surface-variant">أدخل سبب الرفض (اختياري)</p>
+              </div>
+            </div>
+            <div className="bg-surface-container-low p-4 rounded-xl italic text-sm text-on-surface">
+              "{rejectModalReview.comment}"
+            </div>
+            <textarea
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              placeholder="سبب الرفض: محتوى مسيء، معلومات كاذبة..."
+              className="w-full p-4 bg-surface-container-low border border-outline-variant/20 rounded-xl outline-none focus:ring-2 focus:ring-red-500 font-medium min-h-[100px]"
+            />
+            <div className="flex gap-3">
+              <button
+                onClick={handleRejectConfirm}
+                disabled={isRejecting}
+                className="flex-1 py-3 bg-red-600 text-white rounded-xl font-black hover:bg-red-700 transition-colors disabled:opacity-50"
+              >
+                {isRejecting ? 'جاري الرفض...' : 'تأكيد الرفض'}
+              </button>
+              <button
+                onClick={() => { setRejectModalReview(null); setRejectReason(''); }}
+                className="flex-1 py-3 bg-surface-container-high text-on-surface rounded-xl font-black hover:bg-surface-container transition-colors"
+              >
+                إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div>
+        <h2 className="text-2xl font-black text-on-surface font-headline">مراجعة التقييمات والتعليقات</h2>
+        <p className="text-on-surface-variant text-sm mt-1">وافق أو ارفض التعليقات الجديدة قبل ما تبان ف السيت.</p>
+      </div>
+
+      {loading ? (
+        <div className="flex flex-col items-center justify-center py-20">
+          <Loader2 className="w-10 h-10 text-primary animate-spin mb-4" />
+          <p className="text-on-surface-variant font-bold">جاري تحميل التعليقات...</p>
+        </div>
+      ) : error ? (
+        <div className="bg-red-50 p-8 rounded-3xl border border-red-100 text-center">
+          <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+            <X className="w-8 h-8" />
+          </div>
+          <h3 className="text-lg font-black text-red-900 mb-2">خطأ في التحميل</h3>
+          <p className="text-red-700 text-sm mb-4">{error}</p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="px-6 py-2 bg-red-600 text-white rounded-full font-bold text-sm hover:bg-red-700 transition-colors"
+          >
+            إعادة المحاولة
+          </button>
+        </div>
+      ) : pendingReviews.length === 0 ? (
+        <div className="bg-surface p-12 rounded-3xl border border-outline-variant/30 text-center">
+          <div className="w-20 h-20 bg-primary/5 text-primary/30 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Star className="w-10 h-10" />
+          </div>
+          <h3 className="text-xl font-black text-on-surface mb-2">كولشي مريغل!</h3>
+          <p className="text-on-surface-variant">ما كاين حتى تعليق كيتسنى المراجعة حالياً.</p>
+        </div>
+      ) : (
+        <div className="grid gap-4">
+          {pendingReviews.map((review) => (
+            <div key={review.id} className="bg-surface p-6 rounded-3xl border border-outline-variant/30 shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row gap-6">
+              <div className="flex-1 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
+                      {(review.authorName || review.userName || 'U').charAt(0)}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-black text-on-surface">{review.authorName || review.userName || 'مستخدم'}</h4>
+                        {(review.authorPhone || review.phone) && (
+                          <a
+                            href={`https://wa.me/${formatPhone(review.authorPhone || review.phone).replace(/^0/, '212')}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-[10px] font-black hover:bg-green-200 transition-colors"
+                          >
+                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                            واتساب
+                          </a>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${review.type === 'seller' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+                          {review.type === 'seller' ? 'تقييم كساب' : 'تقييم إعلان'}
+                        </span>
+                        <span className="text-[10px] text-on-surface-variant">{review.createdAt?.toDate?.()?.toLocaleString('ar-MA')}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex text-yellow-500">
+                    {[...Array(5)].map((_, i) => (
+                      <Star key={i} className={`w-4 h-4 ${i < review.rating ? 'fill-current' : 'text-gray-300'}`} />
+                    ))}
+                  </div>
+                </div>
+                <p className="text-on-surface font-medium bg-surface-container-low p-4 rounded-xl italic">
+                  "{review.comment}"
+                </p>
+                <div className="text-xs text-on-surface-variant flex items-center gap-2">
+                  <Info className="w-3 h-3" />
+                  <span>الهدف: {review.type === 'seller' ? 'UID الكساب: ' : 'ID الإعلان: '}{review.targetId}</span>
+                </div>
+              </div>
+              <div className="flex md:flex-col gap-2 justify-center shrink-0">
+                <button 
+                  onClick={() => handleApprove(review)}
+                  className="flex-1 md:flex-none px-6 py-3 bg-primary text-on-primary rounded-xl font-bold text-sm shadow-lg shadow-primary/20 hover:scale-105 transition-all flex items-center justify-center gap-2"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  موافقة
+                </button>
+                <button 
+                  onClick={() => setRejectModalReview(review)}
+                  className="flex-1 md:flex-none px-6 py-3 bg-red-50 text-red-600 rounded-xl font-bold text-sm border border-red-100 hover:bg-red-600 hover:text-white transition-all flex items-center justify-center gap-2"
+                >
+                  <X className="w-4 h-4" />
+                  رفض
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AdminDashboard({ onNavigate, activeSubView }: Props) {
   const { user, profile, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState<AdminTab>('overview');
   const [uploadingBanner, setUploadingBanner] = useState<string | null>(null);
-  const [platformStats, setPlatformStats] = useState<any>({ totalUsers: 0, sellers: 0, buyers: 0, verifiedSellers: 0, blockedUsers: 0, totalAds: 0, activeAds: 0, pendingAds: 0, inactiveAds: 0, boostedAds: 0, totalRequests: 0, openRequests: 0, closedRequests: 0, totalOffers: 0, pendingReports: 0, donations: 0, newListingsThisWeek: 0, newUsersThisWeek: 0, monthlyGrowth: [], categoryBreakdown: [], planBreakdown: [] });
+  const [platformStats, setPlatformStats] = useState<any>({
+    totalUsers: 0, sellers: 0, buyers: 0, verifiedSellers: 0, blockedUsers: 0,
+    totalAds: 0, activeAds: 0, pendingAds: 0, inactiveAds: 0, boostedAds: 0,
+    totalRequests: 0, openRequests: 0, closedRequests: 0,
+    totalOffers: 0, pendingReports: 0, donations: 0,
+    newListingsThisWeek: 0, newUsersThisWeek: 0,
+    monthlyGrowth: [], categoryBreakdown: [], planBreakdown: []
+  });
   const [quotaExceeded, setQuotaExceeded] = useState(false);
+
+  const [statsTimeFilter, setStatsTimeFilter] = useState<'today' | 'week' | 'month' | 'all'>('all');
 
   useEffect(() => {
     if (activeTab === 'stats') {
-      firestoreService.getAdminStats().then(setPlatformStats).catch(() => firestoreService.getPlatformStats().then(setPlatformStats));
+      firestoreService.getAdminStats(statsTimeFilter).then(setPlatformStats).catch(() => firestoreService.getPlatformStats().then(setPlatformStats));
     }
-  }, [activeTab]);
+  }, [activeTab, statsTimeFilter]);
 
   useEffect(() => {
     if (activeSubView) {
@@ -329,6 +541,7 @@ export default function AdminDashboard({ onNavigate, activeSubView }: Props) {
     }
   }, [activeSubView]);
   const [userSubTab, setUserSubTab] = useState<'sellers' | 'buyers'>('sellers');
+  const [listingSubTab, setListingSubTab] = useState<'farms' | 'auctions'>('farms');
   const [overviewTimeFilter, setOverviewTimeFilter] = useState<'today' | 'week' | 'month'>('month');
   const [donationSubTab, setDonationSubTab] = useState<'donations' | 'benefits'>('donations');
   const [monetizationSubTab, setMonetizationSubTab] = useState<'subscriptions' | 'boosts'>('subscriptions');
@@ -338,6 +551,9 @@ export default function AdminDashboard({ onNavigate, activeSubView }: Props) {
   const [activeBannerTab, setActiveBannerTab] = useState<Record<number, 'desktop' | 'mobile'>>({ 1: 'desktop', 2: 'desktop', 3: 'desktop' });
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [listingFilter, setListingFilter] = useState<'all' | 'reported' | 'promoted' | 'inactive'>('all');
+  const [listingCityFilter, setListingCityFilter] = useState<string>('all');
+  const [listingSearch, setListingSearch] = useState('');
+  const [userCityFilter, setUserCityFilter] = useState<string>('all');
   const [userSearch, setUserSearch] = useState('');
   const [userStatusFilter, setUserStatusFilter] = useState<'all' | 'active' | 'deactivated' | 'pending' | 'blocked'>('all');
   const [showRejectModal, setShowRejectModal] = useState(false);
@@ -347,10 +563,25 @@ export default function AdminDashboard({ onNavigate, activeSubView }: Props) {
   const [openUserMenuId, setOpenUserMenuId] = useState<string | null>(null);
   const [selectedListingId, setSelectedListingId] = useState<string | null>(null);
   const [announcements, setAnnouncements] = useState<any[]>([]);
+  const [listingsPage, setListingsPage] = useState(1);
+  const itemsPerPage = 10;
   const [reports, setReports] = useState<any[]>([]);
+  const [reportSubTab, setReportSubTab] = useState<'listing' | 'request' | 'offer'>('listing');
+  const [supportSubTab, setSupportSubTab] = useState<'password' | 'contact'>('password');
+  const [sentPasswords, setSentPasswords] = useState<Record<string, boolean>>({});
   const [donations, setDonations] = useState<any[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
+  const [offerRequests, setOfferRequests] = useState<any[]>([]);
+  const [selectedAuctionOffers, setSelectedAuctionOffers] = useState<any[]>([]);
+  const [showOffersModal, setShowOffersModal] = useState(false);
+  const [viewingAuctionTitle, setViewingAuctionTitle] = useState('');
+
+
+  // Reset page when filter or search changes
+  useEffect(() => {
+    setListingsPage(1);
+  }, [listingFilter, listingCityFilter, listingSearch]);
   
   const [notifications, setNotifications] = useState<any[]>([]);
   const [supportRequests, setSupportRequests] = useState<any[]>([]);
@@ -486,8 +717,10 @@ export default function AdminDashboard({ onNavigate, activeSubView }: Props) {
     setProfileSuccess(null);
 
     try {
-      // 1. Upload to Storage
-      const url = await firestoreService.uploadImage(file, `profiles/${user.uid}`);
+      // 1. Compress to WebP before upload (max 400×400, 80% quality)
+      const compressedFile = await compressFileForUpload(file, 400, 400, 0.80);
+      // 2. Upload compressed file to Storage
+      const url = await firestoreService.uploadImage(compressedFile, `profiles/${user.uid}`);
       setNewPhotoURL(url);
       
       // 2. Update Auth & DB (parallel)
@@ -517,31 +750,85 @@ export default function AdminDashboard({ onNavigate, activeSubView }: Props) {
   const filteredAnnouncements = React.useMemo(() => {
     if (!Array.isArray(announcements)) return [];
     return announcements.filter(listing => {
-      if (listingFilter === 'all') return true;
+      // Basic category filter
+      let matchesFilter = true;
       if (listingFilter === 'reported') {
-        return reports.some(r => r.announcementId === listing.id);
+        matchesFilter = reports.some(r => r.announcementId === listing.id);
+      } else if (listingFilter === 'promoted') {
+        matchesFilter = listing.boosted === true;
+      } else if (listingFilter === 'inactive') {
+        matchesFilter = listing.status === 'inactive' || listing.status === 'rejected' || listing.status === 'deactivated';
       }
-      if (listingFilter === 'promoted') return listing.boosted === true;
-      if (listingFilter === 'inactive') return listing.status === 'inactive' || listing.status === 'rejected' || listing.status === 'deactivated';
+
+      if (!matchesFilter) return false;
+
+      // City filter
+      if (listingCityFilter !== 'all') {
+        const arabicCity = cityMapping[listingCityFilter];
+        const location = (listing.city || listing.location || listing.farmLocation || '').toLowerCase();
+        const matchesLatin = location.includes(listingCityFilter.toLowerCase());
+        const matchesArabic = arabicCity && location.includes(arabicCity.toLowerCase());
+        
+        if (!matchesLatin && !matchesArabic) return false;
+      }
+
+      // Search filter
+      if (listingSearch) {
+        const searchStr = listingSearch.toLowerCase();
+        const seller = users.find(u => u.id === listing.sellerId);
+        const matchesSearch = 
+          (listing.title || '').toLowerCase().includes(searchStr) ||
+          (listing.sellerName || '').toLowerCase().includes(searchStr) ||
+          (listing.phone || '').includes(searchStr) ||
+          (seller?.fullName || '').toLowerCase().includes(searchStr) ||
+          (seller?.phoneNumber || '').includes(searchStr) ||
+          (seller?.farmName || '').toLowerCase().includes(searchStr) ||
+          (listing.location || '').toLowerCase().includes(searchStr) ||
+          (listing.city || '').toLowerCase().includes(searchStr);
+        
+        if (!matchesSearch) return false;
+      }
+
       return true;
     });
-  }, [announcements, listingFilter, reports]);
+  }, [announcements, listingFilter, listingCityFilter, listingSearch, reports, users]);
+
+  const paginatedAnnouncements = React.useMemo(() => {
+    const startIndex = (listingsPage - 1) * itemsPerPage;
+    return filteredAnnouncements.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredAnnouncements, listingsPage]);
+
+  const totalPages = Math.ceil(filteredAnnouncements.length / itemsPerPage);
 
   const filteredUsers = React.useMemo(() => {
     if (!Array.isArray(users)) return [];
     return users.filter(u => {
       const matchesRole = userSubTab === 'sellers' ? u.role === 'seller' : u.role === 'buyer';
       const matchesStatus = userStatusFilter === 'all' || (u.status || 'active') === userStatusFilter;
+      
+      // City filter
+      let matchesCity = true;
+      if (userCityFilter !== 'all') {
+        const arabicCity = cityMapping[userCityFilter];
+        const location = (u.city || u.location || '').toLowerCase();
+        const matchesLatin = location.includes(userCityFilter.toLowerCase());
+        const matchesArabic = arabicCity && location.includes(arabicCity.toLowerCase());
+        matchesCity = matchesLatin || matchesArabic;
+      }
+
+      if (!matchesCity) return false;
+
       const searchStr = userSearch.toLowerCase();
       const matchesSearch = 
         (u.displayName || u.name || '').toLowerCase().includes(searchStr) ||
         (u.email || '').toLowerCase().includes(searchStr) ||
         (u.phoneNumber || '').includes(searchStr) ||
-        (u.farmName || '').toLowerCase().includes(searchStr);
+        (u.farmName || '').toLowerCase().includes(searchStr) ||
+        (u.fullName || '').toLowerCase().includes(searchStr);
       
       return matchesRole && matchesStatus && matchesSearch;
     });
-  }, [users, userSubTab, userStatusFilter, userSearch]);
+  }, [users, userSubTab, userStatusFilter, userSearch, userCityFilter]);
 
   const isAllSelected = filteredUsers.length > 0 && selectedUserIds.length === filteredUsers.length;
 
@@ -602,23 +889,29 @@ export default function AdminDashboard({ onNavigate, activeSubView }: Props) {
                        overviewTimeFilter === 'week' ? startOfWeek : 
                        startOfMonth;
 
+    const toJsDate = (ts: any) => {
+      if (!ts) return null;
+      if (typeof ts.toDate === 'function') return ts.toDate();
+      if (ts._seconds !== undefined) return new Date(ts._seconds * 1000);
+      if (ts.seconds !== undefined) return new Date(ts.seconds * 1000);
+      const d = new Date(ts);
+      return isNaN(d.getTime()) ? null : d;
+    };
+
     // Filter data based on time period for specific metrics
     const filteredUsersInPeriod = Array.isArray(users) ? users.filter(u => {
-      if (!u.createdAt) return false;
-      const d = u.createdAt.toDate?.() || new Date(u.createdAt);
-      return d >= filterDate;
+      const d = toJsDate(u.createdAt);
+      return d && d >= filterDate;
     }) : [];
 
     const filteredAnnouncementsInPeriod = Array.isArray(announcements) ? announcements.filter(a => {
-      if (!a.createdAt) return false;
-      const d = a.createdAt.toDate?.() || new Date(a.createdAt);
-      return d >= filterDate;
+      const d = toJsDate(a.createdAt);
+      return d && d >= filterDate;
     }) : [];
 
     const filteredReportsInPeriod = Array.isArray(reports) ? reports.filter(r => {
-      if (!r.createdAt) return false;
-      const d = r.createdAt.toDate?.() || new Date(r.createdAt);
-      return d >= filterDate;
+      const d = toJsDate(r.createdAt);
+      return d && d >= filterDate;
     }) : [];
 
     // Total revenue in this period (simulated from plans of new users joining in this period)
@@ -644,13 +937,14 @@ export default function AdminDashboard({ onNavigate, activeSubView }: Props) {
 
   const fetchAdminData = React.useCallback(async () => {
     try {
-      const [usersData, listingsData, reportsData, donationsData, logsData, supportData] = await Promise.all([
+      const [usersData, listingsData, reportsData, donationsData, logsData, supportData, auctionsData] = await Promise.all([
         firestoreService.adminGetUsers(),
         firestoreService.adminGetListings(),
         firestoreService.adminGetReports(),
         firestoreService.adminGetDonations(),
         firestoreService.adminGetLogs(),
-        firestoreService.adminGetSupportRequests()
+        firestoreService.adminGetSupportRequests(),
+        firestoreService.getOfferRequests(undefined, 100) // Fetching recent auctions
       ]);
       setUsers(usersData);
       setAnnouncements(listingsData);
@@ -658,6 +952,7 @@ export default function AdminDashboard({ onNavigate, activeSubView }: Props) {
       setDonations(donationsData);
       setLogs(logsData);
       setSupportRequests(supportData);
+      setOfferRequests(auctionsData?.data || []);
     } catch (error: any) {
       if (error.message?.includes('Quota')) setQuotaExceeded(true);
       console.error("Fetch admin data error:", error);
@@ -668,9 +963,7 @@ export default function AdminDashboard({ onNavigate, activeSubView }: Props) {
     if (profile?.role !== 'admin') return;
 
     fetchAdminData();
-    // Re-fetch every 30 seconds for pseudo-realtime if desired, or just once.
-    const interval = setInterval(fetchAdminData, 30000);
-    return () => clearInterval(interval);
+    // Removed setInterval to prevent excessive Firestore reads
   }, [profile?.role, fetchAdminData]);
 
   const handleToggleListing = async (listingId: string, currentStatus: string) => {
@@ -690,6 +983,15 @@ export default function AdminDashboard({ onNavigate, activeSubView }: Props) {
       } catch (error) {
         console.error("Failed to boost listing:", error);
       }
+    }
+  };
+
+  const handleTogglePin = async (id: string, currentPin: boolean) => {
+    try {
+      await firestoreService.adminPinListingToHome(id, !currentPin);
+      fetchAdminData();
+    } catch (error) {
+      console.error("Failed to toggle pin:", error);
     }
   };
 
@@ -757,6 +1059,37 @@ export default function AdminDashboard({ onNavigate, activeSubView }: Props) {
     document.body.removeChild(link);
   };
 
+  const handleExportListings = () => {
+    if (!filteredAnnouncements.length) return;
+    
+    const headers = ["ID", "Title", "Seller", "Category", "City", "Price", "Status", "Created At"];
+    const rows = filteredAnnouncements.map(l => [
+      l.id,
+      (l.title || "N/A").replace(/,/g, ' '),
+      (l.sellerName || "N/A").replace(/,/g, ' '),
+      l.category || "N/A",
+      (l.city || l.location || "N/A").replace(/,/g, ' '),
+      l.price || "Negotiable",
+      l.status || "active",
+      l.createdAt?.toDate?.()?.toLocaleDateString() || "N/A"
+    ]);
+
+    const csvContent = [
+      headers.join(","),
+      ...rows.map(r => r.join(","))
+    ].join("\n");
+
+    const blob = new Blob(["\ufeff" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `kessabcom_listings_${listingSubTab}_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const handleDeleteReport = async (reportId: string, announcementId: string) => {
     if (window.confirm("هل أنت متأكد من حذف هذا التبليغ والإعلان؟")) {
       try {
@@ -817,17 +1150,18 @@ export default function AdminDashboard({ onNavigate, activeSubView }: Props) {
 
     // Mini donut helper (pure CSS conic-gradient)
     const DonutChart = ({ segments }: { segments: { value: number; color: string; label: string }[] }) => {
-      const total = segments.reduce((a, b) => a + b.value, 0) || 1;
+      const total = segments.reduce((a, b) => a + (Number(b.value) || 0), 0) || 0;
       let cumulative = 0;
-      const gradient = segments.map(seg => {
-        const pct = (seg.value / total) * 100;
+      const gradient = total > 0 ? segments.map(seg => {
+        const val = Number(seg.value) || 0;
+        const pct = (val / total) * 100;
         const part = `${seg.color} ${cumulative.toFixed(1)}% ${(cumulative + pct).toFixed(1)}%`;
         cumulative += pct;
         return part;
-      }).join(', ');
+      }).join(', ') : '#e2e8f0 0% 100%';
       return (
         <div className="flex items-center gap-6">
-          <div className="relative shrink-0" style={{ width: 80, height: 80 }}>
+          <div className="relative shrink-0 animate-in zoom-in duration-1000" style={{ width: 80, height: 80 }}>
             <div className="absolute inset-0 rounded-full" style={{ background: `conic-gradient(${gradient})` }} />
             <div className="absolute inset-[14px] rounded-full bg-surface flex items-center justify-center">
               <span className="text-[10px] font-black text-on-surface-variant">{total}</span>
@@ -861,7 +1195,7 @@ export default function AdminDashboard({ onNavigate, activeSubView }: Props) {
               </div>
               <div className="h-2 bg-surface-container-high rounded-full overflow-hidden">
                 <div
-                  className="h-full rounded-full transition-all duration-700"
+                  className="h-full rounded-full transition-all duration-1000 ease-out animate-in slide-in-from-right-full"
                   style={{ width: `${(item.value / max) * 100}%`, background: color }}
                 />
               </div>
@@ -881,12 +1215,12 @@ export default function AdminDashboard({ onNavigate, activeSubView }: Props) {
               <div className="flex items-end gap-0.5 h-24 w-full justify-center">
                 <div
                   title={`مستخدمون: ${d.users}`}
-                  className="flex-1 rounded-t-md transition-all duration-700 cursor-pointer hover:opacity-80"
+                  className="flex-1 rounded-t-md transition-all duration-1000 ease-out animate-in slide-in-from-bottom-full cursor-pointer hover:opacity-80"
                   style={{ height: `${(d.users / maxVal) * 96}px`, background: '#6366f1', minHeight: 2 }}
                 />
                 <div
                   title={`إعلانات: ${d.listings}`}
-                  className="flex-1 rounded-t-md transition-all duration-700 cursor-pointer hover:opacity-80"
+                  className="flex-1 rounded-t-md transition-all duration-1000 ease-out animate-in slide-in-from-bottom-full cursor-pointer hover:opacity-80 delay-150"
                   style={{ height: `${(d.listings / maxVal) * 96}px`, background: '#10b981', minHeight: 2 }}
                 />
               </div>
@@ -916,26 +1250,54 @@ export default function AdminDashboard({ onNavigate, activeSubView }: Props) {
     return (
       <div className="space-y-8" dir="rtl">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
             <h2 className="text-2xl font-black text-on-surface font-headline">إحصائيات المنصة</h2>
             <p className="text-sm text-on-surface-variant mt-1">مؤشرات الأداء الرئيسية — يتم تحديثها عند كل زيارة للصفحة</p>
           </div>
-          <button
-            onClick={() => firestoreService.getAdminStats().then(setPlatformStats)}
-            className="flex items-center gap-2 px-4 py-2 bg-primary/10 text-primary rounded-xl text-sm font-black hover:bg-primary/20 transition-all"
-          >
-            <RefreshCw className="w-4 h-4" />
-            تحديث
-          </button>
+          <div className="flex items-center gap-4">
+            <div className="flex bg-surface-container-high p-1 rounded-2xl shadow-sm border border-outline-variant/10">
+              <button 
+                onClick={() => setStatsTimeFilter('today')}
+                className={`px-6 py-2 rounded-xl text-xs font-black transition-all ${statsTimeFilter === 'today' ? 'bg-primary text-on-primary shadow-md' : 'text-on-surface-variant hover:text-primary'}`}
+              >
+                اليوم
+              </button>
+              <button 
+                onClick={() => setStatsTimeFilter('week')}
+                className={`px-6 py-2 rounded-xl text-xs font-black transition-all ${statsTimeFilter === 'week' ? 'bg-primary text-on-primary shadow-md' : 'text-on-surface-variant hover:text-primary'}`}
+              >
+                الأسبوع
+              </button>
+              <button 
+                onClick={() => setStatsTimeFilter('month')}
+                className={`px-6 py-2 rounded-xl text-xs font-black transition-all ${statsTimeFilter === 'month' ? 'bg-primary text-on-primary shadow-md' : 'text-on-surface-variant hover:text-primary'}`}
+              >
+                الشهر
+              </button>
+              <button 
+                onClick={() => setStatsTimeFilter('all')}
+                className={`px-6 py-2 rounded-xl text-xs font-black transition-all ${statsTimeFilter === 'all' ? 'bg-primary text-on-primary shadow-md' : 'text-on-surface-variant hover:text-primary'}`}
+              >
+                منذ البداية
+              </button>
+            </div>
+            <button
+              onClick={() => firestoreService.getAdminStats(statsTimeFilter).then(setPlatformStats)}
+              className="flex items-center gap-2 px-4 py-2 bg-primary/10 text-primary rounded-xl text-sm font-black hover:bg-primary/20 transition-all"
+            >
+              <RefreshCw className="w-4 h-4" />
+              تحديث
+            </button>
+          </div>
         </div>
 
         {/* ── Row 1: Hero KPI Cards ── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <KpiCard icon={<Users className="w-6 h-6 text-indigo-600" />} label="إجمالي المستخدمين" value={s.totalUsers} iconBg="bg-indigo-100" delta={s.newUsersThisWeek} />
-          <KpiCard icon={<Tag className="w-6 h-6 text-emerald-600" />} label="إعلانات نشطة" value={s.activeAds} sub={`من أصل ${s.totalAds} إعلان`} iconBg="bg-emerald-100" delta={s.newListingsThisWeek} />
-          <KpiCard icon={<ShoppingBag className="w-6 h-6 text-violet-600" />} label="طلبات مفتوحة" value={s.openRequests} sub={`${s.closedRequests} مغلق`} iconBg="bg-violet-100" />
-          <KpiCard icon={<Zap className="w-6 h-6 text-amber-600" />} label="إعلانات مدفوعة (Boost)" value={s.boostedAds} sub={`${s.pendingAds} في الانتظار`} iconBg="bg-amber-100" />
+          <KpiCard icon={<Users className="w-6 h-6 text-indigo-600" />} label={statsTimeFilter === 'all' ? "إجمالي المستخدمين" : "مستخدمون جدد"} value={s.totalUsers} iconBg="bg-indigo-100" delta={statsTimeFilter === 'all' ? s.newUsersThisWeek : undefined} />
+          <KpiCard icon={<Tag className="w-6 h-6 text-emerald-600" />} label={statsTimeFilter === 'all' ? "إعلانات نشطة" : "إعلانات جديدة"} value={s.activeAds} sub={statsTimeFilter === 'all' ? `من أصل ${s.totalAds} إعلان` : undefined} iconBg="bg-emerald-100" delta={statsTimeFilter === 'all' ? s.newListingsThisWeek : undefined} />
+          <KpiCard icon={<ShoppingBag className="w-6 h-6 text-violet-600" />} label={statsTimeFilter === 'all' ? "طلبات مفتوحة" : "طلبات جديدة"} value={s.openRequests} sub={statsTimeFilter === 'all' ? `${s.closedRequests} مغلق` : undefined} iconBg="bg-violet-100" />
+          <KpiCard icon={<Zap className="w-6 h-6 text-amber-600" />} label={statsTimeFilter === 'all' ? "إعلانات مدفوعة" : "إعلانات مميزة جديدة"} value={s.boostedAds} sub={statsTimeFilter === 'all' ? `${s.pendingAds} في الانتظار` : undefined} iconBg="bg-amber-100" />
         </div>
 
         {/* ── Row 2: Users + Listings breakdowns ── */}
@@ -1203,69 +1565,143 @@ const renderDonations = () => {
   );
 };
 
-  const renderReports = () => (
-    <div className="space-y-8">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-black text-on-surface font-headline">تبليغات المستخدمين</h2>
-          <p className="text-sm text-on-surface-variant">إعلانات تم التبليغ عنها لمخالفة القوانين</p>
+  const renderReports = () => {
+    const formatDate = (ts: any) => {
+      try {
+        if (!ts) return 'اليوم';
+        const d = ts.toDate ? ts.toDate() : new Date(ts);
+        return new Intl.DateTimeFormat('ar-MA', { dateStyle: 'short', timeStyle: 'short' }).format(d);
+      } catch { return 'اليوم'; }
+    };
+
+    const filteredReports = (Array.isArray(reports) ? reports : []).filter(r => {
+      const type = (r.targetType || r.type || '').toLowerCase();
+      if (reportSubTab === 'listing') return type === 'listing' || type === 'announcement' || (!type && r.announcementId);
+      if (reportSubTab === 'request') return type === 'request' || type === 'offerrequest';
+      if (reportSubTab === 'offer') return type === 'offer';
+      return true;
+    });
+
+    return (
+      <div className="space-y-6" dir="rtl">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <h2 className="text-2xl font-black text-on-surface font-headline">التبليغات</h2>
+            <p className="text-sm text-on-surface-variant">مراجعة وإدارة تبليغات المستخدمين</p>
+          </div>
+          <div className="flex bg-surface-container-high p-1 rounded-xl gap-1">
+            {([['listing', 'إعلان'], ['request', 'طلب'], ['offer', 'عرض']] as const).map(([tab, label]) => (
+              <button
+                key={tab}
+                onClick={() => setReportSubTab(tab)}
+                className={`px-5 py-2 rounded-lg text-sm font-black transition-all ${reportSubTab === tab ? 'bg-white text-primary shadow-sm border border-primary/20' : 'text-on-surface-variant hover:text-primary'}`}
+              >
+                {label}
+                <span className={`mr-1 text-[10px] px-1.5 py-0.5 rounded-full ${reportSubTab === tab ? 'bg-primary/10 text-primary' : 'bg-surface-container text-on-surface-variant'}`}>
+                  {(Array.isArray(reports) ? reports : []).filter(r => {
+                    const type = (r.targetType || r.type || '').toLowerCase();
+                    if (tab === 'listing') return type === 'listing' || type === 'announcement' || (!type && r.announcementId);
+                    if (tab === 'request') return type === 'request' || type === 'offerrequest';
+                    return type === 'offer';
+                  }).length}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="bg-surface rounded-2xl border border-outline-variant/30 shadow-sm overflow-hidden">
+          <table className="w-full text-right">
+            <thead className="bg-surface-container-lowest border-b border-outline-variant/20">
+              <tr className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
+                <th className="p-4">المبلغ به</th>
+                <th className="p-4">المبلغ (المشتري)</th>
+                {reportSubTab === 'listing' && <th className="p-4">الكسابة</th>}
+                <th className="p-4">سبب التبليغ</th>
+                <th className="p-4">التاريخ والساعة</th>
+                <th className="p-4 text-center">إجراءات</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-outline-variant/10">
+              {filteredReports.map((report) => (
+                <tr key={report.id} className="hover:bg-surface-container-lowest transition-colors">
+                  <td className="p-4">
+                    <div className="flex flex-col gap-0.5">
+                      <span className="font-mono text-xs text-on-surface-variant">{report.targetId || report.announcementId || '—'}</span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-black w-fit ${
+                        reportSubTab === 'listing' ? 'bg-blue-100 text-blue-700' :
+                        reportSubTab === 'request' ? 'bg-violet-100 text-violet-700' :
+                        'bg-orange-100 text-orange-700'
+                      }`}>
+                        {reportSubTab === 'listing' ? 'إعلان' : reportSubTab === 'request' ? 'طلب' : 'عرض'}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="p-4">
+                    <div className="flex flex-col gap-0.5">
+                      <span className="font-bold text-sm">{report.reporterName || report.buyerName || (report.reporterId === 'anonymous' ? 'زائر' : 'مستخدم')}</span>
+                      <span className="text-xs text-on-surface-variant font-mono">{report.reporterId || '—'}</span>
+                    </div>
+                  </td>
+                  {reportSubTab === 'listing' && (
+                    <td className="p-4">
+                      <span className="font-bold text-sm text-primary">{report.sellerName || report.sellerId || '—'}</span>
+                    </td>
+                  )}
+                  <td className="p-4">
+                    <span className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-xs font-bold">
+                      {report.reason || 'بدون سبب'}
+                    </span>
+                  </td>
+                  <td className="p-4 text-xs text-on-surface-variant font-medium">{formatDate(report.createdAt)}</td>
+                  <td className="p-4">
+                    <div className="flex gap-2 justify-center">
+                      {reportSubTab === 'listing' && (
+                        <button
+                          onClick={() => onNavigate('listing-details', report.targetId || report.announcementId)}
+                          className="p-2 text-primary hover:bg-primary/10 rounded-lg transition-colors border border-transparent hover:border-primary/20"
+                          title="عرض الإعلان"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                      )}
+                      <button
+                        onClick={async () => {
+                          await firestoreService.adminDeleteReport(report.id);
+                          setReports(prev => prev.filter(r => r.id !== report.id));
+                        }}
+                        className="p-2 text-error hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-200"
+                        title="حذف الإعلان"
+                      >
+                        <Ban className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={async () => {
+                          await firestoreService.adminDeleteReport(report.id);
+                          setReports(prev => prev.filter(r => r.id !== report.id));
+                        }}
+                        className="p-2 text-on-surface-variant hover:bg-surface-container-high rounded-lg transition-colors border border-transparent hover:border-outline-variant"
+                        title="تجاهل التبليغ"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {filteredReports.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="p-12 text-center text-on-surface-variant font-medium">
+                    لا توجد تبليغات في هذا القسم
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
-
-      <div className="bg-surface rounded-2xl border border-outline-variant/30 shadow-sm overflow-hidden">
-        <table className="w-full text-right">
-          <thead className="bg-surface-container-lowest border-b border-outline-variant/20">
-            <tr className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
-              <th className="p-4">رقم الإعلان</th>
-              <th className="p-4">المبلغ</th>
-              <th className="p-4">سبب التبليغ</th>
-              <th className="p-4">التاريخ</th>
-              <th className="p-4">الإجراءات</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-outline-variant/10">
-            {(Array.isArray(reports) ? reports : []).map((report) => (
-              <tr key={report.id} className="hover:bg-surface-container-lowest transition-colors">
-                <td className="p-4 font-mono text-xs">{report.announcementId}</td>
-                <td className="p-4 font-bold">{report.reporterId === 'anonymous' ? 'زائر' : 'مستخدم'}</td>
-                <td className="p-4">
-                  <span className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-xs font-bold">
-                    {report.reason}
-                  </span>
-                </td>
-                <td className="p-4 text-xs">{report.createdAt?.toDate?.()?.toLocaleString('ar-MA') || 'اليوم'}</td>
-                <td className="p-4">
-                  <div className="flex gap-2">
-                    <button 
-                      onClick={() => onNavigate('listing-details', report.announcementId)}
-                      className="p-2 text-primary hover:bg-transparent hover:text-primary rounded-lg transition-colors border border-transparent hover:border-primary"
-                      title="عرض الإعلان"
-                    >
-                      <Eye className="w-4 h-4" />
-                    </button>
-                    <button 
-                      onClick={() => handleDeleteReport(report.id, report.announcementId)}
-                      className="p-2 text-error hover:bg-transparent hover:text-error rounded-lg transition-colors border border-transparent hover:border-error"
-                      title="حذف الإعلان"
-                    >
-                      <Ban className="w-4 h-4" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {reports.length === 0 && (
-              <tr>
-                <td colSpan={5} className="p-8 text-center text-on-surface-variant font-medium">
-                  لا توجد تبليغات حالياً
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
+    );
+  };
 
 const renderOverview = () => (
     <div className="space-y-8 animate-in fade-in duration-700">
@@ -1274,6 +1710,7 @@ const renderOverview = () => (
           <h2 className="text-2xl font-black text-on-surface font-headline">نظرة عامة على المنصة</h2>
           <p className="text-sm text-on-surface-variant font-medium">تتبع أداء المنصة والعمليات اليومية بشكل مباشر</p>
         </div>
+        
         <div className="flex bg-surface-container-high p-1 rounded-2xl shadow-sm border border-outline-variant/10">
           <button 
             onClick={() => setOverviewTimeFilter('today')}
@@ -1357,7 +1794,15 @@ const renderOverview = () => (
                   <p className="text-sm text-on-surface">
                     <span className="font-bold">{activity.user || 'النظام'}</span> {activity.msg || activity.message || activity.action}
                   </p>
-                  <p className="text-xs text-on-surface-variant">{activity.createdAt?.toDate?.()?.toLocaleString('ar-MA') || 'اليوم'}</p>
+                  <p className="text-xs text-on-surface-variant">
+                    {(() => {
+                      if (!activity.createdAt) return 'اليوم';
+                      if (typeof activity.createdAt.toDate === 'function') return activity.createdAt.toDate().toLocaleString('ar-MA');
+                      if (activity.createdAt._seconds) return new Date(activity.createdAt._seconds * 1000).toLocaleString('ar-MA');
+                      if (activity.createdAt.seconds) return new Date(activity.createdAt.seconds * 1000).toLocaleString('ar-MA');
+                      return new Date(activity.createdAt).toLocaleString('ar-MA');
+                    })()}
+                  </p>
                 </div>
                 <button className="p-2 text-on-surface-variant hover:bg-surface-variant rounded-full">
                   <ChevronLeft className="w-4 h-4" />
@@ -1571,111 +2016,226 @@ const renderOverview = () => (
               </div>
             </div>
           </div>
+
+          <div className="bg-surface p-6 rounded-2xl border border-outline-variant/30 shadow-sm space-y-4">
+            <h3 className="font-bold text-on-surface flex items-center gap-2">
+              <ShoppingBag className="w-5 h-5 text-primary" />
+              إعدادات نظام الطلبات والعروض
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="flex justify-between items-center p-3 bg-surface-container-low rounded-xl">
+                <span className="text-sm font-medium">أقصى عدد عروض للطلب</span>
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="number" 
+                    value={settings.buyerRequests?.maxOffersPerRequest || 6} 
+                    onChange={(e) => updateSettings({ buyerRequests: { ...settings.buyerRequests, maxOffersPerRequest: Number(e.target.value) } })}
+                    className="w-12 bg-transparent border-b border-primary text-center font-bold outline-none" 
+                  />
+                </div>
+              </div>
+              <div className="flex justify-between items-center p-3 bg-surface-container-low rounded-xl">
+                <span className="text-sm font-medium">أقصى عروض يومية للكساب</span>
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="number" 
+                    value={settings.buyerRequests?.maxDailyOffersPerSeller || 6} 
+                    onChange={(e) => updateSettings({ buyerRequests: { ...settings.buyerRequests, maxDailyOffersPerSeller: Number(e.target.value) } })}
+                    className="w-12 bg-transparent border-b border-primary text-center font-bold outline-none" 
+                  />
+                </div>
+              </div>
+              <div className="flex justify-between items-center p-3 bg-surface-container-low rounded-xl">
+                <span className="text-sm font-medium">عدد الطلبات في الصفحة</span>
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="number" 
+                    value={settings.buyerRequests?.requestsPerPage || 6} 
+                    onChange={(e) => updateSettings({ buyerRequests: { ...settings.buyerRequests, requestsPerPage: Number(e.target.value) } })}
+                    className="w-12 bg-transparent border-b border-primary text-center font-bold outline-none" 
+                  />
+                </div>
+              </div>
+              <div className="flex justify-between items-center p-3 bg-surface-container-low rounded-xl">
+                <span className="text-sm font-medium">مدة صلاحية الطلب (أيام)</span>
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="number" 
+                    value={settings.buyerRequests?.requestExpirationDays || 7} 
+                    onChange={(e) => updateSettings({ buyerRequests: { ...settings.buyerRequests, requestExpirationDays: Number(e.target.value) } })}
+                    className="w-12 bg-transparent border-b border-primary text-center font-bold outline-none" 
+                  />
+                </div>
+              </div>
+              <div className="flex justify-between items-center p-3 bg-surface-container-low rounded-xl">
+                <span className="text-sm font-medium">قطر البحث (كلم)</span>
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="number" 
+                    value={settings.buyerRequests?.searchRadiusKm || 10} 
+                    onChange={(e) => updateSettings({ buyerRequests: { ...settings.buyerRequests, searchRadiusKm: Number(e.target.value) } })}
+                    className="w-12 bg-transparent border-b border-primary text-center font-bold outline-none" 
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
   );
 
-  const renderSupportRequests = () => (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-black text-on-surface font-headline">طلبات الدعم والتقني</h2>
-      <p className="text-sm text-on-surface-variant font-medium">إدارة طلبات إعادة تعيين كلمة المرور والمشاكل التقنية</p>
-      
-      <div className="bg-surface rounded-3xl border border-outline-variant/30 shadow-md overflow-hidden">
-        <table className="w-full text-right">
-          <thead>
-            <tr className="bg-surface-container-low/50 border-b border-outline-variant/20">
-              <th className="p-5 font-black text-xs">نوع الطلب</th>
-              <th className="p-5 font-black text-xs">المستخدم</th>
-              <th className="p-5 font-black text-xs">رقم الهاتف</th>
-              <th className="p-5 font-black text-xs">التاريخ</th>
-              <th className="p-5 font-black text-xs">الحالة</th>
-              <th className="p-5 font-black text-xs text-left">إجراءات</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-outline-variant/10">
-            {supportRequests.map((req) => (
-              <tr key={req.id} className="hover:bg-primary/[0.02]">
-                <td className="p-5 font-bold text-sm">
-                  {req.type === 'password_reset' ? 'إعادة تعيين كلمة المرور' : req.type}
-                </td>
-                <td className="p-5 font-bold text-sm text-primary">
-                  {req.name || 'غير معروف'}
-                </td>
-                <td className="p-5 font-mono text-sm">{req.phone}</td>
-                <td className="p-5 text-xs text-on-surface-variant font-bold">
-                  {(() => {
-                    try {
-                      if (!req.createdAt) return 'قديماً';
-                      const date = req.createdAt.toDate ? req.createdAt.toDate() : new Date(req.createdAt);
-                      if (isNaN(date.getTime())) return 'قديماً';
-                      return new Intl.DateTimeFormat('ar-MA', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      }).format(date);
-                    } catch (e) {
-                      return 'قديماً';
-                    }
-                  })()}
-                </td>
-                <td className="p-5">
-                  <span className={`px-3 py-1 rounded-full text-[10px] font-black ${
-                    req.status === 'pending' ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'
-                  }`}>
-                    {req.status === 'pending' ? 'في الانتظار' : 'تمت المعالجة'}
-                  </span>
-                </td>
-                <td className="p-5 text-left">
-                  <div className="flex justify-end gap-2">
-                    {req.status === 'pending' && (
+  const renderSupportRequests = () => {
+    const formatSupportPhone = (phone: string) => {
+      if (!phone) return '';
+      const clean = phone.replace(/\D/g, '');
+      if (clean.startsWith('212')) return '0' + clean.slice(3);
+      if (clean.startsWith('0')) return clean;
+      return '0' + clean;
+    };
+
+    const filteredRequests = supportRequests.filter(req => {
+      if (supportSubTab === 'password') {
+        return req.type === 'password_reset' || !req.type; // Fallback for old ones
+      } else {
+        return req.type === 'contact' || req.type === 'home_page' || req.type === 'banner' || req.type === 'other';
+      }
+    });
+
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <h2 className="text-2xl font-black text-on-surface font-headline">طلبات الدعم والتقني</h2>
+            <p className="text-sm text-on-surface-variant font-medium">إدارة طلبات المستخدمين ورسائل التواصل</p>
+          </div>
+          <div className="flex bg-surface-container-high p-1 rounded-xl gap-1">
+            <button
+              onClick={() => setSupportSubTab('password')}
+              className={`px-5 py-2 rounded-lg text-sm font-black transition-all ${supportSubTab === 'password' ? 'bg-white text-primary shadow-sm border border-primary/20' : 'text-on-surface-variant hover:text-primary'}`}
+            >
+              كلمة المرور
+            </button>
+            <button
+              onClick={() => setSupportSubTab('contact')}
+              className={`px-5 py-2 rounded-lg text-sm font-black transition-all ${supportSubTab === 'contact' ? 'bg-white text-primary shadow-sm border border-primary/20' : 'text-on-surface-variant hover:text-primary'}`}
+            >
+              الصفحة الرئيسية / banner
+            </button>
+          </div>
+        </div>
+        
+        <div className="bg-surface rounded-3xl border border-outline-variant/30 shadow-md overflow-hidden">
+          <table className="w-full text-right">
+            <thead>
+              <tr className="bg-surface-container-low/50 border-b border-outline-variant/20">
+                <th className="p-5 font-black text-xs">نوع الطلب</th>
+                <th className="p-5 font-black text-xs">المستخدم</th>
+                <th className="p-5 font-black text-xs">رقم الهاتف</th>
+                <th className="p-5 font-black text-xs">التاريخ</th>
+                <th className="p-5 font-black text-xs">الحالة</th>
+                <th className="p-5 font-black text-xs text-left">إجراءات</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-outline-variant/10">
+              {filteredRequests.map((req) => (
+                <tr key={req.id} className="hover:bg-primary/[0.02]">
+                  <td className="p-5 font-bold text-sm">
+                    {req.type === 'password_reset' ? 'إعادة تعيين كلمة المرور' : 
+                     req.type === 'home_page' ? 'الصفحة الرئيسية' :
+                     req.type === 'banner' ? 'إعلانات البانر' : 
+                     req.type === 'contact' ? 'اتصال عام' :
+                     req.type === 'other' ? 'موضوع آخر' : req.type}
+                  </td>
+                  <td className="p-5 font-bold text-sm text-primary">
+                    {req.name || 'غير معروف'}
+                  </td>
+                  <td className="p-5 font-mono text-sm" dir="ltr">{formatSupportPhone(req.phone)}</td>
+                  <td className="p-5 text-xs text-on-surface-variant font-bold">
+                    {(() => {
+                      try {
+                        if (!req.createdAt) return 'اليوم';
+                        const date = req.createdAt.toDate ? req.createdAt.toDate() : new Date(req.createdAt);
+                        if (isNaN(date.getTime())) return 'اليوم';
+                        return new Intl.DateTimeFormat('ar-MA', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        }).format(date);
+                      } catch (e) {
+                        return 'اليوم';
+                      }
+                    })()}
+                  </td>
+                  <td className="p-5">
+                    <span className={`px-3 py-1 rounded-full text-[10px] font-black ${
+                      req.status === 'pending' ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'
+                    }`}>
+                      {req.status === 'pending' ? 'في الانتظار' : 'تمت المعالجة'}
+                    </span>
+                  </td>
+                  <td className="p-5 text-left">
+                    <div className="flex justify-end gap-2">
+                      {req.status === 'pending' && supportSubTab === 'password' && (
+                        <button 
+                          onClick={async () => {
+                            const tempPass = Math.floor(100000 + Math.random() * 900000).toString();
+                            const message = `مرحبا ${req.name || 'مستخدم كسابكوم'}،\n\nبناءً على طلبك، كلمة المرور المؤقتة الخاصة بك هي: *${tempPass}*\n\nيرجى تسجيل الدخول وتغييرها فوراً من إعدادات حسابك.\n\nفريق كسابكوم.`;
+                            const cleanPhone = (req.phone || '').replace(/\+/g, '');
+                            const whatsappUrl = `https://wa.me/${cleanPhone.startsWith('0') ? '212' + cleanPhone.slice(1) : cleanPhone}?text=${encodeURIComponent(message)}`;
+                            
+                            window.open(whatsappUrl, '_blank');
+                            
+                            setSentPasswords(prev => ({ ...prev, [req.id]: true }));
+                          }}
+                          className={`flex items-center gap-2 px-3 py-2 ${sentPasswords[req.id] ? 'bg-blue-600 hover:bg-blue-700' : 'bg-green-600 hover:bg-green-700'} text-white rounded-xl transition-all text-[10px] font-black`}
+                          title="إرسال كلمة المرور عبر واتساب"
+                        >
+                          <Lock size={14} />
+                          {sentPasswords[req.id] ? 'إعادة إرسال كلمة المرور' : 'إرسال كلمة المرور'}
+                        </button>
+                      )}
+                      {req.status === 'pending' && supportSubTab === 'contact' && (
+                        <button 
+                          onClick={async () => {
+                            await firestoreService.adminUpdateSupportRequestStatus(req.id, 'completed');
+                            fetchAdminData();
+                          }}
+                          className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-all text-[10px] font-black"
+                        >
+                          <CheckCircle2 size={14} />
+                          تمت القراءة
+                        </button>
+                      )}
                       <button 
-                        onClick={async () => {
-                          const tempPass = Math.floor(100000 + Math.random() * 900000).toString();
-                          const message = `مرحبا ${req.name || 'مستخدم كسابكوم'}،\n\nبناءً على طلبك، كلمة المرور المؤقتة الخاصة بك هي: *${tempPass}*\n\nيرجى تسجيل الدخول وتغييرها فوراً من إعدادات حسابك.\n\nفريق كسابكوم.`;
-                          const cleanPhone = (req.phone || '').replace(/\+/g, '');
-                          const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
-                          
-                          window.open(whatsappUrl, '_blank');
-                          
-                          await firestoreService.adminUpdateSupportRequestStatus(req.id, 'completed');
-                          fetchAdminData();
+                        onClick={() => {
+                          setSupportRequestToDelete(req.id);
+                          setShowDeleteSupportConfirm(true);
                         }}
-                        className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-all text-[10px] font-black"
-                        title="إرسال كلمة المرور عبر واتساب"
+                        className="p-2 bg-red-50 text-red-700 rounded-lg hover:bg-red-600 hover:text-white transition-all"
+                        title="حذف"
                       >
-                        <Lock size={14} />
-                        إرسال كلمة المرور
+                        <X size={16} />
                       </button>
-                    )}
-                    <button 
-                      onClick={() => {
-                        setSupportRequestToDelete(req.id);
-                        setShowDeleteSupportConfirm(true);
-                      }}
-                      className="p-2 bg-red-50 text-red-700 rounded-lg hover:bg-red-600 hover:text-white transition-all"
-                      title="حذف"
-                    >
-                      <X size={16} />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {supportRequests.length === 0 && (
-              <tr>
-                <td colSpan={6} className="p-20 text-center text-on-surface-variant font-bold">
-                  لا توجد طلبات حالياً
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {filteredRequests.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="p-20 text-center text-on-surface-variant font-bold">
+                    لا توجد طلبات في هذا القسم
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const renderVerifications = () => (
     <div className="space-y-6">
@@ -1719,7 +2279,7 @@ const renderOverview = () => (
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
             <h2 className="text-2xl font-black text-on-surface font-headline">إدارة المستخدمين</h2>
-            <p className="text-sm text-on-surface-variant font-medium">إدارة حسابات {userSubTab === 'sellers' ? 'الكسابة' : 'المشترين'} والتحقق من نشاطهم</p>
+            <p className="text-sm text-on-surface-variant font-medium">تحكم في حسابات الكسابة والمشترين، تتبع نشاطهم، وقم بإدارة الصلاحيات والتحقق من الهوية</p>
           </div>
           <div className="flex bg-surface-container-high p-1 rounded-2xl shadow-sm">
             <button 
@@ -1738,7 +2298,7 @@ const renderOverview = () => (
         </div>
 
         {/* Filters and Search Bar */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 bg-surface p-4 rounded-3xl border border-outline-variant/20 shadow-sm">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 bg-surface p-4 rounded-3xl border border-outline-variant/20 shadow-sm">
           <div className="lg:col-span-2 relative">
             <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-on-surface-variant/40" />
             <input 
@@ -1762,6 +2322,25 @@ const renderOverview = () => (
               <option value="deactivated">معطل</option>
               <option value="blocked">محظور</option>
             </select>
+            <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-on-surface-variant">
+              <ChevronDown className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="relative">
+            <MapPin className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant/40" />
+            <select 
+              value={userCityFilter}
+              onChange={(e) => setUserCityFilter(e.target.value)}
+              className="w-full bg-surface-container-low border border-outline-variant/30 rounded-2xl py-3 pr-10 pl-4 text-sm font-black outline-none appearance-none cursor-pointer focus:ring-2 focus:ring-primary/20"
+            >
+              <option value="all">جميع المدن</option>
+              {Object.entries(cityMapping).map(([key, name]) => (
+                <option key={key} value={key}>{name}</option>
+              ))}
+            </select>
+            <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-on-surface-variant">
+              <ChevronDown className="w-4 h-4" />
+            </div>
           </div>
           <div className="flex gap-2">
             <button 
@@ -1769,7 +2348,7 @@ const renderOverview = () => (
               className="flex-1 bg-surface-container-high text-on-surface-variant py-3 rounded-2xl text-xs font-black hover:bg-primary/10 hover:text-primary transition-all border border-transparent hover:border-primary/20 flex items-center justify-center gap-2"
             >
               <Download className="w-4 h-4" />
-              تصدير القائمة
+              تصدير
             </button>
           </div>
         </div>
@@ -1802,7 +2381,7 @@ const renderOverview = () => (
                   <th className="p-5 font-black">المعلومات</th>
                   <th className="p-5 font-black">{userSubTab === 'sellers' ? 'النشاط / الخطة' : 'المشتريات'}</th>
                   <th className="p-5 font-black">الحالة</th>
-                  <th className="p-5 font-black">Certification</th>
+                  {userSubTab === 'sellers' && <th className="p-5 font-black">Certification</th>}
                   <th className="p-5 font-black text-left">إجراءات</th>
                 </tr>
               </thead>
@@ -1903,21 +2482,27 @@ const renderOverview = () => (
                         <option value="blocked">محظور</option>
                       </select>
                     </td>
-                    <td className="p-5">
-                      <button 
-                        onClick={async () => {
-                          const newStatus = !user.isVerified;
-                          await updateDoc(doc(db, 'users', user.id), { isVerified: newStatus });
-                          fetchAdminData();
-                        }}
-                        className={`group px-3 py-1.5 rounded-xl text-[10px] font-black transition-all flex items-center gap-2 border-2 ${
-                          user.isVerified ? 'bg-primary/5 text-primary border-primary/20' : 'bg-surface-container-high text-on-surface-variant/40 border-outline-variant/10'
-                        }`}
-                      >
-                        <ShieldCheck className={`w-4 h-4 transition-transform ${user.isVerified ? 'scale-110' : 'opacity-40 group-hover:scale-110'}`} />
-                        <span>{user.isVerified ? 'Membre Certifié' : 'Désactivé'}</span>
-                      </button>
-                    </td>
+                    {userSubTab === 'sellers' && (
+                      <td className="p-5">
+                        <button 
+                          onClick={async () => {
+                            const newStatus = !user.isVerified;
+                            // Ensure both isVerified and isCertified are updated for consistency
+                            await updateDoc(doc(db, 'users', user.id), { 
+                              isVerified: newStatus,
+                              isCertified: newStatus 
+                            });
+                            fetchAdminData();
+                          }}
+                          className={`group px-3 py-1.5 rounded-xl text-[10px] font-black transition-all flex items-center gap-2 border-2 ${
+                            user.isVerified ? 'bg-primary/5 text-primary border-primary/20' : 'bg-surface-container-high text-on-surface-variant/40 border-outline-variant/10'
+                          }`}
+                        >
+                          <ShieldCheck className={`w-4 h-4 transition-transform ${user.isVerified ? 'scale-110' : 'opacity-40 group-hover:scale-110'}`} />
+                          <span>{user.isVerified ? 'Membre Certifié' : 'Désactivé'}</span>
+                        </button>
+                      </td>
+                    )}
                     <td className="p-5 text-left">
                       <div className="flex items-center justify-end gap-3">
                         <button 
@@ -1966,145 +2551,361 @@ const renderOverview = () => (
     );
   };
 
-  const renderListings = () => (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-black text-on-surface font-headline">إدارة الإعلانات</h2>
-        <div className="flex gap-2">
-          <div className="flex bg-surface border border-outline-variant/30 rounded-xl p-1 overflow-x-auto">
-            <button 
-              onClick={() => setListingFilter('all')}
-              className={`px-4 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors border ${listingFilter === 'all' ? 'bg-primary text-on-primary border-primary' : 'text-on-surface-variant border-transparent hover:border-on-surface-variant'}`}
-            >
-              الكل
-            </button>
-            <button 
-              onClick={() => setListingFilter('reported')}
-              className={`px-4 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors border flex items-center gap-1 ${listingFilter === 'reported' ? 'bg-primary text-on-primary border-primary' : 'text-on-surface-variant border-transparent hover:border-on-surface-variant'}`}
-            >
-              تبليغات
-              <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${listingFilter === 'reported' ? 'bg-white text-primary' : 'bg-red-100 text-red-700'}`}>
-                {reports.length}
-              </span>
-            </button>
-            <button 
-              onClick={() => setListingFilter('promoted')}
-              className={`px-4 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors border ${listingFilter === 'promoted' ? 'bg-primary text-on-primary border-primary' : 'text-on-surface-variant border-transparent hover:border-on-surface-variant'}`}
-            >
-              إعلانات مروجة
-            </button>
-            <button 
-              onClick={() => setListingFilter('inactive')}
-              className={`px-4 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors border ${listingFilter === 'inactive' ? 'bg-primary text-on-primary border-primary' : 'text-on-surface-variant border-transparent hover:border-on-surface-variant'}`}
-            >
-              إعلانات متوقفة
-            </button>
-          </div>
+  const renderListings = () => {
+    return (
+      <div className="space-y-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div>
+          <h2 className="text-2xl font-black text-on-surface font-headline">إدارة الإعلانات</h2>
+          <p className="text-sm text-on-surface-variant font-medium">تحكم في الإعلانات المعروضة، المزادات، وقم بمراجعة المحتوى والتبليغات</p>
+        </div>
+        <div className="flex bg-surface-container-high p-1 rounded-2xl shadow-sm">
+          <button 
+            onClick={() => setListingSubTab('farms')}
+            className={`px-8 py-2.5 rounded-xl text-sm font-black transition-all border ${listingSubTab === 'farms' ? 'bg-primary text-on-primary border-primary shadow-md transform scale-105' : 'text-on-surface-variant border-transparent hover:text-primary'}`}
+          >
+            الضيعات
+          </button>
+          <button 
+            onClick={() => setListingSubTab('auctions')}
+            className={`px-8 py-2.5 rounded-xl text-sm font-black transition-all border ${listingSubTab === 'auctions' ? 'bg-primary text-on-primary border-primary shadow-md transform scale-105' : 'text-on-surface-variant border-transparent hover:text-primary'}`}
+          >
+            المزادات
+          </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4">
-        {filteredAnnouncements.map((listing) => (
-          <div key={listing.id} className="bg-surface p-4 rounded-2xl border border-outline-variant/30 shadow-sm flex flex-col md:flex-row gap-6 items-center">
-            <div className="w-full md:w-48 h-32 rounded-xl overflow-hidden shrink-0 relative">
-              <img className="w-full h-full object-cover" src={listing.images?.[0] || "https://i.ytimg.com/vi/RrkkshRUttw/hq720.jpg?sqp=-oaymwEhCK4FEIIDSFryq4qpAxMIARUAAAAAGAElAADIQj0AgKJD&rs=AOn4CLD92lI4Kxe5liKSwWZaJuLAFopNeA"} alt="حولي" referrerPolicy="no-referrer" />
-              {reports.some(r => r.announcementId === listing.id) && (
-                <div className="absolute top-2 right-2 bg-red-600 text-white px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 shadow-lg">
-                  <AlertCircle className="w-3 h-3" />
-                  <span>{reports.filter(r => r.announcementId === listing.id).length} تبليغات</span>
-                </div>
-              )}
-            </div>
-            <div className="flex-1 space-y-2 text-center md:text-right">
-              <div className="flex flex-wrap justify-center md:justify-start gap-2 mb-1">
-                {listing.status === 'pending' && !settings.autoAcceptSellers && <span className="bg-orange-100 text-orange-700 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">في انتظار المراجعة</span>}
-                {listing.status === 'active' && <span className="bg-green-100 text-green-700 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">نشط</span>}
-                {listing.status === 'inactive' && <span className="bg-surface-variant text-on-surface-variant text-[10px] font-black px-2 py-0.5 rounded-full uppercase">متوقف</span>}
-                {listing.status === 'rejected' && <span className="bg-red-100 text-red-700 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">مرفوض</span>}
-                <span className="bg-surface-variant text-on-surface-variant text-[10px] font-black px-2 py-0.5 rounded-full uppercase">{listing.category}</span>
-              </div>
-              <h3 className="font-bold text-on-surface text-lg">{listing.title}</h3>
-              <div className="flex items-center justify-center md:justify-start gap-4 text-xs text-on-surface-variant">
-                <span className="flex items-center gap-1"><User className="w-3 h-3" /> {(() => {
-                  const seller = users.find(u => u.id === listing.sellerId);
-                  return seller ? (seller.fullName || seller.farmName || 'كساب غير معروف') : 'تحميل...';
-                })()}</span>
-                <span className="flex items-center gap-1">
-                  <MapPin className="w-3 h-3" />
-                  {(() => {
-                    const rawCity = (listing.location || 'غير محدد').split(' ')[0];
-                    return (rawCity && cityMapping[rawCity.toLowerCase()]) || rawCity;
-                  })()}
-                </span>
-                <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {listing.createdAt?.toDate?.()?.toLocaleString() || 'اليوم'}</span>
-              </div>
-            </div>
-            <div className="flex gap-2 shrink-0">
-              {listing.status === 'pending' && !settings.autoAcceptSellers && (
-                <button 
-                  onClick={() => handleApproveListing(listing.id)}
-                  className="p-3 bg-green-50 text-green-700 rounded-xl hover:bg-transparent hover:text-green-700 transition-colors border border-transparent hover:border-green-700" 
-                  title="قبول الإعلان"
-                >
-                  <CheckCircle2 className="w-5 h-5" />
-                </button>
-              )}
-              {listing.status !== 'pending' && (
-                <div className="flex items-center gap-2 px-3 py-1 bg-surface-container-high rounded-xl border border-outline-variant/10">
-                  <span className={`text-[10px] font-bold ${listing.status === 'active' ? 'text-green-600' : 'text-on-surface-variant opacity-50'}`}>نشط</span>
-                  <button 
-                    onClick={() => handleToggleListing(listing.id, listing.status)}
-                    className={`w-10 h-5 rounded-full relative transition-colors ${listing.status === 'active' ? 'bg-green-600' : 'bg-surface-variant'}`}
-                    title={listing.status === 'active' ? "توقيف الإعلان" : "تفعيل الإعلان"}
-                  >
-                    <div className={`w-3.5 h-3.5 rounded-full absolute top-0.5 bg-white transition-all ${listing.status === 'active' ? 'left-0.5' : 'right-0.5'}`}></div>
-                  </button>
-                  <span className={`text-[10px] font-bold ${listing.status !== 'active' ? 'text-error' : 'text-on-surface-variant opacity-50'}`}>متوقف</span>
-                </div>
-              )}
-              <button 
-                onClick={() => onNavigate('listing-details', listing.id)}
-                className="p-3 bg-surface-container-high text-on-surface rounded-xl hover:bg-transparent hover:text-on-surface transition-colors border border-transparent hover:border-on-surface" 
-                title="عرض التفاصيل"
-              >
-                <Layers className="w-5 h-5" />
-              </button>
-              {settings.paymentSystemEnabled && (
-                <button 
-                  onClick={() => handleBoost(listing.id)}
-                  className={`p-3 rounded-xl transition-colors border border-transparent ${listing.boosted ? 'bg-yellow-100 text-yellow-700 hover:border-yellow-700' : 'bg-surface-container-high text-on-surface hover:border-on-surface'} hover:bg-transparent hover:text-inherit`}
-                  title="وضع في البورصة"
-                >
-                  <Zap className="w-5 h-5" />
-                </button>
-              )}
-              <button 
-                onClick={() => onNavigate('add-listing', listing.id)}
-                className="p-3 bg-surface-container-high text-on-surface rounded-xl hover:bg-transparent hover:text-on-surface transition-colors border border-transparent hover:border-on-surface" 
-                title="تعديل الإعلان"
-              >
-                <Settings className="w-5 h-5" />
-              </button>
-              <button 
-                onClick={() => {
-                  setListingToDelete(listing.id);
-                  setShowDeleteConfirm(true);
-                }}
-                className="p-3 bg-red-50 text-red-700 rounded-xl hover:bg-transparent hover:text-red-700 transition-colors border border-transparent hover:border-red-700" 
-                title="حذف الإعلان"
-              >
-                <Ban className="w-5 h-5" />
-              </button>
+      {listingSubTab === 'farms' ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 bg-surface p-4 rounded-3xl border border-outline-variant/20 shadow-sm">
+          <div className="lg:col-span-2 relative">
+            <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-on-surface-variant/40" />
+            <input 
+              type="text" 
+              placeholder="البحث بالعنوان، اسم الكساب أو رقم الهاتف..."
+              value={listingSearch}
+              onChange={(e) => setListingSearch(e.target.value)}
+              className="w-full bg-surface-container-low border border-outline-variant/30 rounded-2xl py-3 pr-12 pl-4 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+            />
+          </div>
+
+          <div className="relative">
+            <Filter className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant/40" />
+            <select 
+              value={listingFilter}
+              onChange={(e) => setListingFilter(e.target.value as any)}
+              className="w-full bg-surface-container-low border border-outline-variant/30 rounded-2xl py-3 pr-10 pl-4 text-sm font-black outline-none appearance-none cursor-pointer focus:ring-2 focus:ring-primary/20"
+            >
+              <option value="all">كل الإعلانات</option>
+              <option value="reported">تبليغات ({reports.length})</option>
+              <option value="promoted">مروجة</option>
+              <option value="inactive">متوقفة/مرفوضة</option>
+            </select>
+            <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-on-surface-variant">
+              <ChevronDown className="w-4 h-4" />
             </div>
           </div>
-        ))}
-        {filteredAnnouncements.length === 0 && (
-          <div className="p-12 text-center bg-surface rounded-2xl border border-dashed border-outline-variant/50">
-            <Tag className="w-12 h-12 text-on-surface-variant/30 mx-auto mb-4" />
-            <p className="text-on-surface-variant font-bold">لا توجد إعلانات حالياً</p>
+
+          <div className="relative">
+            <MapPin className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant/40" />
+            <select 
+              value={listingCityFilter}
+              onChange={(e) => setListingCityFilter(e.target.value)}
+              className="w-full bg-surface-container-low border border-outline-variant/30 rounded-2xl py-3 pr-10 pl-4 text-sm font-black outline-none appearance-none cursor-pointer focus:ring-2 focus:ring-primary/20"
+            >
+              <option value="all">جميع المدن</option>
+              {Object.entries(cityMapping).map(([key, name]) => (
+                <option key={key} value={key}>{name}</option>
+              ))}
+            </select>
+            <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-on-surface-variant">
+              <ChevronDown className="w-4 h-4" />
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <button 
+              onClick={handleExportListings}
+              className="flex-1 bg-surface-container-high text-on-surface-variant py-3 rounded-2xl text-xs font-black hover:bg-primary/10 hover:text-primary transition-all border border-transparent hover:border-primary/20 flex items-center justify-center gap-2"
+            >
+              <Download className="w-4 h-4" />
+              تصدير
+            </button>
+          </div>
+        </div>
+      ) : (
+          <div className="bg-surface p-6 rounded-3xl border border-outline-variant/20 shadow-sm">
+            <div className="flex items-center justify-between mb-6">
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-on-surface-variant/40" />
+                <input 
+                  type="text" 
+                  placeholder="البحث في المزادات..."
+                  className="w-full bg-surface-container-low border border-outline-variant/30 rounded-2xl py-3 pr-12 pl-4 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                />
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="text-xs font-bold text-on-surface-variant bg-surface-container-high px-4 py-2 rounded-xl border border-outline-variant/10">
+                  إجمالي المزادات المفتوحة: {offerRequests.length}
+                </div>
+              </div>
+            </div>
+
+            {/* Auctions / Requests Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-right border-collapse">
+                <thead>
+                  <tr className="bg-surface-container-low text-on-surface-variant text-[10px] font-black uppercase tracking-wider border-b border-outline-variant/30">
+                    <th className="p-5 text-right">المزاد / الطلب</th>
+                    <th className="p-5 text-right">المشتري</th>
+                    <th className="p-5 text-right">الميزانية / السلالة</th>
+                    <th className="p-5 text-right">العروض المستلمة</th>
+                    <th className="p-5 text-right">الحالة</th>
+                    <th className="p-5 text-left">الإجراءات</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-outline-variant/10">
+                  {offerRequests.map((request) => (
+                    <tr key={request.id} className="hover:bg-surface-container-lowest/50 transition-colors group">
+                      <td className="p-5">
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-xl bg-violet-100 text-violet-700 flex items-center justify-center shrink-0">
+                            <ShoppingBag className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <p className="font-black text-on-surface text-sm mb-0.5">{request.title}</p>
+                            <p className="text-[10px] text-on-surface-variant font-bold">{request.createdAt?.toDate?.()?.toLocaleDateString() || 'اليوم'}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-5">
+                        <div className="flex items-center gap-2">
+                           <User className="w-4 h-4 text-on-surface-variant/40" />
+                           <span className="text-xs font-bold text-on-surface-variant">{request.buyerName || 'مشتري'}</span>
+                        </div>
+                      </td>
+                      <td className="p-5">
+                        <div className="space-y-1">
+                          <div className="text-xs font-black text-primary">{request.budget || 'غير محدد'} درهم</div>
+                          <div className="flex flex-wrap gap-1">
+                            {(request.breeds || []).map((b: string, i: number) => (
+                              <span key={i} className="text-[8px] font-black bg-surface-container-high px-1.5 py-0.5 rounded-full">{b}</span>
+                            ))}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-5">
+                        <button 
+                          className="flex items-center gap-2 px-3 py-1.5 bg-violet-50 text-violet-700 rounded-xl text-[10px] font-black hover:bg-violet-100 transition-all border border-violet-100"
+                          onClick={async () => {
+                            setViewingAuctionTitle(request.title);
+                            const offers = await firestoreService.getOffersForRequest(request.id);
+                            setSelectedAuctionOffers(offers || []);
+                            setShowOffersModal(true);
+                          }}
+                        >
+                          <History className="w-3.5 h-3.5" />
+                          <span>عرض العروض</span>
+                        </button>
+                      </td>
+                      <td className="p-5">
+                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-black ${
+                          request.status === 'Open' || request.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-surface-container-high text-on-surface-variant'
+                        }`}>
+                          {request.status === 'Open' || request.status === 'Active' ? 'مفتوح' : 'مغلق'}
+                        </span>
+                      </td>
+                      <td className="p-5 text-left">
+                        <div className="flex items-center justify-end gap-2">
+                           <button 
+                             onClick={() => {
+                               // Admin view request details if needed
+                             }}
+                             className="p-2 bg-surface-container-high text-on-surface-variant hover:text-primary rounded-xl transition-all"
+                           >
+                             <Eye className="w-4 h-4" />
+                           </button>
+                           <button 
+                             onClick={() => {
+                               if (window.confirm("هل أنت متأكد من حذف هذا المزاد؟")) {
+                                 firestoreService.deleteOfferRequest(request.id).then(fetchAdminData);
+                               }
+                             }}
+                             className="p-2 bg-surface-container-high text-on-surface-variant hover:text-red-600 rounded-xl transition-all"
+                           >
+                             <Trash2 className="w-4 h-4" />
+                           </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {offerRequests.length === 0 && (
+                <div className="p-16 text-center">
+                  <ShoppingBag className="w-12 h-12 text-on-surface-variant/20 mx-auto mb-4" />
+                  <p className="text-on-surface-variant font-bold">لا توجد مزادات نشطة حالياً</p>
+                </div>
+              )}
+            </div>
           </div>
         )}
-      </div>
+      
+      {listingSubTab === 'farms' ? (
+        <div className="grid grid-cols-1 gap-4">
+          {paginatedAnnouncements.map((listing) => (
+            <div key={listing.id} className="bg-surface p-4 rounded-2xl border border-outline-variant/30 shadow-sm flex flex-col md:flex-row gap-6 items-center">
+              <div className="w-full md:w-48 h-32 rounded-xl overflow-hidden shrink-0 relative">
+                <img className="w-full h-full object-cover" src={listing.images?.[0] || "https://i.ytimg.com/vi/RrkkshRUttw/hq720.jpg?sqp=-oaymwEhCK4FEIIDSFryq4qpAxMIARUAAAAAGAElAADIQj0AgKJD&rs=AOn4CLD92lI4Kxe5liKSwWZaJuLAFopNeA"} alt="حولي" referrerPolicy="no-referrer" />
+                {reports.some(r => r.announcementId === listing.id) && (
+                  <div className="absolute top-2 right-2 bg-red-600 text-white px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 shadow-lg">
+                    <AlertCircle className="w-3 h-3" />
+                    <span>{reports.filter(r => r.announcementId === listing.id).length} تبليغات</span>
+                  </div>
+                )}
+              </div>
+              <div className="flex-1 space-y-2 text-center md:text-right">
+                <div className="flex flex-wrap justify-center md:justify-start gap-2 mb-1">
+                  {listing.status === 'pending' && !settings.autoAcceptSellers && <span className="bg-orange-100 text-orange-700 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">في انتظار المراجعة</span>}
+                  {listing.status === 'active' && <span className="bg-green-100 text-green-700 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">نشط</span>}
+                  {listing.status === 'inactive' && <span className="bg-surface-variant text-on-surface-variant text-[10px] font-black px-2 py-0.5 rounded-full uppercase">متوقف</span>}
+                  {listing.status === 'rejected' && <span className="bg-red-100 text-red-700 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">مرفوض</span>}
+                  <span className="bg-surface-variant text-on-surface-variant text-[10px] font-black px-2 py-0.5 rounded-full uppercase">{listing.category}</span>
+                </div>
+                <h3 className="font-bold text-on-surface text-lg">{listing.title}</h3>
+                <div className="flex items-center justify-center md:justify-start gap-4 text-xs text-on-surface-variant">
+                  <span className="flex items-center gap-1"><User className="w-3 h-3" /> {(() => {
+                    const seller = users.find(u => u.id === listing.sellerId);
+                    return seller ? (seller.fullName || seller.farmName || 'كساب غير معروف') : 'تحميل...';
+                  })()}</span>
+                  <span className="flex items-center gap-1">
+                    <MapPin className="w-3 h-3" />
+                    {(() => {
+                      const rawCity = (listing.location || 'غير محدد').split(' ')[0];
+                      return (rawCity && cityMapping[rawCity.toLowerCase()]) || rawCity;
+                    })()}
+                  </span>
+                  <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {listing.createdAt?.toDate?.()?.toLocaleString() || 'اليوم'}</span>
+                </div>
+              </div>
+              <div className="flex gap-2 shrink-0">
+                {listing.status === 'pending' && !settings.autoAcceptSellers && (
+                  <button 
+                    onClick={() => handleApproveListing(listing.id)}
+                    className="p-3 bg-green-50 text-green-700 rounded-xl hover:bg-transparent hover:text-green-700 transition-colors border border-transparent hover:border-green-700" 
+                    title="قبول الإعلان"
+                  >
+                    <CheckCircle2 className="w-5 h-5" />
+                  </button>
+                )}
+                {listing.status !== 'pending' && (
+                  <div className="flex items-center gap-2 px-3 py-1 bg-surface-container-high rounded-xl border border-outline-variant/10">
+                    <span className={`text-[10px] font-bold ${listing.status === 'active' ? 'text-green-600' : 'text-on-surface-variant opacity-50'}`}>نشط</span>
+                    <button 
+                      onClick={() => handleToggleListing(listing.id, listing.status)}
+                      className={`w-10 h-5 rounded-full relative transition-colors ${listing.status === 'active' ? 'bg-green-600' : 'bg-surface-variant'}`}
+                      title={listing.status === 'active' ? "توقيف الإعلان" : "تفعيل الإعلان"}
+                    >
+                      <div className={`w-3.5 h-3.5 rounded-full absolute top-0.5 bg-white transition-all ${listing.status === 'active' ? 'left-0.5' : 'right-0.5'}`}></div>
+                    </button>
+                    <span className={`text-[10px] font-bold ${listing.status !== 'active' ? 'text-error' : 'text-on-surface-variant opacity-50'}`}>متوقف</span>
+                  </div>
+                )}
+                <button 
+                  onClick={() => onNavigate('listing-details', listing.id)}
+                  className="p-3 bg-surface-container-high text-on-surface rounded-xl hover:bg-transparent hover:text-on-surface transition-colors border border-transparent hover:border-on-surface" 
+                  title="عرض التفاصيل"
+                >
+                  <Layers className="w-5 h-5" />
+                </button>
+                {settings.paymentSystemEnabled && (
+                  <button 
+                    onClick={() => handleBoost(listing.id)}
+                    className={`p-3 rounded-xl transition-colors border border-transparent ${listing.boosted ? 'bg-yellow-100 text-yellow-700 hover:border-yellow-700' : 'bg-surface-container-high text-on-surface hover:border-on-surface'} hover:bg-transparent hover:text-inherit`}
+                    title="وضع في البورصة"
+                  >
+                    <Zap className="w-5 h-5" />
+                  </button>
+                )}
+                <button 
+                  onClick={() => handleTogglePin(listing.id, !!listing.isPinnedToHome)}
+                  className={`p-3 rounded-xl transition-colors border border-transparent ${listing.isPinnedToHome ? 'bg-blue-100 text-blue-700 hover:border-blue-700' : 'bg-surface-container-high text-on-surface hover:border-on-surface'} hover:bg-transparent hover:text-inherit`}
+                  title={listing.isPinnedToHome ? "إزالة من الصفحة الرئيسية" : "تثبيت في الصفحة الرئيسية"}
+                >
+                  <BadgeCheck className="w-5 h-5" />
+                </button>
+                <button 
+                  onClick={() => onNavigate('add-listing', listing.id)}
+                  className="p-3 bg-surface-container-high text-on-surface rounded-xl hover:bg-transparent hover:text-on-surface transition-colors border border-transparent hover:border-on-surface" 
+                  title="تعديل الإعلان"
+                >
+                  <Settings className="w-5 h-5" />
+                </button>
+                <button 
+                  onClick={() => {
+                    setListingToDelete(listing.id);
+                    setShowDeleteConfirm(true);
+                  }}
+                  className="p-3 bg-red-50 text-red-700 rounded-xl hover:bg-transparent hover:text-red-700 transition-colors border border-transparent hover:border-red-700" 
+                  title="حذف الإعلان"
+                >
+                  <Ban className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          ))}
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-4 mt-8 bg-surface p-4 rounded-2xl border border-outline-variant/20 shadow-sm">
+              <button 
+                disabled={listingsPage === 1}
+                onClick={() => setListingsPage(p => Math.max(1, p - 1))}
+                className="p-2 bg-surface-container-high rounded-xl disabled:opacity-30 disabled:cursor-not-allowed hover:bg-primary/10 hover:text-primary transition-all border border-transparent hover:border-primary/20"
+              >
+                <ChevronLeft className="w-5 h-5 rotate-180" />
+              </button>
+              
+              <div className="flex items-center gap-2">
+                {[...Array(totalPages)].map((_, i) => {
+                  const page = i + 1;
+                  if (page === 1 || page === totalPages || (page >= listingsPage - 1 && page <= listingsPage + 1)) {
+                    return (
+                      <button
+                        key={page}
+                        onClick={() => setListingsPage(page)}
+                        className={`w-10 h-10 rounded-xl font-bold text-sm transition-all border ${
+                          listingsPage === page 
+                          ? 'bg-primary text-on-primary border-primary shadow-lg shadow-primary/20 scale-110' 
+                          : 'bg-surface-container-low text-on-surface-variant border-transparent hover:border-primary/30'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    );
+                  } else if (page === listingsPage - 2 || page === listingsPage + 2) {
+                    return <span key={page} className="text-on-surface-variant/40 font-black">...</span>;
+                  }
+                  return null;
+                })}
+              </div>
+
+              <button 
+                disabled={listingsPage === totalPages}
+                onClick={() => setListingsPage(p => Math.min(totalPages, p + 1))}
+                className="p-2 bg-surface-container-high rounded-xl disabled:opacity-30 disabled:cursor-not-allowed hover:bg-primary/10 hover:text-primary transition-all border border-transparent hover:border-primary/20"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+            </div>
+          )}
+
+          {filteredAnnouncements.length === 0 && (
+            <div className="p-12 text-center bg-surface rounded-2xl border border-dashed border-outline-variant/50">
+              <Tag className="w-12 h-12 text-on-surface-variant/30 mx-auto mb-4" />
+              <p className="text-on-surface-variant font-bold">لا توجد إعلانات حالياً</p>
+            </div>
+          )}
+        </div>
+      ) : null}
 
       {/* Import Confirmation Modal */}
       {importData && (
@@ -2294,8 +3095,91 @@ const renderOverview = () => (
           </div>
         </div>
       )}
-    </div>
-  );
+      {/* Offers Modal */}
+      {showOffersModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300" style={{ direction: 'rtl' }}>
+          <div className="bg-surface w-full max-w-4xl max-h-[85vh] rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden border border-white/20 animate-in zoom-in-95 duration-300">
+            <div className="p-6 border-b border-outline-variant/10 flex items-center justify-between bg-primary/5">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-primary text-on-primary flex items-center justify-center shadow-lg">
+                  <ShoppingBag className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-on-surface">عروض الكسابة</h3>
+                  <p className="text-xs text-on-surface-variant font-bold mt-0.5">للمزاد: {viewingAuctionTitle}</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowOffersModal(false)}
+                className="p-3 bg-surface-container-high text-on-surface-variant hover:text-red-600 rounded-2xl transition-all hover:rotate-90"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-6 space-y-4 no-scrollbar">
+              {selectedAuctionOffers.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {selectedAuctionOffers.map((offer: any) => (
+                    <div key={offer.id} className="bg-surface-container-low p-5 rounded-3xl border border-outline-variant/30 hover:shadow-md transition-shadow group relative overflow-hidden text-right">
+                      <div className="absolute top-0 right-0 w-1 h-full bg-primary/20 group-hover:bg-primary transition-colors" />
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-black">
+                            {offer.sellerName?.[0] || 'ك'}
+                          </div>
+                          <div className="text-right">
+                            <p className="font-black text-on-surface text-sm">{offer.sellerName}</p>
+                            <p className="text-[10px] text-on-surface-variant font-bold">{offer.sellerCity}</p>
+                          </div>
+                        </div>
+                        <div className="text-left">
+                          <p className="text-sm font-black text-primary">{offer.price} درهم</p>
+                          <p className="text-[9px] text-on-surface-variant font-bold">{offer.createdAt?.toDate?.()?.toLocaleDateString() || 'اليوم'}</p>
+                        </div>
+                      </div>
+                      <p className="text-xs text-on-surface-variant font-medium leading-relaxed mb-4 line-clamp-3">
+                        {offer.description || 'لا يوجد وصف إضافي للعرض'}
+                      </p>
+                      <div className="flex items-center gap-2 pt-4 border-t border-outline-variant/10">
+                        <span className={`px-2 py-1 rounded-lg text-[9px] font-black ${
+                          offer.status === 'accepted' ? 'bg-green-100 text-green-700' : 
+                          offer.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-violet-100 text-violet-700'
+                        }`}>
+                          {offer.status === 'accepted' ? 'مقبول' : offer.status === 'rejected' ? 'مرفوض' : 'قيد الانتظار'}
+                        </span>
+                        <div className="flex-1" />
+                        <button className="p-2 text-on-surface-variant hover:text-primary transition-colors">
+                          <Phone className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="py-20 text-center">
+                  <div className="w-16 h-16 bg-surface-container-high rounded-full flex items-center justify-center mx-auto mb-4 text-on-surface-variant/20">
+                    <History className="w-8 h-8" />
+                  </div>
+                  <p className="text-on-surface-variant font-black">لا توجد عروض مقدمة لهذا المزاد بعد</p>
+                </div>
+              )}
+            </div>
+            
+            <div className="p-6 bg-surface-container-low border-t border-outline-variant/10">
+              <button 
+                onClick={() => setShowOffersModal(false)}
+                className="w-full py-4 bg-primary text-on-primary rounded-2xl font-black text-sm shadow-lg shadow-primary/20 hover:shadow-xl hover:translate-y-[-2px] transition-all"
+              >
+                إغلاق
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      </div>
+    );
+  };
 
   const renderAds = () => {
     const banners = settings.banners || {};
@@ -2517,6 +3401,8 @@ const renderOverview = () => (
       </div>
     </div>
   );
+
+
 
   const renderProfile = () => {
     return (
@@ -2831,10 +3717,9 @@ const renderOverview = () => (
           <div className="h-24 flex flex-col items-center justify-center border-b border-outline-variant/20 gap-2 shrink-0">
             <button onClick={() => onNavigate('home')} className="flex items-center group">
               <img 
-                src="https://i.ibb.co/Psdn5FfW/logo-removebg-preview.png" 
+                src={logoV2} 
                 alt="منصة kessabcom.ma" 
-                className="h-12 w-auto object-contain transition-transform group-hover:scale-105"
-                referrerPolicy="no-referrer"
+                className="h-10 md:h-12 w-auto object-contain transition-transform group-hover:scale-105"
               />
             </button>
           </div>
@@ -2861,16 +3746,6 @@ const renderOverview = () => (
               <span>المستخدمين</span>
             </button>
             <button 
-              onClick={() => setActiveTab('reports')}
-              className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl font-bold transition-colors border ${activeTab === 'reports' ? 'bg-primary-container text-on-primary-container border-primary shadow-sm hover:bg-transparent hover:text-primary' : 'text-on-surface-variant border-transparent hover:border-on-surface-variant'}`}
-            >
-              <AlertCircle className="w-5 h-5 text-error" />
-              {reports.length > 0 && (
-                <span className="bg-error text-on-error text-[10px] px-2 py-0.5 rounded-full font-bold">{reports.length}</span>
-              )}
-              <span>التبليغات</span>
-            </button>
-            <button 
               onClick={() => setActiveTab('support_requests')}
               className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl font-bold transition-colors border ${activeTab === 'support_requests' ? 'bg-primary-container text-on-primary-container border-primary shadow-sm hover:bg-transparent hover:text-primary' : 'text-on-surface-variant border-transparent hover:border-on-surface-variant'}`}
             >
@@ -2883,11 +3758,28 @@ const renderOverview = () => (
               <span>الطلبات</span>
             </button>
             <button 
-              onClick={() => setActiveTab('stats')}
-              className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl font-bold transition-colors border ${activeTab === 'stats' ? 'bg-primary-container text-on-primary-container border-primary shadow-sm hover:bg-transparent hover:text-primary' : 'text-on-surface-variant border-transparent hover:border-on-surface-variant'}`}
+              onClick={() => setActiveTab('reports')}
+              className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl font-bold transition-colors border ${activeTab === 'reports' ? 'bg-primary-container text-on-primary-container border-primary shadow-sm hover:bg-transparent hover:text-primary' : 'text-on-surface-variant border-transparent hover:border-on-surface-variant'}`}
             >
-              <Database className="w-5 h-5" />
-              <span>إحصائيات المنصة</span>
+              <AlertCircle className="w-5 h-5 text-error" />
+              {reports.length > 0 && (
+                <span className="bg-error text-on-error text-[10px] px-2 py-0.5 rounded-full font-bold">{reports.length}</span>
+              )}
+              <span>التبليغات</span>
+            </button>
+            <button 
+              onClick={() => setActiveTab('reviews')}
+              className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl font-bold transition-colors border ${activeTab === 'reviews' ? 'bg-primary-container text-on-primary-container border-primary shadow-sm' : 'text-on-surface-variant border-transparent hover:border-on-surface-variant'}`}
+            >
+              <Star className="w-5 h-5" />
+              <span>التعليقات والمراجعة</span>
+            </button>
+            <button 
+              onClick={() => setActiveTab('ads')}
+              className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl font-bold transition-colors border ${activeTab === 'ads' ? 'bg-primary-container text-on-primary-container border-primary shadow-sm hover:bg-transparent hover:text-primary' : 'text-on-surface-variant border-transparent hover:border-on-surface-variant'}`}
+            >
+              <Megaphone className="w-5 h-5" />
+              <span>الإعلانات الترويجية</span>
             </button>
             <button 
               onClick={() => setActiveTab('stock-market')}
@@ -2895,6 +3787,20 @@ const renderOverview = () => (
             >
               <TrendingUp className="w-5 h-5" />
               <span>بورصة الأغنام</span>
+            </button>
+            <button 
+              onClick={() => setActiveTab('stats')}
+              className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl font-bold transition-colors border ${activeTab === 'stats' ? 'bg-primary-container text-on-primary-container border-primary shadow-sm hover:bg-transparent hover:text-primary' : 'text-on-surface-variant border-transparent hover:border-on-surface-variant'}`}
+            >
+              <Database className="w-5 h-5" />
+              <span>إحصائيات المنصة</span>
+            </button>
+            <button 
+              onClick={() => setActiveTab('settings')}
+              className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl font-bold transition-colors border ${activeTab === 'settings' ? 'bg-primary-container text-on-primary-container border-primary shadow-sm hover:bg-transparent hover:text-primary' : 'text-on-surface-variant border-transparent hover:border-on-surface-variant'}`}
+            >
+              <Settings className="w-5 h-5" />
+              <span>الإعدادات</span>
             </button>
 
             {settings.solidarityDonationEnabled && (
@@ -2916,30 +3822,6 @@ const renderOverview = () => (
                 <span>الأرباح والاشتراكات</span>
               </button>
             )}
-
-            <button 
-              onClick={() => setActiveTab('ads')}
-              className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl font-bold transition-colors border ${activeTab === 'ads' ? 'bg-primary-container text-on-primary-container border-primary shadow-sm hover:bg-transparent hover:text-primary' : 'text-on-surface-variant border-transparent hover:border-on-surface-variant'}`}
-            >
-              <Megaphone className="w-5 h-5" />
-              <span>إعلانات المنصة</span>
-            </button>
-
-            <button 
-              onClick={() => setActiveTab('settings')}
-              className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl font-bold transition-colors border ${activeTab === 'settings' ? 'bg-primary-container text-on-primary-container border-primary shadow-sm hover:bg-transparent hover:text-primary' : 'text-on-surface-variant border-transparent hover:border-on-surface-variant'}`}
-            >
-              <Settings className="w-5 h-5" />
-              <span>الإعدادات</span>
-            </button>
-
-            <button 
-              onClick={() => setActiveTab('profile')}
-              className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl font-bold transition-colors border ${activeTab === 'profile' ? 'bg-primary-container text-on-primary-container border-primary shadow-sm hover:bg-transparent hover:text-primary' : 'text-on-surface-variant border-transparent hover:border-on-surface-variant'}`}
-            >
-              <User className="w-5 h-5" />
-              <span>ملفي الشخصي</span>
-            </button>
           </nav>
         </div>
         <div className="p-4 border-t border-outline-variant/20">
@@ -2971,7 +3853,8 @@ const renderOverview = () => (
           {activeTab === 'listings' && renderListings()}
           {activeTab === 'reports' && renderReports()}
           {activeTab === 'support_requests' && renderSupportRequests()}
-          {activeTab === 'monetization' && (
+              {activeTab === 'reviews' && <ReviewsModerationView />}
+              {activeTab === 'monetization' && (
             settings.paymentSystemEnabled ? renderMonetization() : (
               <div className="p-12 text-center bg-surface rounded-2xl border border-outline-variant/30">
                 <DollarSign className="w-12 h-12 text-on-surface-variant/30 mx-auto mb-4" />
@@ -3092,7 +3975,7 @@ const renderOverview = () => (
                                   farmLocation: find(['ville', 'المدينة', 'location', 'city']),
                                   images: find(['الصور', 'images']),
                                   videoUrl: find(['الفيديو', 'video', 'videoUrl']),
-                                  youtubeUrl: find(['رابط فيديو يوتيوب', 'youtube', 'youtubeUrl']),
+                                  youtubeLink: find(['رابط فيديو يوتيوب', 'youtube', 'youtubeUrl']),
                                   sheepCount: find(['عدد رؤوس الغنم المتوفرة', 'العدد', 'stockCount', 'stock', 'sheepCount']),
                                   price: find(['أقل ثمن كيبدا من', 'الثمن', 'price', 'prix']),
                                   age: find(['السن', 'العمر', 'ageRange', 'age']),
@@ -3192,6 +4075,19 @@ const renderOverview = () => (
                         <div className={`w-4 h-4 rounded-full absolute top-0.5 shadow-sm transition-all ${settings.autoAcceptSellers ? 'bg-on-primary left-0.5' : 'bg-surface right-0.5'}`}></div>
                       </div>
                     </div>
+
+                    <div className="flex items-center justify-between p-4 bg-surface-container-low rounded-xl border border-primary/20">
+                      <div>
+                        <h4 className="font-bold text-on-surface text-sm text-primary">تفعيل نظام المزاد (Auction)</h4>
+                        <p className="text-[10px] text-on-surface-variant">يسمح للمشترين بتقديم عروض أسعار تنافسية على الإعلانات</p>
+                      </div>
+                      <div 
+                        className={`w-10 h-5 rounded-full relative cursor-pointer transition-colors ${settings.auctionSystemEnabled ? 'bg-primary' : 'bg-surface-variant'}`}
+                        onClick={() => updateSettings({ auctionSystemEnabled: !settings.auctionSystemEnabled })}
+                      >
+                        <div className={`w-4 h-4 rounded-full absolute top-0.5 shadow-sm transition-all ${settings.auctionSystemEnabled ? 'bg-on-primary left-0.5' : 'bg-surface right-0.5'}`}></div>
+                      </div>
+                    </div>
                     {/* Date et notification de l'Aïd */}
                     <div className="p-4 bg-primary/5 border border-primary/10 rounded-xl space-y-4">
                       
@@ -3246,6 +4142,21 @@ const renderOverview = () => (
                         <div className={`w-4 h-4 rounded-full absolute top-0.5 shadow-sm transition-all ${settings.paymentSystemEnabled ? 'bg-on-primary left-0.5' : 'bg-surface right-0.5'}`}></div>
                       </div>
                     </div>
+
+                    {!settings.paymentSystemEnabled && (
+                      <div className="flex items-center justify-between p-4 bg-primary/5 rounded-xl border border-primary/10 animate-in slide-in-from-top-1">
+                        <div>
+                          <h4 className="font-bold text-on-surface text-sm text-primary">أقصى عدد من الإعلانات للمستخدم المجاني</h4>
+                          <p className="text-[10px] text-on-surface-variant">الحد الأقصى للإعلانات النشطة لكل كساب في حالة تعطل نظام الدفع</p>
+                        </div>
+                        <input 
+                          type="number" 
+                          className="w-20 bg-white border border-outline-variant/30 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary font-bold text-center"
+                          value={settings.maxListingsPerFreeUser || 5}
+                          onChange={(e) => updateSettings({ maxListingsPerFreeUser: Number(e.target.value) })}
+                        />
+                      </div>
+                    )}
                     <div className="flex items-center justify-between p-4 bg-surface-container-low rounded-xl border border-primary/20">
                       <div>
                         <h4 className="font-bold text-on-surface text-sm text-primary">تفعيل التبرع التضامني</h4>
@@ -3270,6 +4181,40 @@ const renderOverview = () => (
                         <div className={`w-4 h-4 rounded-full absolute top-0.5 shadow-sm transition-all ${settings.guestBuyerMode ? 'bg-on-primary left-0.5' : 'bg-surface right-0.5'}`}></div>
                       </div>
                     </div>
+
+                    {/* Max Home Listings */}
+                    <div className="flex items-center justify-between p-4 bg-surface-container-low rounded-xl border border-primary/20">
+                      <div>
+                        <h4 className="font-bold text-on-surface text-sm text-primary">عدد الإعلانات في الصفحة الرئيسية</h4>
+                        <p className="text-[10px] text-on-surface-variant">الحد الأقصى لعدد الإعلانات المعروضة في كل مدينة على الصفحة الرئيسية (الحد الأقصى: 12)</p>
+                      </div>
+                      <input
+                        type="number"
+                        min="1"
+                        max="12"
+                        className="w-16 bg-white border border-outline-variant/30 rounded-lg px-2 py-1 text-sm font-black outline-none text-center focus:ring-2 focus:ring-primary"
+                        value={settings.maxHomeListings ?? 6}
+                        onChange={(e) => updateSettings({ maxHomeListings: Math.min(12, Math.max(1, Number(e.target.value))) })}
+                      />
+                    </div>
+
+                    {/* Listing limit when payment is disabled */}
+                    {!settings.paymentSystemEnabled && (
+                      <div className="flex items-center justify-between p-4 bg-surface-container-low rounded-xl border border-primary/20">
+                        <div>
+                          <h4 className="font-bold text-on-surface text-sm text-primary">أقصى عدد للإعلانات لكل مستخدم</h4>
+                          <p className="text-[10px] text-on-surface-variant">عندما يكون نظام الدفع معطلاً، هذا هو الحد الأقصى للإعلانات التي يمكن لكل كساب نشرها.</p>
+                        </div>
+                        <input
+                          type="number"
+                          min="1"
+                          max="100"
+                          className="w-16 bg-white border border-outline-variant/30 rounded-lg px-2 py-1 text-sm font-black outline-none text-center focus:ring-2 focus:ring-primary"
+                          value={settings.maxListingsPerFreeUser ?? 5}
+                          onChange={(e) => updateSettings({ maxListingsPerFreeUser: Math.max(1, Number(e.target.value)) })}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
                 )}
@@ -3373,6 +4318,24 @@ const renderOverview = () => (
                             Nom Complet, Numéro de téléphone, Ville, موقع الضيعة (مثل 33.55, -7.64), الصور (روابط مفصولة بـ ;), الفيديو (رابط MP4 أو YouTube), رابط فيديو يوتيوب, عدد رؤوس الغنم المتوفرة, أقل ثمن كيبدا من, السن, حجم الحولي, سلالة الغنم, وصف إضافي, Audio (رابط MP3)
                           </code>
                         </p>
+                        <button 
+                          onClick={() => {
+                            const headers = "Nom Complet,Numéro de téléphone,Ville,موقع الضيعة (مثل 33.55, -7.64),الصور (روابط مفصولة بـ ;),الفيديو (رابط MP4 أو YouTube),رابط فيديو يوتيوب,عدد رؤوس الغنم المتوفرة,أقل ثمن كيبدا من,السن,حجم الحولي,سلالة الغنم,وصف إضافي,Audio (رابط MP3)";
+                            const row = "\nJohn Doe,212600000000,سطات,\"33.55, -7.64\",https://example.com/img1.jpg;https://example.com/img2.jpg,,https://youtube.com/watch?v=123,10,2500,ثني,كبير,سردي,وصف تجريبي,";
+                            const blob = new Blob([headers + row], { type: 'text/csv;charset=utf-8;' });
+                            const url = URL.createObjectURL(blob);
+                            const link = document.createElement("a");
+                            link.setAttribute("href", url);
+                            link.setAttribute("download", "sample_kessabcom.csv");
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                          }}
+                          className="mt-2 flex items-center gap-2 px-4 py-2 bg-primary/10 text-primary rounded-xl text-[10px] font-black hover:bg-primary/20 transition-all border border-primary/20"
+                        >
+                          <Download className="w-3 h-3" />
+                          تحميل ملف CSV تجريبي (Sample)
+                        </button>
                       </section>
 
                       <section className="space-y-2">
@@ -3401,7 +4364,7 @@ const renderOverview = () => (
                           3. ربط الإعلانات بالكسابة
                         </h4>
                         <p className="text-xs text-on-surface-variant leading-relaxed">
-                          خانة <code dir="ltr">sellerId</code> خاص يكون فيها الـ UID ديال الكساب ف Firebase. إلا كنتي باغي ترفع إعلانات لكسابة جداد، خاصك تكريهوم ف Firebase Auth أولاً.
+                          خانة <code dir="ltr">sellerId</code> اختيارية. إلا خليتيها خاوية، النظام غادي يتكلف ويكري حساب (Firebase Auth & Profile) لكل كساب جديد بشكل تلقائي بناءً على رقم التيليفون ديالو.
                         </p>
                       </section>
 

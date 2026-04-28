@@ -204,7 +204,8 @@ export const firestoreService = {
     if (startAfter) url += `&startAfter=${encodeURIComponent(startAfter)}`;
 
     try {
-      const response = await fetch(url);
+      const headers = await getAuthHeaders();
+      const response = await fetch(url, { headers });
       return await response.json();
     } catch (error) {
       console.error("getOfferRequests error:", error);
@@ -242,6 +243,35 @@ export const firestoreService = {
     });
   },
 
+  async archiveOfferRequest(id: string) {
+    const headers = await getAuthHeaders();
+    return apiFetch(`${API_BASE}/offer-requests/${id}`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({ status: 'Archived' })
+    });
+  },
+
+  async getSellerListing(sellerId: string) {
+    try {
+      const res = await fetch(`${API_BASE}/listings?sellerId=${encodeURIComponent(sellerId)}&limit=1`);
+      const data = await res.json();
+      return (data?.data || data)?.[0] || null;
+    } catch { return null; }
+  },
+
+  async getUserOfferRequestsCount(buyerId: string) {
+    try {
+      const q = query(
+        collection(db, 'offerRequests'),
+        where('buyerId', '==', buyerId),
+        where('status', 'in', ['Open', 'Active'])
+      );
+      const snap = await getDocs(q);
+      return snap.size;
+    } catch { return 0; }
+  },
+
   async createOffer(data: any) {
     const headers = await getAuthHeaders();
     return fetch(`${API_BASE}/offers`, {
@@ -254,6 +284,11 @@ export const firestoreService = {
   async getOffersForRequest(requestId: string) {
     const headers = await getAuthHeaders();
     return fetch(`${API_BASE}/offers/request/${requestId}`, { headers }).then(res => res.json());
+  },
+
+  async getOffersForSeller(sellerId: string) {
+    const headers = await getAuthHeaders();
+    return fetch(`${API_BASE}/offers/seller/${sellerId}`, { headers }).then(res => res.json()).catch(() => []);
   },
 
   async acceptOffer(offerId: string) {
@@ -355,6 +390,15 @@ export const firestoreService = {
       headers,
       body: JSON.stringify({ status, reason })
     }).then(res => res.json());
+  },
+
+  async adminPinListingToHome(id: string, isPinnedToHome: boolean) {
+    const headers = await getAuthHeaders();
+    return apiFetch(`${API_BASE}/admin/listings/${id}/pin`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({ isPinnedToHome })
+    });
   },
 
   async adminDeleteListing(id: string) {
@@ -479,13 +523,7 @@ export const firestoreService = {
     }).then(res => res.json());
   },
 
-  async archiveOfferRequest(id: string) {
-    const headers = await getAuthHeaders();
-    return fetch(`${API_BASE}/offer-requests/${id}/archive`, {
-      method: 'PUT',
-      headers
-    }).then(res => res.json());
-  },
+
 
   async createDonation(data: any) {
     const headers = await getAuthHeaders();
@@ -523,12 +561,12 @@ export const firestoreService = {
     );
   },
 
-  async rateAnnouncement(id: string, rating: number) {
+  async rateAnnouncement(id: string, rating: number, comment?: string) {
     const headers = await getAuthHeaders();
     return fetch(`${API_BASE}/listings/${id}/rate`, {
       method: "POST",
       headers,
-      body: JSON.stringify({ rating })
+      body: JSON.stringify({ rating, comment })
     }).then(res => res.json());
   },
 
@@ -549,6 +587,32 @@ export const firestoreService = {
     }).then(res => res.json());
   },
 
+  async adminGetPendingReviews() {
+    const headers = await getAuthHeaders();
+    return apiFetch(`${API_BASE}/admin/reviews/pending`, { headers });
+  },
+
+  async adminApproveReview(type: 'seller' | 'listing', targetId: string, reviewId: string) {
+    const headers = await getAuthHeaders();
+    return apiFetch(`${API_BASE}/admin/reviews/${type}/${targetId}/${reviewId}/approve`, {
+      method: 'PUT',
+      headers
+    });
+  },
+
+  async getBuyerReviews() {
+    const headers = await getAuthHeaders();
+    return apiFetch(`${API_BASE}/buyer/reviews`, { headers });
+  },
+
+  async adminDeleteReview(type: 'seller' | 'listing', targetId: string, reviewId: string) {
+    const headers = await getAuthHeaders();
+    return apiFetch(`${API_BASE}/admin/reviews/${type}/${targetId}/${reviewId}`, {
+      method: 'DELETE',
+      headers
+    });
+  },
+
   async deleteOffer(id: string) {
     const headers = await getAuthHeaders();
     return fetch(`${API_BASE}/offers/${id}`, {
@@ -562,9 +626,10 @@ export const firestoreService = {
     return fetch(`${API_BASE}/stats`).then(res => res.json());
   },
 
-  async getAdminStats() {
+  async getAdminStats(period?: 'today' | 'week' | 'month' | 'all') {
     const headers = await getAuthHeaders();
-    return fetch(`${API_BASE}/admin/stats`, { headers }).then(res => res.json());
+    const url = period && period !== 'all' ? `${API_BASE}/admin/stats?period=${period}` : `${API_BASE}/admin/stats`;
+    return apiFetch(url, { headers });
   },
 
 
@@ -633,24 +698,30 @@ export const firestoreService = {
    * subscribeToOffersForRequest
    * Private read — requires auth (firestore.rules: allow read: if isSignedIn()).
    */
-  subscribeToOffersForRequest(requestId: string, callback: (offers: any[]) => void) {
+  subscribeToOffersForRequest(requestId: string, callback: (offers: any[]) => void, onError?: (err: any) => void) {
     if (!requestId) {
       callback([]);
       return () => {};
     }
     const q = query(
       collection(db, 'offers'),
-      where('requestId', '==', requestId),
-      orderBy('createdAt', 'desc')
+      where('requestId', '==', requestId)
     );
     return onSnapshot(
       q,
       (snapshot) => {
-        callback(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        docs.sort((a: any, b: any) => {
+          const tA = a.createdAt?.toMillis ? a.createdAt.toMillis() : (a.createdAt || 0);
+          const tB = b.createdAt?.toMillis ? b.createdAt.toMillis() : (b.createdAt || 0);
+          return tB - tA;
+        });
+        callback(docs);
       },
       (error) => {
         console.error('[subscribeToOffersForRequest] Firestore error:', error.code, error.message);
-        callback([]);
+        if (onError) onError(error);
+        else callback([]);
       }
     );
   },

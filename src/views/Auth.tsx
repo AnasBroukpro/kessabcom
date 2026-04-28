@@ -62,6 +62,11 @@ export default function Auth({ onNavigate, intendedView }: Props) {
     if (index === 0) return; // '0' is fixed
     if (!/^\d*$/.test(value)) return;
     
+    // Moroccan prefixes validation for the second digit
+    if (index === 1 && value && !['5', '6', '7'].includes(value.slice(-1))) {
+      return;
+    }
+
     const newDigits = [...phoneDigits];
     newDigits[index] = value.slice(-1);
     setPhoneDigits(newDigits);
@@ -156,7 +161,25 @@ export default function Auth({ onNavigate, intendedView }: Props) {
           const hasListings = await firestoreService.hasUserListings(result.user.uid);
           targetView = hasListings ? 'seller' : 'add-listing';
         }
-        onNavigate(intendedView ? intendedView.view : targetView, intendedView?.listingId);
+        let finalView = targetView;
+        
+        if (intendedView) {
+          if (profileData.role === 'buyer' && (intendedView.view === 'seller' || intendedView.view === 'add-listing' || intendedView.view === 'admin')) {
+            finalView = 'buyer';
+          } else if (profileData.role === 'seller' && (intendedView.view === 'buyer' || intendedView.view === 'admin')) {
+            finalView = targetView;
+          } else {
+            finalView = intendedView.view;
+          }
+        }
+        
+        onNavigate(
+          finalView,
+          intendedView?.listingId,
+          undefined,
+          undefined,
+          finalView === 'buyer' ? 'dashboard' : undefined
+        );
         return;
       } else {
         // Auth exists but no Firestore profile → let them complete registration
@@ -245,6 +268,7 @@ export default function Auth({ onNavigate, intendedView }: Props) {
         fullName: fullName.trim(),
         displayName: fullName.trim(),
         phoneNumber: formattedPhone,
+        whatsappNumber: selectedRole === 'seller' ? formattedPhone : '',
         role: selectedRole,
         pseudo: selectedRole === 'seller' ? pseudo.trim() : '',
         city,
@@ -304,34 +328,6 @@ export default function Auth({ onNavigate, intendedView }: Props) {
     }
   };
 
-  // ─── Forgot password ─────────────────────────────────────────────────────────
-  const handleForgotPassword = async () => {
-    if (!phoneNumber) { setError('أدخل رقم هاتفك أولاً'); return; }
-    setLoading(true);
-    try {
-      let userName = 'غير معروف';
-      try {
-        const formatted = getFormattedPhone(phoneNumber);
-        const q = query(collection(db, 'users'), where('phoneNumber', '==', formatted), limit(1));
-        const snap = await getDocs(q);
-        if (!snap.empty) {
-          const data = snap.docs[0].data();
-          userName = data.fullName || data.displayName || 'غير معروف';
-        }
-      } catch { /* ignore */ }
-
-      await firestoreService.createSupportRequest('password_reset', {
-        phone: getFormattedPhone(phoneNumber),
-        name: userName,
-      });
-      setShowSupportSuccess(true);
-      setFieldErrors({});
-    } catch {
-      setError('وقع خطأ في إرسال الطلب.');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // Detect location for new users
   useEffect(() => {
@@ -358,8 +354,13 @@ export default function Auth({ onNavigate, intendedView }: Props) {
   }, [isNewUser, phoneChecked]);
 
   return (
-    <div className="h-screen w-full flex bg-white font-sans overflow-hidden" dir="rtl">
-      {/* BACK TO HOME BUTTON */}
+    <div className="h-screen w-full flex bg-white overflow-hidden" dir="rtl">
+      {/* Background Decor (Only for form side) */}
+      <div className="absolute inset-0 lg:w-1/2 overflow-hidden pointer-events-none">
+        <div className="absolute -top-24 -left-24 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
+        <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-secondary/5 rounded-full blur-3xl" />
+      </div>
+
       <button 
         onClick={() => onNavigate('home')}
         className="fixed top-6 right-6 z-50 flex flex-row-reverse items-center gap-2 bg-white px-5 py-2.5 rounded-full text-sm font-black shadow-[0_4px_20px_-4px_rgba(0,0,0,0.1)] hover:bg-gray-50 transition-all transform hover:scale-105 active:scale-95 group text-[#1A1A1A]"
@@ -368,20 +369,20 @@ export default function Auth({ onNavigate, intendedView }: Props) {
         <ArrowRight className="w-4 h-4 text-[#2E7D32]" />
       </button>
 
-      {/* LEFT: AUTH FORM */}
-      <div className="flex-[1.2] lg:flex-1 flex flex-col justify-center items-center p-8 lg:p-12 relative">
-        <div className="w-full max-w-[360px] animate-in fade-in slide-in-from-bottom-4 duration-700">
+      {/* LEFT: AUTH FORM (Displayed on the right in RTL) */}
+      <div className="flex-[1.2] lg:flex-1 flex flex-col justify-center items-center p-6 md:p-12 relative z-10 bg-[#FDFCF8]">
+        <div className="w-full max-w-[440px] bg-white rounded-[32px] p-8 md:p-10 shadow-[0_20px_50px_rgba(0,0,0,0.05)] border border-outline-variant/10 animate-in fade-in slide-in-from-bottom-4 duration-700">
 
           <div className="text-center mb-8">
-            <div className="w-48 md:w-56 mx-auto mb-6 flex items-center justify-center">
+            <div className="w-[154px] md:w-[180px] mx-auto mb-6 flex items-center justify-center">
               <img 
                 src={logoV2} 
                 alt="منصة kessabcom.ma" 
                 className="w-full h-auto"
               />
             </div>
-            <h1 className="text-3xl md:text-4xl font-black text-[#1A1A1A] mb-2 font-headline">تسجيل الدخول</h1>
-            <p className="text-[#4A4A4A] text-sm md:text-base font-bold">
+            <h1 className="text-2xl font-black text-on-surface mb-3 font-headline">تسجيل الدخول</h1>
+            <p className="text-on-surface-variant font-medium leading-relaxed">
               على سلامتك، توحشناك في السوق
             </p>
           </div>
@@ -411,11 +412,12 @@ export default function Auth({ onNavigate, intendedView }: Props) {
             {/* Phone Input with Inline Error */}
             <div className="space-y-6">
               <div className="space-y-2">
-                <label className="block text-xs md:text-sm font-black text-[#1A1A1A] text-right px-1">رقم الهاتف</label>
-                <div className={`flex w-full overflow-hidden rounded-2xl border transition-all ${fieldErrors.phone ? 'border-red-500 shadow-sm shadow-red-100' : 'border-outline-variant/30'}`} dir="ltr" onPaste={handlePaste}>
+                <label className="block text-sm font-black text-on-surface-variant mb-4 text-right">رقم الهاتف</label>
+                <div className="flex flex-row justify-between gap-1 sm:gap-2" dir="ltr" onPaste={handlePaste}>
                   {phoneDigits.map((digit, idx) => (
                     <input
                       key={idx}
+                      id={`digit-${idx}`}
                       ref={el => digitRefs.current[idx] = el}
                       type="text"
                       inputMode="numeric"
@@ -425,10 +427,13 @@ export default function Auth({ onNavigate, intendedView }: Props) {
                       disabled={phoneChecked}
                       onChange={(e) => handleDigitChange(idx, e.target.value)}
                       onKeyDown={(e) => handleDigitKeyDown(idx, e)}
-                      placeholder="-"
-                      className={`w-full h-12 md:h-14 text-center font-black text-xl md:text-2xl transition-all outline-none border-r border-outline-variant/20 last:border-r-0
-                        ${idx === 0 ? 'bg-[#E6EBE6] text-[#0A5C2F]' : 'bg-white focus:bg-primary/5 text-[#1A1A1A] placeholder:text-gray-300'}
-                        ${phoneChecked ? 'opacity-50' : ''}`}
+                      className={`w-full h-12 sm:h-14 text-center text-xl font-black rounded-xl border-2 transition-all outline-none ${
+                        idx === 0 || digit ? 'text-[#2E7D32]' : 'text-[#1A1A1A]'
+                      } ${
+                        idx === 0 ? 'bg-[#E8F5E9] border-[#2E7D32]/20' :
+                        fieldErrors.phone ? 'border-red-500 bg-red-50/30' :
+                        'border-outline-variant/20 bg-[#F9F9F6] focus:border-primary focus:bg-white focus:shadow-lg focus:shadow-primary/10'
+                      } ${phoneChecked ? 'opacity-50' : ''}`}
                     />
                   ))}
                 </div>
@@ -441,7 +446,7 @@ export default function Auth({ onNavigate, intendedView }: Props) {
 
               {/* Password Input with Inline Error */}
               <div className="space-y-2 mt-4">
-                <label className="block text-xs md:text-sm font-black text-[#1A1A1A] text-right px-1">كلمة المرور</label>
+                <label className="block text-sm font-black text-on-surface-variant mb-4 text-right">كلمة المرور</label>
                 <div className="relative">
                   <input
                     type={showPassword ? 'text' : 'password'}
@@ -449,7 +454,7 @@ export default function Auth({ onNavigate, intendedView }: Props) {
                     value={password}
                     disabled={phoneChecked && !isNewUser}
                     onChange={(e) => setPassword(e.target.value)}
-                    className={`w-full h-12 md:h-14 bg-[#F5F5F0] border rounded-2xl px-4 text-sm md:text-base text-center font-bold focus:border-[#2E7D32] focus:ring-2 focus:ring-[#2E7D32]/20 transition-all placeholder:text-[#757575]
+                    className={`w-full h-14 bg-[#F9F9F6] border-2 rounded-2xl px-4 text-lg text-center font-black focus:border-primary focus:bg-white focus:shadow-lg focus:shadow-primary/10 transition-all placeholder:text-outline-variant/60
                       ${fieldErrors.password ? 'border-red-500 bg-red-50/30' : 'border-outline-variant/20'}
                       ${phoneChecked && !isNewUser ? 'opacity-50 cursor-not-allowed' : ''}`}
                     required
@@ -457,9 +462,9 @@ export default function Auth({ onNavigate, intendedView }: Props) {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute left-4 top-1/2 -translate-y-1/2 text-[#757575] hover:text-[#1A1A1A] transition-colors"
+                    className="absolute left-4 top-1/2 -translate-y-1/2 text-outline-variant hover:text-on-surface transition-colors"
                   >
-                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                   </button>
                 </div>
                 {fieldErrors.password && (
@@ -499,7 +504,7 @@ export default function Auth({ onNavigate, intendedView }: Props) {
                   placeholder="الاسم الكامل"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  className="w-full h-12 bg-black/5 border-0 rounded-xl px-4 text-sm text-center font-bold"
+                  className="w-full h-14 bg-[#F9F9F6] border-2 border-outline-variant/20 rounded-2xl px-4 text-base text-center font-black focus:border-primary focus:bg-white transition-all"
                   required
                 />
                 {selectedRole === 'seller' && (
@@ -508,14 +513,14 @@ export default function Auth({ onNavigate, intendedView }: Props) {
                     placeholder="اللقب (اختياري) - مثلا: الحاج التهامي"
                     value={pseudo}
                     onChange={(e) => setPseudo(e.target.value)}
-                    className="w-full h-12 bg-black/5 border-0 rounded-xl px-4 text-sm text-center font-bold"
+                    className="w-full h-14 bg-[#F9F9F6] border-2 border-outline-variant/20 rounded-2xl px-4 text-base text-center font-black focus:border-primary focus:bg-white transition-all"
                   />
                 )}
                 <div className="relative">
                   <select
                     value={city}
                     onChange={(e) => setCity(e.target.value)}
-                    className="w-full h-12 bg-black/5 border-0 rounded-xl px-4 text-sm text-center font-bold appearance-none"
+                    className="w-full h-14 bg-[#F9F9F6] border-2 border-outline-variant/20 rounded-2xl px-4 text-base text-center font-black appearance-none focus:border-primary focus:bg-white transition-all"
                     required
                   >
                     <option value="">
@@ -525,7 +530,7 @@ export default function Auth({ onNavigate, intendedView }: Props) {
                       <option key={c} value={c}>{c}</option>
                     ))}
                   </select>
-                  <MapPin className="absolute right-4 top-1/2 -translate-y-1/2 text-black/20 w-4 h-4" />
+                  <MapPin className="absolute right-4 top-1/2 -translate-y-1/2 text-outline-variant w-5 h-5" />
                 </div>
               </div>
             )}
@@ -533,23 +538,26 @@ export default function Auth({ onNavigate, intendedView }: Props) {
             <button
               type="submit"
               disabled={loading}
-              className="w-full h-12 md:h-14 bg-[#115E2C] text-white rounded-2xl font-black text-lg md:text-xl shadow-md hover:shadow-lg hover:bg-[#0E4A22] transition-all flex items-center justify-center active:scale-95 mt-6"
+              className="w-full h-14 bg-primary text-white rounded-2xl font-black text-lg shadow-xl shadow-primary/20 hover:shadow-primary/30 active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-3"
             >
               {loading ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
+                <>
+                  <Loader2 className="w-6 h-6 animate-spin" />
+                  <span>جاري المعالجة...</span>
+                </>
               ) : !phoneChecked ? (
-                'دخول'
+                <span>دخول</span>
               ) : isNewUser ? (
-                'إنشاء الحساب'
+                <span>إنشاء الحساب</span>
               ) : (
-                'دخول'
+                <span>دخول</span>
               )}
             </button>
 
             {!phoneChecked && (
               <button
                 type="button"
-                onClick={handleForgotPassword}
+                onClick={() => onNavigate('forgot-password')}
                 className="w-full text-center text-sm md:text-base text-[#115E2C] font-black hover:underline mt-6"
               >
                 نسيت كلمة المرور؟
@@ -602,30 +610,6 @@ export default function Auth({ onNavigate, intendedView }: Props) {
         </div>
       </div>
 
-      {/* SUCCESS POPUP */}
-      {showSupportSuccess && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl border border-primary/10 animate-in zoom-in-95 duration-300 text-center">
-            <div className="w-24 h-24 bg-primary/10 text-primary rounded-full flex items-center justify-center mx-auto mb-8">
-              <CheckCircle2 className="w-12 h-12" />
-            </div>
-            <h3 className="text-3xl font-black text-on-surface mb-4 font-headline">تم إرسال طلبك بنجاح!</h3>
-            <div className="bg-surface-container-low p-6 rounded-3xl mb-8 border border-outline-variant/20">
-              <p className="text-[10px] font-black text-on-surface-variant uppercase mb-2">رقم الهاتف المسجل</p>
-              <p className="text-2xl font-black text-primary" dir="ltr">{phoneNumber}</p>
-            </div>
-            <p className="text-on-surface-variant font-bold text-base leading-relaxed mb-10">
-              سيقوم فريق الدعم لدينا بالاتصال بك قريباً عبر الهاتف لتغيير كلمة المرور الخاصة بك.
-            </p>
-            <button 
-              onClick={() => setShowSupportSuccess(false)}
-              className="w-full py-5 bg-primary text-on-primary font-black rounded-2xl shadow-xl shadow-primary/20 transition-all hover:scale-[1.02] active:scale-95 text-lg"
-            >
-              فهمت، شكراً
-            </button>
-          </div>
-        </div>
-      )}
 
       <style dangerouslySetInnerHTML={{ __html: `
         @keyframes marquee-up { 0% { transform: translateY(0); } 100% { transform: translateY(-50%); } }

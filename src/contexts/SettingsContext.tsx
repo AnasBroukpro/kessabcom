@@ -12,6 +12,9 @@ export interface AppSettings {
   paymentSystemEnabled: boolean;
   guestBuyerMode: boolean;
   googleMapsApiKey: string;
+  auctionSystemEnabled: boolean;
+  maxListingsPerFreeUser: number;
+  maxHomeListings: number;
   stockMarket: {
     sheep: number;
     goats: number;
@@ -63,6 +66,9 @@ const defaultSettings: AppSettings = {
   paymentSystemEnabled: true,
   guestBuyerMode: false,
   googleMapsApiKey: '',
+  auctionSystemEnabled: true,
+  maxListingsPerFreeUser: 5,
+  maxHomeListings: 6,
   stockMarket: {
     sheep: 70,
     goats: 55,
@@ -120,8 +126,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     };
 
     fetchSettings();
-    const interval = setInterval(fetchSettings, 60000); // Poll every minute
-    return () => clearInterval(interval);
+    // Removed setInterval to prevent excessive Firestore reads
   }, []);
 
   const updateSettings = async (newSettings: Partial<AppSettings>) => {

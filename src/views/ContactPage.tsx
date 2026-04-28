@@ -1,7 +1,8 @@
 import React from 'react';
-import { Mail, Phone, MapPin, MessageSquare, Send, ArrowLeft } from 'lucide-react';
-import { motion } from 'motion/react';
+import { motion } from 'framer-motion';
+import { Phone, Mail, MapPin, MessageSquare, Send } from 'lucide-react';
 import { ViewType } from '../App';
+import SearchHeader from '../components/SearchHeader';
 
 interface Props {
   onNavigate: (view: ViewType) => void;
@@ -9,15 +10,11 @@ interface Props {
 
 export default function ContactPage({ onNavigate }: Props) {
   return (
-    <div className="min-h-screen bg-[#FDFCF8] py-12 px-6" dir="rtl">
-      <div className="max-w-5xl mx-auto">
-        <button 
-          onClick={() => onNavigate('home')}
-          className="flex items-center gap-2 text-[#2E7D32] font-bold mb-8 px-4 py-2 rounded-xl border border-transparent hover:bg-[#2E7D32] hover:text-white transition-colors"
-        >
-          <ArrowLeft className="w-5 h-5 ml-1" />
-          الرجوع للرئيسية
-        </button>
+    <div className="min-h-screen bg-[#FDFCF8] antialiased" dir="rtl">
+      <SearchHeader onNavigate={onNavigate} />
+      
+      <div className="max-w-5xl mx-auto py-12 px-6">
+
 
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
@@ -114,11 +111,22 @@ export default function ContactPage({ onNavigate }: Props) {
 
               <div className="space-y-2">
                 <label className="text-sm font-bold text-[#4A4A4A] mr-2">الموضوع</label>
-                <input 
-                  type="text" 
-                  placeholder="علاش بغيتي تواصل معانا؟"
-                  className="w-full h-14 px-4 bg-[#F9F9F6] border-none rounded-2xl focus:ring-2 focus:ring-[#2E7D32] transition-all"
-                />
+                <div className="relative">
+                  <select 
+                    className="w-full h-14 px-4 bg-[#F9F9F6] border-none rounded-2xl focus:ring-2 focus:ring-[#2E7D32] transition-all appearance-none cursor-pointer text-[#1A1A1A] font-medium"
+                    defaultValue=""
+                  >
+                    <option value="" disabled>اختار الموضوع...</option>
+                    <option value="password_reset">إعادة تعيين كلمة المرور</option>
+                    <option value="certified_badge">طلب الحصول على شارة معتمد (ONSSA)</option>
+                    <option value="home_page">الصفحة الرئيسية</option>
+                    <option value="banner">إعلانات البانر (Banner)</option>
+                    <option value="other">موضوع آخر</option>
+                  </select>
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                    <svg className="w-5 h-5 text-[#4A4A4A]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                  </div>
+                </div>
               </div>
 
               <div className="space-y-2">

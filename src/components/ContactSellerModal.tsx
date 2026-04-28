@@ -1,23 +1,40 @@
 import React from 'react';
-import { Phone, MessageCircle, AlertTriangle, X } from 'lucide-react';
+import { Phone, AlertTriangle, X } from 'lucide-react';
 import { useSettings } from '../hooks/useSettings';
 import { useAuth } from '../contexts/AuthContext';
 import { firestoreService } from '../services/firestoreService';
 import { ViewType } from '../App';
 import LoginRequiredModal from './LoginRequiredModal';
 
+// Assets
+import whatsappIcon from '../assets/marketing/features/whatsapp-svgrepo-com.svg';
+import mapPointIcon from '../assets/marketing/features/map-point-svgrepo-com.svg';
+
 interface ContactSellerModalProps {
   isOpen: boolean;
   onClose: () => void;
   sellerPhone?: string;
   sellerWhatsapp?: string;
+  phones?: string[];
+  whatsapps?: string[];
   listingId?: string;
   onNavigate: (view: ViewType, listingId?: string, city?: string, radius?: string, subView?: string) => void;
 }
 
-export default function ContactSellerModal({ isOpen, onClose, sellerPhone, sellerWhatsapp, listingId, onNavigate }: ContactSellerModalProps) {
+const formatMoroccanPhone = (phone: string) => {
+  if (!phone) return '';
+  let clean = phone.replace(/\D/g, '');
+  if (clean.startsWith('212')) clean = clean.substring(3);
+  if (clean.startsWith('0')) return clean;
+  return '0' + clean;
+};
+
+export default function ContactSellerModal({ 
+  isOpen, onClose, sellerPhone, sellerWhatsapp, phones = [], whatsapps = [], listingId, onNavigate 
+}: ContactSellerModalProps) {
   const { settings } = useSettings();
   const { profile } = useAuth();
+  const [showAllNumbers, setShowAllNumbers] = React.useState(false);
 
   if (!isOpen) return null;
 
@@ -45,54 +62,114 @@ export default function ContactSellerModal({ isOpen, onClose, sellerPhone, selle
     );
   }
 
-  const whatsappNumber = sellerWhatsapp || sellerPhone;
+  // Ensure arrays have data
+  const allPhones = phones.length > 0 ? phones : (sellerPhone ? [sellerPhone] : []);
+  const allWhatsapps = whatsapps.length > 0 ? whatsapps : (sellerWhatsapp ? [sellerWhatsapp] : (sellerPhone ? [sellerPhone] : []));
+
+  const primaryPhone = allPhones[0];
+  const primaryWhatsapp = allWhatsapps[0];
+  
+  const otherPhones = allPhones.slice(1);
+  const otherWhatsapps = allWhatsapps.slice(1);
+  const hasMore = otherPhones.length > 0 || otherWhatsapps.length > 0;
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
-      <div className="bg-white w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300" dir="rtl">
-        <div className="p-4 border-b border-gray-100 flex items-center justify-between">
-          <h3 className="font-black text-[#1A1A1A]">تواصل مع الكساب</h3>
-          <button onClick={onClose} className="p-2 transition-colors border border-transparent hover:border-gray-300 rounded-full">
+      <div className="bg-white w-full max-w-md rounded-[2.5rem] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300" dir="rtl">
+        <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+          <h3 className="text-xl font-black text-[#1A1A1A]">تواصل مع الكساب</h3>
+          <button onClick={onClose} className="p-2 transition-colors border border-transparent hover:bg-gray-100 rounded-full">
             <X className="w-5 h-5 text-[#757575]" />
           </button>
         </div>
         
-        <div className="p-6 space-y-6">
-          <div className="bg-red-50 border border-red-100 p-4 rounded-2xl flex gap-3">
+        <div className="p-8 space-y-6 max-h-[80vh] overflow-y-auto no-scrollbar">
+          <div className="bg-red-50 border border-red-100 p-5 rounded-3xl flex gap-4">
             <AlertTriangle className="w-6 h-6 text-red-600 shrink-0" />
             <div>
               <h4 className="font-bold text-red-800 text-sm mb-1">رد البال!</h4>
-              <p className="text-xs text-red-700 leading-relaxed">
+              <p className="text-xs text-red-700 leading-relaxed font-medium">
                 ماتصيفطش الفلوس مسبقاً للكساب عبر التحويل البنكي ولا وكالات تحويل الأموال. ديما شوف السلعة عاد خلص.
               </p>
             </div>
           </div>
 
-          <div className="space-y-3">
-            <a 
-              href={sellerPhone ? `tel:${sellerPhone}` : '#'} 
-              onClick={(e) => {
-                if (!sellerPhone) e.preventDefault();
-                handlePhoneClick();
-              }}
-              className={`w-full flex items-center justify-center gap-3 text-white py-4 rounded-xl font-bold transition-colors border border-transparent shadow-lg ${sellerPhone ? 'bg-[#2E7D32] hover:bg-transparent hover:text-[#2E7D32] hover:border-[#2E7D32] shadow-[#2E7D32]/20' : 'bg-gray-400 cursor-not-allowed shadow-none'}`}
-            >
-              <span dir="ltr">{sellerPhone || 'الرقم غير متوفر'}</span>
-              <Phone className="w-5 h-5" />
-            </a>
-            <a 
-              href={whatsappNumber ? `https://wa.me/${whatsappNumber.replace(/\D/g, '')}` : '#'} 
-              target={whatsappNumber ? "_blank" : undefined}
-              rel="noopener noreferrer" 
-              onClick={(e) => {
-                if (!whatsappNumber) e.preventDefault();
-                handleWhatsappClick();
-              }}
-              className={`w-full flex items-center justify-center gap-3 text-white py-4 rounded-xl font-bold transition-colors border border-transparent shadow-lg ${whatsappNumber ? 'bg-[#25D366] hover:bg-transparent hover:text-[#25D366] hover:border-[#25D366] shadow-[#25D366]/20' : 'bg-gray-400 cursor-not-allowed shadow-none'}`}
-            >
-              <span>رسالة واتساب</span>
-              <MessageCircle className="w-5 h-5 fill-white" />
-            </a>
+          <div className="space-y-4">
+            {/* Primary Contacts */}
+            <div className="space-y-3">
+              <p className="text-[10px] font-black text-[#757575] uppercase tracking-wider mr-2">التواصل الرئيسي</p>
+              
+              {/* Phone Button */}
+              <a 
+                href={primaryPhone ? `tel:${primaryPhone}` : '#'} 
+                onClick={(e) => {
+                  if (!primaryPhone) e.preventDefault();
+                  handlePhoneClick();
+                }}
+                className={`w-full flex flex-row-reverse items-center gap-4 px-8 py-5 text-white rounded-2xl font-black transition-all border-2 border-transparent shadow-xl ${primaryPhone ? 'bg-[#1A1A1A] hover:bg-transparent hover:text-[#1A1A1A] hover:border-[#1A1A1A] shadow-black/10' : 'bg-gray-400 cursor-not-allowed shadow-none'}`}
+              >
+                <div className="w-8 h-8 flex items-center justify-center shrink-0">
+                  <Phone className="w-6 h-6 text-white" />
+                </div>
+                <span dir="ltr" className="text-xl flex-1 text-right font-black tracking-widest">{formatMoroccanPhone(primaryPhone) || 'الرقم غير متوفر'}</span>
+              </a>
+
+              {/* WhatsApp Button */}
+              <a 
+                href={primaryWhatsapp ? `https://wa.me/${primaryWhatsapp.replace(/\D/g, '')}` : '#'} 
+                target={primaryWhatsapp ? "_blank" : undefined}
+                rel="noopener noreferrer" 
+                onClick={(e) => {
+                  if (!primaryWhatsapp) e.preventDefault();
+                  handleWhatsappClick();
+                }}
+                className={`w-full flex flex-row-reverse items-center gap-4 px-8 py-5 text-white rounded-2xl font-black transition-all border-2 border-transparent shadow-xl ${primaryWhatsapp ? 'bg-[#25D366] hover:bg-transparent hover:text-[#25D366] hover:border-[#25D366] shadow-[#25D366]/20' : 'bg-gray-400 cursor-not-allowed shadow-none'}`}
+              >
+                <div className="w-8 h-8 flex items-center justify-center shrink-0">
+                  <img src={whatsappIcon} alt="" className="w-7 h-7" style={{ filter: 'brightness(0) invert(1)' }} />
+                </div>
+                <span dir="ltr" className="text-xl flex-1 text-right font-black tracking-widest">{formatMoroccanPhone(primaryWhatsapp)}</span>
+              </a>
+            </div>
+
+            {/* Other Numbers Toggle */}
+            {hasMore && (
+              <div className="pt-4">
+                <button 
+                  onClick={() => setShowAllNumbers(!showAllNumbers)}
+                  className="w-full py-3 text-sm font-black text-[#2E7D32] border-2 border-[#2E7D32]/20 rounded-2xl hover:bg-[#2E7D32]/5 transition-all flex items-center justify-center gap-2"
+                >
+                  {showAllNumbers ? 'إخفاء الأرقام الأخرى' : 'عرض أرقام أخرى'}
+                </button>
+
+                {showAllNumbers && (
+                  <div className="mt-4 space-y-6 animate-in slide-in-from-top-2 duration-300">
+                    {otherPhones.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-[10px] font-black text-[#757575] uppercase tracking-wider mr-2">أرقام هاتف إضافية</p>
+                        {otherPhones.map((p, i) => (
+                          <a key={i} href={`tel:${p}`} className="flex items-center gap-4 p-4 bg-[#F9F9F6] rounded-xl font-black text-[#1A1A1A] border border-outline-variant/10">
+                            <Phone className="w-4 h-4 text-[#757575]" />
+                            <span dir="ltr" className="flex-1 text-center font-black tracking-widest">{formatMoroccanPhone(p)}</span>
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                    {otherWhatsapps.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-[10px] font-black text-[#757575] uppercase tracking-wider mr-2">أرقام واتساب إضافية</p>
+                        {otherWhatsapps.map((w, i) => (
+                          <a key={i} href={`https://wa.me/${w.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-4 p-4 bg-[#F9F9F6] rounded-xl font-black text-[#25D366] border border-outline-variant/10">
+                            <img src={whatsappIcon} alt="" className="w-5 h-5" />
+                            <span dir="ltr" className="flex-1 text-center font-black tracking-widest">{formatMoroccanPhone(w)}</span>
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>

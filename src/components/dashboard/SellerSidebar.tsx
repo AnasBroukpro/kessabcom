@@ -15,6 +15,17 @@ interface SellerSidebarProps {
   signOut: () => void;
 }
 
+const SheepIcon = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M15.5 11c0 2.209-1.791 4-4 4s-4-1.791-4-4 1.791-4 4-4 4 1.791 4 4Z" />
+    <path d="M11.5 15v3m-2-3v3m4-3v3" />
+    <path d="M8.5 8.5c-1.5-1.5-3.5-1.5-4.5 0s-.5 3.5 1 4.5" />
+    <path d="M14.5 8.5c1.5-1.5 3.5-1.5 4.5 0s.5 3.5-1 4.5" />
+    <circle cx="10" cy="10.5" r=".5" />
+    <circle cx="13" cy="10.5" r=".5" />
+  </svg>
+);
+
 export default function SellerSidebar({
   activeTab,
   setActiveTab,
@@ -26,7 +37,7 @@ export default function SellerSidebar({
   const navItems = [
     { id: 'dashboard', icon: LayoutDashboard, label: 'لوحة القيادة' },
     { id: 'flock', icon: Tag, label: 'القطيع ديالي' },
-    { id: 'buyer-requests', icon: ShoppingBag, label: 'طلبات المشترين', count: requestsCount },
+    { id: 'buyer-requests', icon: SheepIcon, label: 'طلبات المشترين', count: requestsCount, visible: settings.auctionSystemEnabled },
     { id: 'stats', icon: BarChart3, label: 'الإحصائيات' },
     { id: 'subscription', icon: CreditCard, label: 'الاشتراك', visible: settings.paymentSystemEnabled },
     { id: 'settings', icon: Settings, label: 'الإعدادات' },
@@ -39,8 +50,8 @@ export default function SellerSidebar({
           <button onClick={() => onNavigate('home')} className="flex items-center group">
             <img 
               src={logoV2} 
-              alt="كسابكوم" 
-              className="h-12 w-auto object-contain transition-transform group-hover:scale-105" 
+              alt="KESSABCOM" 
+              className="h-10 w-auto object-contain transition-transform group-hover:scale-105"
             />
           </button>
         </div>

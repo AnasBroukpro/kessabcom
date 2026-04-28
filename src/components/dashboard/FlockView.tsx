@@ -1,5 +1,5 @@
 import React from 'react';
-import { PlusCircle, MapPin, Eye, Phone, MessageCircle, TrendingUp, Edit3, Trash2 } from 'lucide-react';
+import { PlusCircle, MapPin, Eye, Phone, MessageCircle, TrendingUp, Edit3, Trash2, ChevronRight, ChevronLeft } from 'lucide-react';
 import { getDisplayCity } from '../../constants/cityMapping';
 
 interface FlockViewProps {
@@ -19,6 +19,11 @@ export default function FlockView({
   setShowDeleteConfirm,
   renderStars
 }: FlockViewProps) {
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const pageSize = 12;
+  const totalPages = Math.ceil(announcements.length / pageSize);
+  const currentAnnouncements = announcements.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
   return (
     <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -35,18 +40,34 @@ export default function FlockView({
       {(!Array.isArray(announcements) || announcements.length === 0) ? (
         <div 
           onClick={() => onNavigate('add-listing')}
-          className="border-2 border-dashed border-[#115E2C]/10 rounded-[10px] p-16 flex flex-col items-center justify-center cursor-pointer bg-[#FDFCF8] hover:bg-white hover:border-[#115E2C]/30 hover:shadow-2xl transition-all group"
+          className="border-2 border-dashed border-[#115E2C]/10 rounded-3xl p-16 flex flex-col items-center justify-center cursor-pointer bg-[#FDFCF8] hover:bg-white hover:border-[#115E2C]/30 hover:shadow-2xl transition-all group"
         >
-          <div className="w-20 h-20 bg-[#115E2C] rounded-[10px] flex items-center justify-center mb-6 shadow-2xl shadow-[#115E2C]/30 group-hover:scale-110 group-hover:rotate-6 transition-all duration-500">
+          <div className="w-20 h-20 bg-[#115E2C] rounded-full flex items-center justify-center mb-6 shadow-2xl shadow-[#115E2C]/30 group-hover:scale-110 group-hover:rotate-6 transition-all duration-500">
             <PlusCircle className="w-10 h-10 text-white" />
           </div>
-          <h3 className="text-2xl font-black text-[#1A1A1A] mb-2 font-headline">إضافة قطيع جديد</h3>
-          <p className="text-[#757575] font-bold text-lg">سجل، صور وبيع فالحين</p>
+          <h3 className="text-2xl font-black text-[#1A1A1A] mb-2 font-headline">أضف حولي جديد</h3>
+          <p className="text-[#757575] font-bold text-lg">صور وسجل فيديو</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {announcements.map((announcement) => (
-            <div key={announcement.id} className="bg-white rounded-[10px] overflow-hidden border border-outline-variant/5 shadow-sm group hover:shadow-2xl hover:border-[#115E2C]/10 transition-all duration-500 flex flex-col">
+          {/* Add New Listing Card (Inspired by User Image) */}
+          <div 
+            onClick={() => onNavigate('add-listing')}
+            className="border-2 border-dashed border-[#115E2C]/15 rounded-3xl p-10 flex flex-col items-center justify-center cursor-pointer bg-[#FDFCF8]/50 hover:bg-white hover:border-[#115E2C]/40 hover:shadow-xl transition-all duration-300 group min-h-[350px]"
+          >
+            <div className="w-20 h-20 bg-[#115E2C] rounded-full flex items-center justify-center mb-6 shadow-lg shadow-[#115E2C]/20 group-hover:scale-110 transition-transform duration-500">
+              <PlusCircle className="w-10 h-10 text-white" />
+            </div>
+            <h3 className="text-2xl font-black text-[#1A1A1A] mb-2 font-headline">أضف حولي جديد</h3>
+            <p className="text-[#757575] font-bold text-sm">صور وسجل فيديو</p>
+          </div>
+
+          {currentAnnouncements.map((announcement) => (
+            <div 
+              key={announcement.id} 
+              onClick={() => onNavigate('listing-details', announcement.id)}
+              className="bg-white rounded-[10px] overflow-hidden border border-outline-variant/5 shadow-sm group hover:shadow-2xl hover:border-[#115E2C]/10 transition-all duration-500 flex flex-col cursor-pointer"
+            >
               <div className="relative h-56 overflow-hidden">
                 <img alt={announcement.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" src={announcement.images?.[0] || "https://i.ytimg.com/vi/RrkkshRUttw/hq720.jpg?sqp=-oaymwEhCK4FEIIDSFryq4qpAxMIARUAAAAAGAElAADIQj0AgKJD&rs=AOn4CLD92lI4Kxe5liKSwWZaJuLAFopNeA"} referrerPolicy="no-referrer" />
                 <div className={`absolute top-5 right-5 px-4 py-1.5 rounded-[10px] text-[10px] font-black shadow-xl backdrop-blur-md ${announcement.status === 'active' ? 'bg-[#115E2C] text-white' : 'bg-red-600 text-white'}`}>
@@ -112,6 +133,43 @@ export default function FlockView({
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="flex justify-center items-center gap-2 mt-12 pb-10">
+          <button
+            disabled={currentPage === 1}
+            onClick={() => setCurrentPage(p => p - 1)}
+            className="p-2 rounded-xl bg-white border border-outline-variant/20 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-surface-container-low transition-colors"
+          >
+            <ChevronRight className="w-5 h-5" />
+          </button>
+          
+          <div className="flex items-center gap-1">
+            {[...Array(totalPages)].map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setCurrentPage(i + 1)}
+                className={`w-10 h-10 rounded-xl font-black text-sm transition-all ${
+                  currentPage === i + 1 
+                    ? 'bg-[#115E2C] text-white shadow-lg' 
+                    : 'bg-white text-[#757575] border border-outline-variant/10 hover:border-[#115E2C]/30'
+                }`}
+              >
+                {i + 1}
+              </button>
+            ))}
+          </div>
+
+          <button
+            disabled={currentPage === totalPages}
+            onClick={() => setCurrentPage(p => p + 1)}
+            className="p-2 rounded-xl bg-white border border-outline-variant/20 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-surface-container-low transition-colors"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
         </div>
       )}
     </div>

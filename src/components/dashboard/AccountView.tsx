@@ -26,6 +26,7 @@ const AccountView = ({ user, profile, settings, cities }: AccountViewProps) => {
   const [newPhotoURL, setNewPhotoURL] = useState(profile?.photoURL || '');
   const [newPhoneNumber, setNewPhoneNumber] = useState(profile?.phoneNumber || '');
   const [newLocation, setNewLocation] = useState(profile?.location || '');
+  const [newPseudo, setNewPseudo] = useState(profile?.pseudo || '');
   
   // Security states
   const [currentPassword, setCurrentPassword] = useState('');
@@ -46,6 +47,7 @@ const AccountView = ({ user, profile, settings, cities }: AccountViewProps) => {
       setNewPhotoURL(profile.photoURL || '');
       setNewPhoneNumber(profile.phoneNumber || '');
       setNewLocation(profile.location || '');
+      setNewPseudo(profile.pseudo || '');
     }
   }, [profile]);
 
@@ -98,7 +100,8 @@ const AccountView = ({ user, profile, settings, cities }: AccountViewProps) => {
         displayName: newDisplayName,
         photoURL: newPhotoURL,
         phoneNumber: newPhoneNumber,
-        location: newLocation
+        location: newLocation,
+        pseudo: newPseudo
       });
 
       await refreshProfile();
@@ -162,6 +165,22 @@ const AccountView = ({ user, profile, settings, cities }: AccountViewProps) => {
             <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-on-surface-variant/40" />
           </div>
         </div>
+        
+        {profile?.role === 'seller' && (
+          <div className="space-y-2">
+            <label className="text-xs font-black text-on-surface-variant uppercase tracking-wider px-1">اسم الضيعة (Pseudo)</label>
+            <div className="relative">
+              <input 
+                type="text" 
+                value={newPseudo}
+                onChange={(e) => setNewPseudo(e.target.value)}
+                className="w-full bg-surface-container-low border border-outline-variant/10 rounded-[10px] p-4 pl-12 text-sm font-bold outline-none focus:ring-2 focus:ring-primary transition-all"
+                placeholder="مثلا: ضيعة الخير"
+              />
+              <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-on-surface-variant/40" />
+            </div>
+          </div>
+        )}
         <div className="space-y-2">
           <label className="text-xs font-black text-on-surface-variant uppercase tracking-wider px-1">رقم الهاتف</label>
           <div className="relative">
@@ -269,8 +288,8 @@ const AccountView = ({ user, profile, settings, cities }: AccountViewProps) => {
   );
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 md:p-8 animate-in fade-in slide-in-from-bottom-4 duration-500" dir="rtl">
-      <div className="max-w-5xl mx-auto">
+    <div className="space-y-8 w-full animate-in fade-in slide-in-from-bottom-4 duration-500" dir="rtl">
+      <div className="w-full">
         <div className="flex justify-between items-center mb-8">
           <div>
             <h2 className="text-2xl font-black text-on-surface font-headline">حسابي الشخصي</h2>

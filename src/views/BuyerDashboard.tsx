@@ -7,6 +7,7 @@ import { useSettings } from '../hooks/useSettings';
 import { compressImage, checkPayloadSize } from '../lib/imageUtils';
 import DashboardHeader from '../components/DashboardHeader';
 import NewsTicker from '../components/NewsTicker';
+import logoV2 from '../assets/marketing/branding/logo v2.png';
 
 import GoogleMapComponent from '../components/GoogleMap';
 import { cityMapping, getDisplayCity, cityCoords, calculateDistance } from '../constants/cityMapping';
@@ -21,6 +22,7 @@ import FavoritesView from '../components/dashboard/FavoritesView';
 import SubscriptionView from '../components/dashboard/SubscriptionView';
 import BuyerHomeView from "../components/dashboard/BuyerHomeView";
 import Notifications from './Notifications';
+import BuyerReviewsView from '../components/dashboard/BuyerReviewsView';
 
 interface Props {
   onNavigate: (view: ViewType, listingId?: string, city?: string, radius?: string, subView?: string) => void;
@@ -42,7 +44,7 @@ interface Listing {
 
 const cities = ["سطات", "برشيد", "خريبكة", "الدار البيضاء", "الرباط", "مراكش", "أزرو", "خنيفرة", "وجدة", "الراشيدية", "طنجة"];
 
-type DashboardView = 'dashboard' | 'favorites' | 'tools' | 'subscription' | 'account' | 'request-animal' | 'kessaba-offers' | 'notifications';
+type DashboardView = 'dashboard' | 'favorites' | 'tools' | 'subscription' | 'account' | 'request-animal' | 'kessaba-offers' | 'notifications' | 'reviews';
 
 
 export default function BuyerDashboard({ onNavigate, activeSubView }: Props) {
@@ -56,6 +58,14 @@ export default function BuyerDashboard({ onNavigate, activeSubView }: Props) {
       setActiveView(activeSubView as DashboardView);
     }
   }, [activeSubView]);
+
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get('sub') !== activeView) {
+      url.searchParams.set('sub', activeView);
+      window.history.replaceState({}, '', url.toString());
+    }
+  }, [activeView]);
   const [timeFilter, setTimeFilter] = useState<'day' | 'month'>('day');
   const [activeAccountTab, setActiveAccountTab] = useState<'profile' | 'notifications' | 'security' | 'settings' | 'payment'>('profile');
   const [kessabaRequests, setKessabaRequests] = useState<any[]>([]);
@@ -74,6 +84,7 @@ export default function BuyerDashboard({ onNavigate, activeSubView }: Props) {
       case 'account': return 'حسابي';
       case 'request-animal': return 'تبرع تضامني';
       case 'kessaba-offers': return 'فتح المزاد';
+      case 'reviews': return 'تقييماتي';
       default: return 'لوحة التحكم';
     }
   };
@@ -123,7 +134,7 @@ export default function BuyerDashboard({ onNavigate, activeSubView }: Props) {
             let allListings = data.data;
             
             // Sort by distance if possible
-            const userCity = profile?.city || 'سطات';
+            const userCity = profile?.city || '';
             const userCoords = cityCoords[userCity];
             if (userCoords) {
               allListings = allListings.map((listing: any) => {
@@ -154,7 +165,6 @@ export default function BuyerDashboard({ onNavigate, activeSubView }: Props) {
 
 
   const [showNewRequestForm, setShowNewRequestForm] = useState(false);
-  const [selectedKessabaRequest, setSelectedKessabaRequest] = useState<any>(null);
   const [hoveredMarker, setHoveredMarker] = useState<number | null>(null);
 
   const [citySearch, setCitySearch] = useState('');
@@ -229,10 +239,9 @@ export default function BuyerDashboard({ onNavigate, activeSubView }: Props) {
           <div className="h-24 flex flex-col items-center justify-center border-b border-outline-variant/20 gap-2 shrink-0">
             <button onClick={() => onNavigate('home')} className="flex items-center group">
               <img 
-                src="https://i.ibb.co/Psdn5FfW/logo-removebg-preview.png" 
+                src={logoV2} 
                 alt="منصة kessabcom.ma" 
                 className="h-12 w-auto object-contain transition-transform group-hover:scale-105"
-                referrerPolicy="no-referrer"
               />
             </button>
           </div>
@@ -259,6 +268,13 @@ export default function BuyerDashboard({ onNavigate, activeSubView }: Props) {
               <Heart className="w-6 h-6" />
               <span className="hidden lg:block">المفضلة</span>
               <span className="hidden lg:flex mr-auto bg-primary text-on-primary text-xs w-5 h-5 items-center justify-center rounded-full">{favorites.length}</span>
+            </button>
+            <button 
+              onClick={() => setActiveView('reviews')}
+              className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl font-bold transition-all ${activeView === 'reviews' ? 'bg-primary-container text-on-primary-container' : 'text-on-surface-variant hover:bg-surface-variant'}`}
+            >
+              <Star className={`w-5 h-5 ${activeView === 'reviews' && 'fill-on-primary-container/20'}`} />
+              <span className="lg:block hidden">تقييماتي</span>
             </button>
             <button 
               onClick={() => setActiveView('tools')}
@@ -324,7 +340,8 @@ export default function BuyerDashboard({ onNavigate, activeSubView }: Props) {
         />
 
         {/* Dynamic Content Area */}
-        <div className="flex-1 overflow-hidden flex flex-col">
+        <div className="flex-1 overflow-y-auto no-scrollbar">
+          <div className="p-4 md:p-8 max-w-7xl mx-auto w-full space-y-6 md:space-y-8 text-right">
           {activeView === 'dashboard' && (
             <BuyerHomeView 
               profile={profile}
@@ -344,8 +361,6 @@ export default function BuyerDashboard({ onNavigate, activeSubView }: Props) {
               setKessabaRequests={setKessabaRequests}
               showNewRequestForm={showNewRequestForm}
               setShowNewRequestForm={setShowNewRequestForm}
-              selectedKessabaRequest={selectedKessabaRequest}
-              setSelectedKessabaRequest={setSelectedKessabaRequest}
             />
           )}
           {activeView === 'favorites' && (
@@ -377,6 +392,10 @@ export default function BuyerDashboard({ onNavigate, activeSubView }: Props) {
           {activeView === 'notifications' && (
             <Notifications onNavigate={onNavigate} hideHeader={true} />
           )}
+          {activeView === 'reviews' && (
+            <BuyerReviewsView onNavigate={onNavigate} />
+          )}
+          </div>
         </div>
       </main>
 
@@ -389,20 +408,22 @@ export default function BuyerDashboard({ onNavigate, activeSubView }: Props) {
           <LayoutDashboard className={`w-5 h-5 ${activeView === 'dashboard' && 'fill-primary/20'}`} />
           <span className="text-[10px] font-bold">الرئيسية</span>
         </button>
-        <button 
-          onClick={() => setActiveView('kessaba-offers')}
-          className={`flex-1 flex flex-col items-center justify-center gap-1 p-2 rounded-xl transition-colors relative border border-transparent ${activeView === 'kessaba-offers' ? 'text-primary bg-primary/5 border-primary' : 'text-on-surface-variant hover:text-primary hover:border-primary'}`}
-        >
-          <div className="relative">
-            <ShoppingBag className={`w-5 h-5 ${activeView === 'kessaba-offers' && 'fill-primary/20'}`} />
-            {kessabaRequests.filter(r => r.status !== 'Archived').length > 0 && (
-              <span className="absolute -top-1 -right-1.5 bg-primary text-white text-[8px] w-3.5 h-3.5 flex items-center justify-center rounded-full font-bold">
-                {kessabaRequests.filter(r => r.status !== 'Archived').length}
-              </span>
-            )}
-          </div>
-          <span className="text-[10px] font-bold">المزاد</span>
-        </button>
+        {settings.auctionSystemEnabled && (
+          <button 
+            onClick={() => setActiveView('kessaba-offers')}
+            className={`flex-1 flex flex-col items-center justify-center gap-1 p-2 rounded-xl transition-colors relative border border-transparent ${activeView === 'kessaba-offers' ? 'text-primary bg-primary/5 border-primary' : 'text-on-surface-variant hover:text-primary hover:border-primary'}`}
+          >
+            <div className="relative">
+              <ShoppingBag className={`w-5 h-5 ${activeView === 'kessaba-offers' && 'fill-primary/20'}`} />
+              {kessabaRequests.filter(r => r.status !== 'Archived').length > 0 && (
+                <span className="absolute -top-1 -right-1.5 bg-primary text-white text-[8px] w-3.5 h-3.5 flex items-center justify-center rounded-full font-bold">
+                  {kessabaRequests.filter(r => r.status !== 'Archived').length}
+                </span>
+              )}
+            </div>
+            <span className="text-[10px] font-bold">المزاد</span>
+          </button>
+        )}
         <button 
           onClick={() => setActiveView('favorites')}
           className={`flex-1 flex flex-col items-center justify-center gap-1 p-2 rounded-xl transition-colors relative border border-transparent ${activeView === 'favorites' ? 'text-primary bg-primary/5 border-primary' : 'text-on-surface-variant hover:text-primary hover:border-primary'}`}

@@ -42,7 +42,7 @@ export default function SellerHomeView({
             <User className="w-8 h-8" />
           </div>
           <div>
-            <h1 className="text-3xl font-black text-[#1A1A1A] font-headline tracking-tight">
+            <h1 className="text-2xl md:text-3xl font-black text-[#1A1A1A] font-headline tracking-tight truncate max-w-[280px] md:max-w-md" title={`مرحبا بك، ${profile?.pseudo || profile?.fullName || 'سي محمد'}`}>
               مرحبا بك، {profile?.pseudo || profile?.fullName || 'سي محمد'}
             </h1>
             <p className="text-[#757575] font-bold">هدا هو الوضع العام ديال القطيع ديالك اليوم</p>
@@ -106,8 +106,12 @@ export default function SellerHomeView({
 
           {/* Mobile Carousel / Desktop Grid */}
           <div className="flex md:grid md:grid-cols-2 gap-6 md:gap-8 overflow-x-auto md:overflow-x-visible pb-6 md:pb-0 snap-x no-scrollbar -mx-4 px-4 md:mx-0 md:px-0">
-            {Array.isArray(announcements) && announcements.slice(0, 4).map((announcement) => (
-              <div key={announcement.id} className="min-w-[280px] sm:min-w-[320px] md:min-w-0 bg-white rounded-[10px] overflow-hidden border border-outline-variant/10 shadow-sm group hover:shadow-2xl hover:border-[#115E2C]/20 transition-all duration-500 flex flex-col snap-center">
+            {Array.isArray(announcements) && announcements.slice(0, 2).map((announcement) => (
+              <div 
+                key={announcement.id} 
+                onClick={() => onNavigate('listing-details', announcement.id)}
+                className="min-w-[280px] sm:min-w-[320px] md:min-w-0 bg-white rounded-[10px] overflow-hidden border border-outline-variant/10 shadow-sm group hover:shadow-2xl hover:border-[#115E2C]/20 transition-all duration-500 flex flex-col snap-center cursor-pointer"
+              >
                 <div className="relative h-48 sm:h-56 overflow-hidden">
                   <img alt={announcement.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" src={announcement.images?.[0] || "https://i.ytimg.com/vi/RrkkshRUttw/hq720.jpg?sqp=-oaymwEhCK4FEIIDSFryq4qpAxMIARUAAAAAGAElAADIQj0AgKJD&rs=AOn4CLD92lI4Kxe5liKSwWZaJuLAFopNeA"} referrerPolicy="no-referrer" />
                   <div className={`absolute top-5 right-5 px-4 py-1.5 rounded-[10px] text-[10px] font-black shadow-xl backdrop-blur-md ${announcement.status === 'active' ? 'bg-[#115E2C] text-white' : 'bg-red-600 text-white'}`}>

@@ -7,6 +7,7 @@ import { firestoreService } from '../services/firestoreService';
 import { getCachedData, setCachedData } from '../lib/cache';
 import { cityMapping, cityCoords, getDisplayCity, getClosestCity } from '../constants/cityMapping';
 import barkiImage from '../assets/marketing/branding/حولي بركي..png';
+import heroBackground from '../assets/marketing/branding/hero-background.webp';
 
 import { useSettings } from '../hooks/useSettings';
 import ContactSellerModal from '../components/ContactSellerModal';
@@ -21,6 +22,64 @@ interface Props {
 }
 
 const moroccanCities = Object.keys(cityCoords);
+
+const EidCountdown = () => {
+  const calculateTimeLeft = () => {
+    // Approximation for Eid 2026
+    const eidDate = new Date('2026-05-26T00:00:00');
+    const difference = +eidDate - +new Date();
+    let timeLeft = { days: 0, hours: 0, minutes: 0, seconds: 0 };
+
+    if (difference > 0) {
+      timeLeft = {
+        days: Math.floor(difference / (1000 * 60 * 60 * 24)),
+        hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
+        minutes: Math.floor((difference / 1000 / 60) % 60),
+        seconds: Math.floor((difference / 1000) % 60)
+      };
+    }
+    return timeLeft;
+  };
+
+  const [timeLeft, setTimeLeft] = useState(calculateTimeLeft());
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setTimeLeft(calculateTimeLeft());
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [timeLeft]);
+
+  if (timeLeft.days === 0 && timeLeft.hours === 0 && timeLeft.minutes === 0) return null;
+
+  return (
+    <div className="bg-white/10 backdrop-blur-2xl border border-white/20 rounded-[2rem] p-4 md:p-6 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] inline-block">
+      <div className="flex items-center justify-center gap-2 mb-4">
+        <Clock className="w-4 h-4 text-[#A5D6A7]" />
+        <h2 className="text-sm md:text-base font-black text-white tracking-tight font-headline">باقي لعيد الأضحى المبارك</h2>
+      </div>
+      <div className="flex justify-center gap-2 md:gap-3" dir="ltr">
+        {[
+          { label: 'أيام', value: timeLeft.days },
+          { label: 'ساعات', value: timeLeft.hours },
+          { label: 'دقائق', value: timeLeft.minutes },
+          { label: 'ثواني', value: timeLeft.seconds }
+        ].map((unit, idx) => (
+          <div key={idx} className="flex flex-col items-center">
+            <div className="bg-white/10 backdrop-blur-xl border border-white/30 rounded-xl p-2 md:p-3 min-w-[55px] md:min-w-[65px] shadow-xl relative overflow-hidden group">
+              <div className="text-lg md:text-xl font-black text-white leading-none mb-1 drop-shadow-md">
+                {unit.value}
+              </div>
+              <div className="text-[10px] md:text-xs font-black text-white uppercase tracking-wider drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)] mt-1">
+                {unit.label}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 export default function Home({ onNavigate }: Props) {
   const { settings } = useSettings();
@@ -52,6 +111,18 @@ export default function Home({ onNavigate }: Props) {
   const [isOpenRadius, setIsOpenRadius] = useState(false);
   const [openUpwards, setOpenUpwards] = useState(false);
   const searchBarRef = useRef<HTMLDivElement>(null);
+
+  // Set initial city from user profile or IP geolocation
+  useEffect(() => {
+    const initLocation = async () => {
+      if (profile?.city) {
+        setCitySearch(profile.city);
+      }
+    };
+    if (user !== undefined) {
+      initLocation();
+    }
+  }, [profile, user]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -89,6 +160,7 @@ export default function Home({ onNavigate }: Props) {
   const [selectedListingId, setSelectedListingId] = useState<string | undefined>();
 
   const suggestionsRef = useRef<HTMLDivElement>(null);
+  const notificationsRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
 
   const filteredCities = moroccanCities.filter(city => city.includes(citySearch));
@@ -103,11 +175,28 @@ export default function Home({ onNavigate }: Props) {
     return () => unsub();
   }, [user]);
 
+  const getCityAnnouncements = (cityKey: string) => {
+    return (announcements || [])
+      .filter(a => a.location === cityKey && a.status === 'active')
+      .sort((a, b) => {
+        // First priority: Pinned listings
+        if (a.isPinnedToHome && !b.isPinnedToHome) return -1;
+        if (!a.isPinnedToHome && b.isPinnedToHome) return 1;
+        
+        // Second priority: Latest created
+        const dateA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
+        const dateB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
+        return dateB - dateA;
+      })
+      .slice(0, settings.maxHomeListings || 6);
+  };
+
   useEffect(() => {
     const fetchAnnouncements = async () => {
       const cached = getCachedData('home_announcements');
       if (cached) {
         setAnnouncements(cached);
+        return; // IMPORTANT: Prevent redundant fetch if cache is valid
       }
 
       const response = await firestoreService.getAnnouncements();
@@ -148,6 +237,7 @@ export default function Home({ onNavigate }: Props) {
           const closest = cityCoords ? getClosestCity(position.coords.latitude, position.coords.longitude) : null;
           if (closest) {
             setCitySearch(closest);
+            sessionStorage.setItem('last_city', closest);
           } else {
             // Outside Morocco logic
             setCitySearch('');
@@ -170,6 +260,9 @@ export default function Home({ onNavigate }: Props) {
       setShowCityModal(true);
       return;
     }
+    // Save city to sessionStorage for other views to use
+    sessionStorage.setItem('last_city', citySearch);
+    
     // Pass multiple breeds as a comma-separated string if selected
     const breedParam = selectedBreeds.length > 0 ? selectedBreeds.join(',') : undefined;
     onNavigate('search-results', undefined, citySearch, radiusSearch, undefined, breedParam);
@@ -288,7 +381,7 @@ export default function Home({ onNavigate }: Props) {
               <img
                 src={logoV2}
                 alt="KESSABCOM"
-                className="h-8 md:h-10 w-auto object-contain transition-transform group-hover:scale-105"
+                className="h-[26px] md:h-8 w-auto object-contain transition-transform group-hover:scale-105"
               />
             </button>
             <div className="hidden md:flex items-center gap-6">
@@ -358,55 +451,19 @@ export default function Home({ onNavigate }: Props) {
 
       <main className="pt-16">
         {/* Hero & Search Section - 100vh with vertical centering */}
-        <section className="relative min-h-[calc(100dvh-64px)] flex items-center justify-center bg-[#FDFCF8] px-4 z-20">
-          {/* Enhanced Background with Overlay */}
+        <section className="relative min-h-[calc(100dvh-64px)] flex items-center justify-center bg-[#FDFCF8] px-4 z-20 overflow-hidden">
           <div className="absolute inset-0 z-0">
-            <img
-              alt="مرعى أخضر في جبال الأطلس"
-              className="w-full h-full object-cover"
-              src="https://i.ibb.co/hxCgrSY7/generated-image.jpg"
-              fetchpriority="high"
+            <img 
+              alt="مرعى أخضر في جبال الأطلس" 
+              className="w-full h-full object-cover" 
+              src={heroBackground} 
+              fetchpriority="high" 
               referrerPolicy="no-referrer"
             />
-            {/* Linear Gradient Overlay for maximum text contrast (WCAG 2.1) */}
             <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-transparent"></div>
           </div>
 
-          {/* Optimized Floating Elements (Visual Storytelling) */}
           <div className="absolute inset-0 pointer-events-none overflow-hidden hidden md:block">
-            <motion.div
-              animate={{ y: [0, -15, 0], rotate: [0, 3, 0] }}
-              transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-              className="absolute top-[15%] right-[10%] w-48 h-48 lg:w-64 lg:h-64 opacity-90"
-            >
-              <img
-                src="https://i.pinimg.com/474x/f1/c4/f3/f1c4f375f585d2c88ef5bf4b453cd01e.jpg"
-                alt="خروف صحي ممتاز"
-                className="w-full h-full object-contain rounded-full border-8 border-white/20 shadow-[0_20px_50px_rgba(0,0,0,0.3)] backdrop-blur-sm"
-                referrerPolicy="no-referrer"
-              />
-            </motion.div>
-
-            <motion.div
-              animate={{ scale: [1, 1.1, 1], opacity: [0.15, 0.25, 0.15] }}
-              transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-              className="absolute bottom-[20%] left-[5%] w-48 h-48 lg:w-72 lg:h-72"
-            >
-              <div className="w-full h-full bg-[#A5D6A7] rounded-full blur-[100px]"></div>
-            </motion.div>
-
-            {/* New Barki Circular Image on the Left */}
-            <motion.div
-              animate={{ y: [0, -10, 0], rotate: [0, -3, 0] }}
-              transition={{ duration: 6, repeat: Infinity, ease: "easeInOut", delay: 1 }}
-              className="absolute top-[35%] left-[5%] lg:left-[10%] w-40 h-40 lg:w-56 lg:h-56 opacity-95"
-            >
-              <img
-                src={barkiImage}
-                alt="حولي بركي"
-                className="w-full h-full object-cover rounded-full border-8 border-white/40 shadow-[0_20px_50px_rgba(0,0,0,0.4)] backdrop-blur-sm"
-              />
-            </motion.div>
           </div>
 
           {/* Mobile News Ticker attached to top */}
@@ -415,8 +472,37 @@ export default function Home({ onNavigate }: Props) {
           </div>
 
           <div className="relative z-10 max-w-5xl w-full text-center mt-[100px] md:mt-0">
+            <div className="flex flex-col items-center mb-8 animate-in fade-in slide-in-from-top-4 duration-1000 relative">
+              {/* Left floating circle - Sheep */}
+              <motion.div 
+                animate={{ y: [0, -5, 0], rotate: [0, 5, 0] }}
+                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                className="absolute -left-2 md:-left-12 top-0 w-24 h-24 md:w-32 md:h-32 opacity-90 hidden sm:block"
+              >
+                <img 
+                  src="https://i.pinimg.com/474x/f1/c4/f3/f1c4f375f585d2c88ef5bf4b453cd01e.jpg" 
+                  alt="خروف صحي ممتاز" 
+                  className="w-full h-full object-contain rounded-full border-4 border-white/30 shadow-2xl backdrop-blur-sm" 
+                  referrerPolicy="no-referrer"
+                />
+              </motion.div>
 
-            <Countdown />
+              <EidCountdown />
+
+              {/* Right floating circle - Barki */}
+              <motion.div 
+                animate={{ y: [0, 5, 0], rotate: [0, -5, 0] }}
+                transition={{ duration: 5, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
+                className="absolute -right-2 md:-right-12 bottom-0 w-24 h-24 md:w-32 md:h-32 opacity-95 hidden sm:block"
+              >
+                <img 
+                  src={barkiImage} 
+                  alt="حولي بركي" 
+                  className="w-full h-full object-cover rounded-full border-4 border-white/30 shadow-2xl backdrop-blur-sm"
+                />
+              </motion.div>
+            </div>
+
             <h1 className="text-4xl md:text-7xl font-black text-white mb-6 tracking-tight font-headline leading-[1.1] drop-shadow-lg">
               شوف الحولي <span className="text-[#2E7D32]" style={{ WebkitTextStroke: '2px white' }}>حداك</span> <br /> وزورو فالضيعة
             </h1>
@@ -424,7 +510,6 @@ export default function Home({ onNavigate }: Props) {
               منصة kessabcom.ma كايوريك الكسابة لي قراب ليك فبلاصتها بلاما تضرب تمارة. قلب، اختار، وشوف الكسيبة بعينيك.
             </p>
 
-            {/* Modern Expert Search Bar */}
             <motion.div
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
@@ -436,10 +521,7 @@ export default function Home({ onNavigate }: Props) {
                 className="bg-white/95 backdrop-blur-xl p-2 md:p-3 rounded-2xl shadow-[0_30px_60px_rgba(0,0,0,0.3)] border border-white/20 z-[60] relative"
               >
                 <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2 md:gap-3">
-
-                  {/* City Selector & Locate Me Wrapper for Mobile Row */}
                   <div className="flex flex-row items-stretch gap-2 w-full md:w-auto">
-                    {/* City Selector Block */}
                     <div className="flex-1 md:w-[200px] flex items-center px-3 md:px-4 py-2 md:py-2 relative group bg-white rounded-xl border border-outline-variant/10 shadow-sm transition-all hover:border-[#2E7D32]/30">
                       <MapPin className="w-5 h-5 md:w-6 md:h-6 text-[#2E7D32] shrink-0" />
                       <div className="flex flex-col text-right mr-3 md:mr-4 flex-1">
@@ -481,12 +563,11 @@ export default function Home({ onNavigate }: Props) {
                       />
                     </div>
 
-                    {/* Distinct "في مدينتي" Button */}
                     <div className="flex shrink-0">
                       <button
                         onClick={handleLocateMe}
                         disabled={isLocating}
-                        className={`flex items-center justify-center gap-1.5 md:gap-2 px-3 md:px-4 py-2 md:py-4 bg-[#F0F0F0] hover:bg-[#E5E5E5] text-[#1B5E20] rounded-xl border border-outline-variant/20 transition-all transform active:scale-95 shadow-sm group/loc`}
+                        className="flex items-center justify-center gap-1.5 md:gap-2 px-3 md:px-4 py-2 md:py-4 bg-[#F0F0F0] hover:bg-[#E5E5E5] text-[#1B5E20] rounded-xl border border-outline-variant/20 transition-all transform active:scale-95 shadow-sm group/loc"
                       >
                         <Target className={`w-4 h-4 md:w-5 md:h-5 group-hover/loc:scale-110 transition-transform ${isLocating ? 'animate-pulse' : ''}`} />
                         <span className="text-[11px] md:text-sm font-black whitespace-nowrap">في مدينتي</span>
@@ -495,7 +576,6 @@ export default function Home({ onNavigate }: Props) {
                     </div>
                   </div>
 
-                  {/* Distance Selector Block */}
                   <div
                     onClick={() => { setIsOpenRadius(!isOpenRadius); setIsOpenCity(false); }}
                     className="w-full md:w-[180px] flex items-center px-3 md:px-4 py-2 md:py-2 relative group bg-white rounded-xl border border-outline-variant/10 shadow-sm transition-all hover:border-[#2E7D32]/30 cursor-pointer"
@@ -537,7 +617,6 @@ export default function Home({ onNavigate }: Props) {
                     <ChevronDown className={`w-6 h-6 text-[#757575] mr-2 transition-transform ${isOpenRadius ? 'rotate-180' : ''}`} />
                   </div>
 
-                  {/* Search CTA Button */}
                   <div className="md:pr-1">
                     <button
                       onClick={handleSearchNearMe}
@@ -547,11 +626,9 @@ export default function Home({ onNavigate }: Props) {
                       <span>قلب دابا</span>
                     </button>
                   </div>
-
                 </div>
               </div>
 
-              {/* Categorized Visual Tags with Multi-Selection */}
               <div className="flex flex-row items-center justify-start md:justify-center gap-3 md:gap-6 mt-6 md:mt-12 overflow-x-auto pb-4 w-full max-w-full no-scrollbar">
                 <div className="flex items-center gap-1.5 md:gap-3 text-white shrink-0">
                   <PlusCircle className="w-4 h-4 md:w-6 md:h-6 text-[#A5D6A7]" />
@@ -651,8 +728,8 @@ export default function Home({ onNavigate }: Props) {
         <section className="max-w-7xl mx-auto px-6 py-20">
           <div className="flex justify-between items-end mb-12">
             <div className="text-right">
-              <span className="text-[#2E7D32] font-bold text-sm tracking-widest uppercase mb-2 block">كسيبة قريبة ليك</span>
-              <h2 className="text-3xl font-black text-[#1A1A1A] font-headline">أحدث العروض فمنطقتك</h2>
+              <span className="text-[#2E7D32] font-bold text-sm tracking-widest uppercase mb-2 block">الضيعات لي قريبة ليك</span>
+              <h2 className="text-3xl font-black text-[#1A1A1A] font-headline">الضيعات المتاحة</h2>
             </div>
             <button onClick={() => onNavigate('search-results')} className="text-[#2E7D32] font-bold flex items-center gap-2 hover:gap-3 transition-all">
               <span>شوف كلشي</span>
@@ -661,7 +738,48 @@ export default function Home({ onNavigate }: Props) {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {(Array.isArray(announcements) ? announcements : []).slice(0, 6).map((listing) => (
+            {(() => {
+              const baseList = Array.isArray(announcements) ? announcements : [];
+              const sorted = [...baseList].sort((a, b) => {
+                // If user has a city search active or detected, sort by distance
+                if (citySearch) {
+                  const targetCoords = cityCoords[citySearch];
+                  if (targetCoords) {
+                    const getDist = (item: any) => {
+                       const itemCity = cityMapping[(item.location || '').toLowerCase()] || item.location || '';
+                       if (item.coordinates && item.coordinates.lat && item.coordinates.lng) {
+                          return calculateDistance(targetCoords.lat, targetCoords.lng, item.coordinates.lat, item.coordinates.lng);
+                       }
+                       const mappedCoords = cityCoords[itemCity];
+                       return mappedCoords ? calculateDistance(targetCoords.lat, targetCoords.lng, mappedCoords.lat, mappedCoords.lng) : 9999;
+                    };
+                    const distA = getDist(a);
+                    const distB = getDist(b);
+                    if (distA !== distB) return distA - distB;
+                  } else {
+                    const aCity = (a.location || '').toLowerCase();
+                    const bCity = (b.location || '').toLowerCase();
+                    const targetCity = citySearch.toLowerCase();
+                    
+                    const aMatches = aCity.includes(targetCity);
+                    const bMatches = bCity.includes(targetCity);
+                    
+                    if (aMatches && !bMatches) return -1;
+                    if (!aMatches && bMatches) return 1;
+                  }
+                }
+
+                // Global Pin priority
+                if (a.isPinnedToHome && !b.isPinnedToHome) return -1;
+                if (!a.isPinnedToHome && b.isPinnedToHome) return 1;
+                
+                // Latest first
+                const dateA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
+                const dateB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
+                return dateB - dateA;
+              });
+
+              return sorted.slice(0, settings.maxHomeListings ?? 6).map((listing) => (
 
 
               <div key={listing.id} className="bg-white rounded-2xl overflow-hidden shadow-sm border border-outline-variant/20 hover:shadow-xl transition-all duration-300 group cursor-pointer" onClick={() => onNavigate('listing-details', listing.id)}>
@@ -732,7 +850,7 @@ export default function Home({ onNavigate }: Props) {
                 <div className="p-6">
                   <div className="flex flex-col gap-3">
                     <div className="flex items-center justify-between">
-                      <p className="text-[#2E7D32] font-bold">ضيعة {listing.sellerPseudo || listing.sellerName || 'كساب'}</p>
+                      <p className="text-[#2E7D32] font-bold truncate max-w-[150px]">ضيعة {listing.sellerPseudo || listing.sellerName || 'كساب'}</p>
                       <div className="flex items-center gap-1.5">
                         <span className="text-[10px] font-bold text-[#757575]">الحجم:</span>
                         <div className="flex gap-1 text-[10px] font-bold text-[#4A4A4A]">
@@ -746,12 +864,15 @@ export default function Home({ onNavigate }: Props) {
                     </div>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1 text-[#757575] text-sm font-bold">
-                        <span>{listing.farmLocation || 'موقع الضيعة غير محدد'}</span>
+                        <span className="truncate max-w-[200px]">{listing.farmLocation || 'موقع الضيعة غير محدد'}</span>
                       </div>
                       <div className="flex items-center gap-0.5" dir="ltr">
-                        {[...Array(5)].map((_, i) => (
-                          <Star key={i} className={`w-3.5 h-3.5 ${i < (listing.rating || 5) ? 'fill-[#FFC107] text-[#FFC107]' : 'text-[#D1D1D1]'}`} />
-                        ))}
+                        {[...Array(5)].map((_, i) => {
+                          const avg = listing.ratingCount > 0 ? (listing.rating || 0) / listing.ratingCount : 5;
+                          return (
+                            <Star key={i} className={`w-3.5 h-3.5 ${i < Math.round(avg) ? 'fill-[#FFC107] text-[#FFC107]' : 'text-[#D1D1D1]'}`} />
+                          );
+                        })}
                         {listing.ratingCount > 0 && (
                           <span className="text-[10px] text-on-surface-variant font-bold ml-1">({listing.ratingCount})</span>
                         )}
@@ -787,7 +908,7 @@ export default function Home({ onNavigate }: Props) {
                   </div>
                 </div>
               </div>
-            ))}
+            ))})()}
           </div>
         </section>
 
