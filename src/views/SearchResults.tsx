@@ -4,7 +4,7 @@ import { Search, MapPin, Star, ArrowLeft, SlidersHorizontal, Heart, LayoutGrid, 
 import SearchHeader from '../components/SearchHeader';
 import GoogleMapComponent from '../components/GoogleMap';
 import { firestoreService } from '../services/firestoreService';
-import { cityMapping, cityCoords, getDisplayCity, calculateDistance } from '../constants/cityMapping';
+import { cityMapping, cityCoords, getDisplayCity, calculateDistance, normalizeArabic } from '../constants/cityMapping';
 import { getCachedData, setCachedData } from '../lib/cache';
 import ContactSellerModal from '../components/ContactSellerModal';
 import LoginRequiredModal from '../components/LoginRequiredModal';
@@ -131,12 +131,19 @@ export default function SearchResults({ onNavigate, initialCity, initialRadius, 
     const matchesPrice = matchesMinPrice && matchesMaxPrice;
 
     // Core search center point
-    const normalizedSearch = cityMapping[citySearch.toLowerCase()] || citySearch;
+    const normSearchInput = citySearch.trim();
+    const mappedSearch = cityMapping[normSearchInput.toLowerCase()] || cityMapping[normSearchInput];
+    const normalizedSearch = mappedSearch || normSearchInput;
     const searchCoords = cityCoords[normalizedSearch];
 
     // Check if the city search matches the calculated display city
     const displayCity = getDisplayCity(listing);
-    const matchesCityName = normalizedSearch === 'الكل' || displayCity.includes(normalizedSearch) || (listing.location && listing.location.includes(normalizedSearch));
+    const normDisplayCity = normalizeArabic(displayCity);
+    const normNormalizedSearch = normalizeArabic(normalizedSearch);
+    
+    const matchesCityName = normalizedSearch === 'الكل' || 
+                          normDisplayCity.includes(normNormalizedSearch) || 
+                          (listing.location && normalizeArabic(listing.location).includes(normNormalizedSearch));
 
     let dist = 999;
 

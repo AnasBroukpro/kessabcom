@@ -8,7 +8,7 @@ import { useSettings } from '../hooks/useSettings';
 import { compressImage, checkPayloadSize, compressFileForUpload } from '../lib/imageUtils';
 import * as audioUtils from '../lib/audioUtils';
 import LocationMap from '../components/LocationMap';
-import { cityCoords, getClosestCity } from '../constants/cityMapping';
+import { cityCoords, getClosestCity, normalizeArabic } from '../constants/cityMapping';
 import { ChevronDown } from 'lucide-react';
 import mapMarkerSvg from '../assets/map-marker-001.svg';
 
@@ -88,11 +88,14 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
     // Auto-select city in dropdown based on coordinates
     const closestCity = getClosestCity(lat, lng);
     
-    // Use the mapped closest city for UI display if available, else raw city
-    setDynamicCity(closestCity || city);
+    // Map the raw city from geocoder if no closest city found locally
+    const safeCity = city || '';
+    const mappedCity = !closestCity ? (cityMapping[safeCity.toLowerCase()] || cityMapping[safeCity] || safeCity) : closestCity;
     
-    if (closestCity) {
-      setAddress(closestCity);
+    setDynamicCity(mappedCity);
+    
+    if (mappedCity) {
+      setAddress(mappedCity);
     }
   }, []);
 
@@ -471,7 +474,11 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
               {isOpenCity && (
                 <div className="absolute top-full right-0 left-0 w-full bg-white rounded-xl shadow-2xl border border-outline-variant/20 max-h-60 overflow-y-auto z-[100] p-1 mt-2 animate-in fade-in slide-in-from-top-2">
                   <div className="flex flex-col gap-0.5">
-                    {Object.keys(cityCoords).filter(c => c.includes(address)).sort().map(city => (
+                    {Object.keys(cityCoords).filter(city => {
+                      const normSearch = normalizeArabic(address);
+                      if (!normSearch) return true;
+                      return normalizeArabic(city).includes(normSearch);
+                    }).sort().map(city => (
                       <button
                         key={city}
                         type="button"

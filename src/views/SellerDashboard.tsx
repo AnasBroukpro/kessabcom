@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../hooks/useSettings';
 import { useSellerDashboardData } from '../hooks/useSellerDashboardData';
 import { firestoreService } from '../services/firestoreService';
-import { cityMapping } from '../constants/cityMapping';
+import { cityCoords, getDisplayCity } from '../constants/cityMapping';
 
 // UI Components
 import DashboardHeader from '../components/DashboardHeader';
@@ -155,8 +155,8 @@ export default function SellerDashboard({ onNavigate, activeSubView }: Props) {
       <main className="flex-1 flex flex-col overflow-y-auto no-scrollbar pb-20 md:pb-0">
         <DashboardHeader 
           title={getTitle()} 
-          subtitle={activeTab === 'dashboard' ? cityMapping[(profile?.location || '').split(' ')[0].toLowerCase()] : undefined}
-          location={activeTab === 'dashboard' ? cityMapping[(profile?.location || '').split(' ')[0].toLowerCase()] : undefined}
+          subtitle={activeTab === 'dashboard' ? getDisplayCity({ location: profile?.location }) : undefined}
+          location={activeTab === 'dashboard' ? getDisplayCity({ location: profile?.location }) : undefined}
           showSearch={true}
           onSearch={(city, distance) => onNavigate('search-results', undefined, city, distance)}
           onNavigate={onNavigate}
@@ -195,7 +195,7 @@ export default function SellerDashboard({ onNavigate, activeSubView }: Props) {
               user={user} 
               profile={profile} 
               settings={settings} 
-              cities={Object.keys(cityMapping)} 
+              cities={Object.keys(cityCoords).sort()} 
             />
           )}
           {activeTab === 'buyer-requests' && (

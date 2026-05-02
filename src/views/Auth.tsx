@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ViewType } from '../App';
-import { MapPin, Loader2, Eye, EyeOff, CheckCircle2, ArrowRight } from 'lucide-react';
+import { MapPin, Loader2, Eye, EyeOff, CheckCircle2, ArrowRight, Search, ChevronDown, Star, BarChart2, Navigation, Bell, Package, ShieldCheck, Users, Image, FileText, PhoneCall } from 'lucide-react';
 import { auth, db } from '../lib/firebase';
 import {
   signInWithEmailAndPassword,
@@ -11,7 +11,7 @@ import {
 } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import { firestoreService } from '../services/firestoreService';
-import { cityCoords } from '../constants/cityMapping';
+import { cityCoords, normalizeArabic } from '../constants/cityMapping';
 
 // Import marketing images
 import img1 from '../assets/marketing/branding/img1.webp';
@@ -23,6 +23,175 @@ import img6 from '../assets/marketing/branding/img6.webp';
 import logoV2 from '../assets/marketing/branding/logo v2.png';
 
 const marketingImages = [img1, img2, img3, img4, img5, img6];
+
+// ─── City Search Input Component ─────────────────────────────────────────────
+function CitySearchInput({ value, onChange, isDetecting, allCities }: {
+  value: string;
+  onChange: (city: string) => void;
+  isDetecting: boolean;
+  allCities: string[];
+}) {
+  const [query, setQuery] = useState(value);
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Sync external value (e.g., from geolocation)
+  useEffect(() => { setQuery(value); }, [value]);
+
+  const filtered = query.trim().length === 0
+    ? allCities.slice(0, 15) // Show more initial cities
+    : allCities.filter(c => {
+        const normSearch = normalizeArabic(query);
+        return normalizeArabic(c).includes(normSearch) || c.toLowerCase().includes(query.toLowerCase());
+      }).slice(0, 50); // Show up to 50 matches for better selection
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const select = (city: string) => {
+    setQuery(city);
+    onChange(city);
+    setOpen(false);
+  };
+
+  return (
+    <div ref={ref} className="relative group">
+      <div className={`flex items-center w-full h-14 bg-[#F9F9F6] border-2 rounded-2xl transition-all ${
+        open ? 'border-[#2E7D32] bg-white shadow-lg shadow-[#2E7D32]/10' : 'border-outline-variant/20'
+      }`}>
+        {/* Dropdown Arrow (Visually "Outside" the interaction zone) */}
+        <div 
+          onClick={() => setOpen(o => !o)}
+          className="h-full px-4 flex items-center justify-center border-r border-[#E0E0E0] cursor-pointer hover:bg-gray-100 transition-colors rounded-l-2xl"
+        >
+          <ChevronDown
+            className={`w-5 h-5 text-[#2E7D32] transition-transform duration-300 ${open ? 'rotate-180' : ''}`}
+          />
+        </div>
+
+        {/* Input Area */}
+        <div className="relative flex-1 h-full">
+          <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none">
+            {isDetecting ? (
+              <Loader2 className="w-5 h-5 text-[#2E7D32] animate-spin shrink-0" />
+            ) : (
+              <MapPin className="w-5 h-5 text-[#2E7D32] shrink-0" />
+            )}
+          </div>
+          
+          <input
+            type="text"
+            value={query}
+            onChange={e => { setQuery(e.target.value); onChange(''); setOpen(true); }}
+            onFocus={() => setOpen(true)}
+            placeholder={isDetecting ? 'جاري الكشف عن موقعك...' : 'اختر مدينتك...'}
+            className="w-full h-full bg-transparent border-none outline-none text-base font-black text-[#1A1A1A] text-right pr-12 pl-4 placeholder:text-[#757575]/50"
+            dir="rtl"
+          />
+        </div>
+      </div>
+
+      {open && filtered.length > 0 && (
+        <div className="absolute top-full mt-2 left-0 right-0 bg-white rounded-2xl shadow-2xl border border-outline-variant/10 max-h-60 overflow-y-auto z-[200] p-1.5 animate-in slide-in-from-top-2 duration-200">
+          {query.trim().length > 0 && !allCities.includes(query) && (
+            <button
+              type="button"
+              onClick={() => select(query)}
+              className="w-full text-right px-4 py-2.5 rounded-xl text-sm font-black text-[#2E7D32] bg-[#E8F5E9] hover:bg-[#C8E6C9] transition-colors mb-1"
+            >
+              ✏️ استخدم "{query}" مباشرة
+            </button>
+          )}
+          {filtered.map(city => (
+            <button
+              key={city}
+              type="button"
+              onClick={() => select(city)}
+              className={`w-full text-right px-4 py-2.5 rounded-xl text-sm font-bold transition-colors ${
+                city === value ? 'bg-[#2E7D32] text-white' : 'text-[#1A1A1A] hover:bg-[#F9F9F6]'
+              }`}
+            >
+              {city}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Onboarding Page Component ───────────────────────────────────────────────
+function OnboardingModal({ role, name, onDone }: { role: 'seller' | 'buyer'; name: string; onDone: () => void }) {
+  const isSeller = role === 'seller';
+  const features = isSeller ? [
+    { icon: MapPin, label: 'حدد موقع الضيعة ديالك بدقة على الخريطة' },
+    { icon: Image, label: 'دخل تصاور القطيع ديالك' },
+    { icon: FileText, label: 'دخل المعلومات ديال القطيع' },
+    { icon: PhoneCall, label: 'صافي! راك واجد باش تستقبل طلبات المشترين' },
+  ] : [
+    { icon: Search, label: 'قلب على الحولي لي قراب منك بالمدينة والصنف' },
+    { icon: Navigation, label: 'شوف موقع الضيعة على الخريطة قبل ما تتنقل' },
+    { icon: Users, label: 'تواصل مع الكسابة ديريكت بلا وسيط' },
+    { icon: ShieldCheck, label: 'سجل طلبك وسلم على الكسابة لي عندهم الحولي لي بغيتي' },
+  ];
+
+  return (
+    <div className="fixed inset-0 z-[1000] flex flex-col items-center justify-center p-4 sm:p-8 bg-[#FDFCF8] overflow-y-auto" dir="rtl">
+      <div className="w-full max-w-xl bg-white rounded-[32px] overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.08)] border border-outline-variant/10 animate-in fade-in slide-in-from-bottom-8 duration-700 my-auto">
+        {/* Header */}
+        <div className="bg-gradient-to-br from-[#1B5E20] to-[#2E7D32] p-8 sm:p-10 text-center relative overflow-hidden">
+          <div className="absolute -top-12 -left-12 w-48 h-48 bg-white/5 rounded-full" />
+          <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-white/5 rounded-full" />
+          <div className="w-20 h-20 bg-white/15 rounded-3xl flex items-center justify-center mx-auto mb-6 text-4xl shadow-inner">
+            {isSeller ? '🐑' : '🛒'}
+          </div>
+          <h2 className="text-white font-black text-2xl sm:text-3xl mb-2 font-headline">
+            مبروك عليك يا {name.split(' ')[0]}! 🎉
+          </h2>
+          <p className="text-[#A5D6A7] font-bold text-base sm:text-lg">
+            {isSeller
+              ? 'نجحت في إنشاء حساب كساب على منصة kessabcom.ma'
+              : 'نجحت في إنشاء حسابك على منصة kessabcom.ma'}
+          </p>
+        </div>
+
+        {/* Body */}
+        <div className="p-8 sm:p-10">
+          <div className="flex items-center gap-3 mb-6">
+            <Star className="w-5 h-5 text-[#2E7D32] fill-[#2E7D32]" />
+            <p className="text-[#1A1A1A] font-black text-lg">
+              {isSeller ? 'باش تبدا تبيع، خاصك:' : 'باش تستافيد من كل شي، يمكنك:'}
+            </p>
+          </div>
+          <div className="space-y-4 mb-10">
+            {features.map((f, i) => (
+              <div key={i} className="flex items-center gap-4 p-4 bg-[#F9F9F6] rounded-2xl border border-black/5 hover:bg-[#F3F4ED] transition-colors">
+                <div className="w-12 h-12 rounded-xl bg-[#E8F5E9] flex items-center justify-center shrink-0 shadow-sm">
+                  <f.icon className="w-6 h-6 text-[#2E7D32]" />
+                </div>
+                <p className="text-base sm:text-lg font-bold text-[#4A4A4A] leading-snug">{f.label}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex flex-col gap-4">
+            <button
+              onClick={onDone}
+              className="w-full h-16 bg-[#2E7D32] text-white rounded-2xl font-black text-xl shadow-xl shadow-[#2E7D32]/30 hover:shadow-[#2E7D32]/40 active:scale-[0.98] hover:-translate-y-1 transition-all"
+            >
+              {isSeller ? '🚀 أنشئ أول إعلان دابا' : '🔍 قلب على حولي دابا'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 interface Props {
   onNavigate: (view: ViewType, listingId?: string, city?: string, radius?: string, subView?: string) => void;
@@ -48,6 +217,9 @@ export default function Auth({ onNavigate, intendedView }: Props) {
   const [pseudo, setPseudo] = useState('');
   const [selectedRole, setSelectedRole] = useState<'buyer' | 'seller' | null>(null);
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState<{ view: ViewType } | null>(null);
+  const allCities = Object.keys(cityCoords).sort();
   
   // 10-digit phone input logic
   const [phoneDigits, setPhoneDigits] = useState(['0', '', '', '', '', '', '', '', '', '']);
@@ -252,6 +424,9 @@ export default function Auth({ onNavigate, intendedView }: Props) {
       const formattedPhone = getFormattedPhone(phoneNumber);
       console.log('📝 Registering:', email, '| role:', selectedRole);
 
+      // Prevent App.tsx from auto-redirecting us away while we show the onboarding modal
+      sessionStorage.setItem('isRegistering', 'true');
+
       // 1. Create Firebase Auth user
       const result = await createUserWithEmailAndPassword(auth, email, password);
       const { uid } = result.user;
@@ -301,15 +476,12 @@ export default function Auth({ onNavigate, intendedView }: Props) {
         console.warn('⚠️ Server sync failed (profile already in Firestore):', err)
       );
 
-      // Final step: Navigation logic based on role and listings
-      if (selectedRole === 'seller') {
-        console.log('✨ New Seller registered, sending to add-listing for their first time');
-        onNavigate('add-listing');
-      } else {
-        console.log('✨ New Buyer registered, sending to buyer dashboard');
-        onNavigate('buyer');
-      }
       updateProfileState(profileData as any);
+
+      // Show onboarding modal first, then navigate
+      const targetView: ViewType = intendedView?.view || (selectedRole === 'seller' ? 'add-listing' : 'buyer');
+      setPendingNavigation({ view: targetView });
+      setShowOnboarding(true);
     } catch (err: any) {
       console.error('❌ Register error:', err.code, err.message);
       if (err.code === 'auth/operation-not-allowed') {
@@ -353,8 +525,23 @@ export default function Auth({ onNavigate, intendedView }: Props) {
     }
   }, [isNewUser, phoneChecked]);
 
+  const handleOnboardingDone = () => {
+    setShowOnboarding(false);
+    sessionStorage.removeItem('isRegistering');
+    if (pendingNavigation) {
+      setTimeout(() => onNavigate(pendingNavigation.view), 50);
+    }
+  };
+
   return (
     <div className="h-screen w-full flex bg-white overflow-hidden" dir="rtl">
+      {showOnboarding && selectedRole && (
+        <OnboardingModal
+          role={selectedRole}
+          name={fullName || 'صاحبنا'}
+          onDone={handleOnboardingDone}
+        />
+      )}
       {/* Background Decor (Only for form side) */}
       <div className="absolute inset-0 lg:w-1/2 overflow-hidden pointer-events-none">
         <div className="absolute -top-24 -left-24 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
@@ -516,22 +703,12 @@ export default function Auth({ onNavigate, intendedView }: Props) {
                     className="w-full h-14 bg-[#F9F9F6] border-2 border-outline-variant/20 rounded-2xl px-4 text-base text-center font-black focus:border-primary focus:bg-white transition-all"
                   />
                 )}
-                <div className="relative">
-                  <select
-                    value={city}
-                    onChange={(e) => setCity(e.target.value)}
-                    className="w-full h-14 bg-[#F9F9F6] border-2 border-outline-variant/20 rounded-2xl px-4 text-base text-center font-black appearance-none focus:border-primary focus:bg-white transition-all"
-                    required
-                  >
-                    <option value="">
-                      {isDetectingLocation ? 'جاري الكشف عن موقعك...' : 'اختر المدينة...'}
-                    </option>
-                    {Object.keys(cityCoords).sort().map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
-                  <MapPin className="absolute right-4 top-1/2 -translate-y-1/2 text-outline-variant w-5 h-5" />
-                </div>
+                <CitySearchInput
+                  value={city}
+                  onChange={setCity}
+                  isDetecting={isDetectingLocation}
+                  allCities={allCities}
+                />
               </div>
             )}
 

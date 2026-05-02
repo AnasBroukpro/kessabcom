@@ -1,0 +1,5 @@
+FROM kessabcom-kessabcom:latest
+WORKDIR /app
+COPY server.ts ./
+COPY dist ./dist
+CMD ["tsx", "server.ts"]

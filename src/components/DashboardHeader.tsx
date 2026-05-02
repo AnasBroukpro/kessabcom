@@ -3,7 +3,7 @@ import { Bell, User, MapPin, Search, Navigation, ChevronDown, LogOut, LayoutDash
 import { motion } from 'motion/react';
 import { useAuth } from '../contexts/AuthContext';
 import { firestoreService } from '../services/firestoreService';
-import { cityMapping, cityCoords, getClosestCity } from '../constants/cityMapping';
+import { cityMapping, cityCoords, getClosestCity, normalizeArabic } from '../constants/cityMapping';
 import MobileSidebar from './MobileSidebar';
 import NotificationSidebar from './NotificationSidebar';
 import logoV2 from '../assets/marketing/branding/logo v2.png';
@@ -40,10 +40,19 @@ export default function DashboardHeader({ title, subtitle, location, showSearch 
     return cityMapping[normalizedInput] || input;
   };
 
-  const filteredCities = cities.filter(city => 
-    city.toLowerCase().includes(citySearch.toLowerCase()) || 
-    getMappedCity(citySearch).toLowerCase().includes(city.toLowerCase())
-  );
+  const filteredCities = cities.filter(city => {
+    const normSearch = normalizeArabic(citySearch);
+    if (!normSearch) return true;
+    
+    // Check Arabic name normalization
+    if (normalizeArabic(city).includes(normSearch)) return true;
+    
+    // Check mapped city (from French/English)
+    const mapped = getMappedCity(citySearch);
+    if (mapped && normalizeArabic(city).includes(normalizeArabic(mapped))) return true;
+    
+    return false;
+  });
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {

@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  kessabcom:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: kessabcom_local
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    volumes:
+      # Montage du fichier de service account pour Firebase Admin SDK
+      - ./firebase-service-account.json:/app/firebase-service-account.json
+    restart: unless-stopped

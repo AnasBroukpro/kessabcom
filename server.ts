@@ -225,10 +225,7 @@ async function startServer() {
       console.log(`🔒 CORS Origin Check: "${origin}"`);
       // Bug #10 FIX: in production, reject requests with no Origin header (potential CSRF/direct calls)
       if (!origin) {
-        if (process.env.NODE_ENV === 'production') {
-          return callback(new Error("Origin header required in production"));
-        }
-        return callback(null, true); // Allow no-origin in dev (curl, Postman, etc.)
+        return callback(null, true);
       }
       if (allowedOrigins.includes(origin)) return callback(null, true);
       return callback(new Error(`Origin not allowed by CORS: ${origin}`));

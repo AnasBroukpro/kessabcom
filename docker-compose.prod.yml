@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  kessabcom:
+    image: ghcr.io/anasbrouk/kessabcom-v31:latest
+    container_name: kessabcom_prod
+    ports:
+      - "3001:3000"
+    env_file:
+      - .env
+    volumes:
+      # Sur le VPS, assurez-vous que ce fichier est présent dans le même dossier que ce docker-compose.prod.yml
+      - ./firebase-service-account.json:/app/firebase-service-account.json
+    restart: always

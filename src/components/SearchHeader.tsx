@@ -6,7 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import MobileSidebar from './MobileSidebar';
 import NotificationSidebar from './NotificationSidebar';
 import { firestoreService } from '../services/firestoreService';
-import { cityCoords, getClosestCity } from '../constants/cityMapping';
+import { cityCoords, getClosestCity, normalizeArabic, cityMapping } from '../constants/cityMapping';
 import logoV2 from '../assets/marketing/branding/logo v2.png';
 
 interface Props {
@@ -49,7 +49,17 @@ export default function SearchHeader({ onNavigate, initialCity = '', initialRadi
     if (user) await firestoreService.markNotificationAsRead(user.uid, id);
   };
 
-  const filteredCities = moroccanCities.filter(city => city.includes(citySearch));
+  const filteredCities = moroccanCities.filter(city => {
+    const normSearch = normalizeArabic(citySearch);
+    if (!normSearch) return true;
+    
+    if (normalizeArabic(city).includes(normSearch)) return true;
+    
+    const mapped = cityMapping[citySearch.toLowerCase()] || cityMapping[citySearch];
+    if (mapped && normalizeArabic(city).includes(normalizeArabic(mapped))) return true;
+    
+    return false;
+  });
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {

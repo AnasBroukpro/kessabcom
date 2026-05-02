@@ -1,0 +1,17 @@
+node_modules
+# dist
+# .env
+firebase-service-account.json
+firebase-applet-config.json
+.git
+.github
+*.zip
+*.md
+.gitignore
+.firebaserc
+firestore.rules
+firestore.indexes.json
+firebase.json
+metadata.json
+request.json
+scratch

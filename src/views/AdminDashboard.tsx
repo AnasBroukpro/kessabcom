@@ -17,7 +17,7 @@ import {
 import { updatePassword, updateProfile, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { useSettings } from '../hooks/useSettings';
 import DashboardHeader from '../components/DashboardHeader';
-import { cityMapping } from '../constants/cityMapping';
+import { cityCoords, getDisplayCity, normalizeArabic, cityMapping } from '../constants/cityMapping';
 import { compressImage, compressFileForUpload } from '../lib/imageUtils';
 import Notifications from './Notifications';
 
@@ -764,12 +764,8 @@ export default function AdminDashboard({ onNavigate, activeSubView }: Props) {
 
       // City filter
       if (listingCityFilter !== 'all') {
-        const arabicCity = cityMapping[listingCityFilter];
-        const location = (listing.city || listing.location || listing.farmLocation || '').toLowerCase();
-        const matchesLatin = location.includes(listingCityFilter.toLowerCase());
-        const matchesArabic = arabicCity && location.includes(arabicCity.toLowerCase());
-        
-        if (!matchesLatin && !matchesArabic) return false;
+        const displayCity = getDisplayCity(listing);
+        if (normalizeArabic(displayCity) !== normalizeArabic(listingCityFilter)) return false;
       }
 
       // Search filter
@@ -809,11 +805,8 @@ export default function AdminDashboard({ onNavigate, activeSubView }: Props) {
       // City filter
       let matchesCity = true;
       if (userCityFilter !== 'all') {
-        const arabicCity = cityMapping[userCityFilter];
-        const location = (u.city || u.location || '').toLowerCase();
-        const matchesLatin = location.includes(userCityFilter.toLowerCase());
-        const matchesArabic = arabicCity && location.includes(arabicCity.toLowerCase());
-        matchesCity = matchesLatin || matchesArabic;
+        const displayCity = getDisplayCity({ city: u.city, location: u.location });
+        matchesCity = normalizeArabic(displayCity) === normalizeArabic(userCityFilter);
       }
 
       if (!matchesCity) return false;
@@ -2334,8 +2327,8 @@ const renderOverview = () => (
               className="w-full bg-surface-container-low border border-outline-variant/30 rounded-2xl py-3 pr-10 pl-4 text-sm font-black outline-none appearance-none cursor-pointer focus:ring-2 focus:ring-primary/20"
             >
               <option value="all">جميع المدن</option>
-              {Object.entries(cityMapping).map(([key, name]) => (
-                <option key={key} value={key}>{name}</option>
+              {Object.keys(cityCoords).sort().map((name) => (
+                <option key={name} value={name}>{name}</option>
               ))}
             </select>
             <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-on-surface-variant">
@@ -2421,10 +2414,7 @@ const renderOverview = () => (
                         <div className="flex items-center gap-2 text-xs text-on-surface-variant font-bold">
                           <MapPin className="w-3 h-3" />
                           <span>
-                            {(() => {
-                              const rawCity = (user.location || user.city || 'غير محدد').split(' ')[0];
-                              return (rawCity && cityMapping[rawCity.toLowerCase()]) || rawCity;
-                            })()}
+                            {getDisplayCity({ location: user.location || user.city })}
                           </span>
                         </div>
                         <div className="flex items-center gap-2 text-[10px] text-on-surface-variant/70 font-mono">
@@ -2613,8 +2603,8 @@ const renderOverview = () => (
               className="w-full bg-surface-container-low border border-outline-variant/30 rounded-2xl py-3 pr-10 pl-4 text-sm font-black outline-none appearance-none cursor-pointer focus:ring-2 focus:ring-primary/20"
             >
               <option value="all">جميع المدن</option>
-              {Object.entries(cityMapping).map(([key, name]) => (
-                <option key={key} value={key}>{name}</option>
+              {Object.keys(cityCoords).sort().map((name) => (
+                <option key={name} value={name}>{name}</option>
               ))}
             </select>
             <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-on-surface-variant">

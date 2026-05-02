@@ -158,7 +158,7 @@ function AppContent() {
       }
 
       // Role-based and Authentication access restrictions
-      if (profile && intendedView) {
+      if (profile && intendedView && sessionStorage.getItem('isRegistering') !== 'true') {
           const next = intendedView;
           setIntendedView(null);
           
@@ -174,7 +174,7 @@ function AppContent() {
 
       // Bug Fix: Auto-redirect logged-in users who land on auth pages or try to access dashboard without listings
       if (profile?.role) {
-        if (currentView === 'auth' || currentView === 'admin-auth') {
+        if ((currentView === 'auth' || currentView === 'admin-auth') && sessionStorage.getItem('isRegistering') !== 'true') {
           console.log(`🚀 App: Auto-redirecting ${profile.role} from auth page`);
           
           if (profile.role === 'admin') {

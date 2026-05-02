@@ -5,9 +5,10 @@ import { motion } from 'motion/react';
 import { useAuth } from '../contexts/AuthContext';
 import { firestoreService } from '../services/firestoreService';
 import { getCachedData, setCachedData } from '../lib/cache';
-import { cityMapping, cityCoords, getDisplayCity, getClosestCity } from '../constants/cityMapping';
+import { cityMapping, cityCoords, getDisplayCity, getClosestCity, normalizeArabic } from '../constants/cityMapping';
 import barkiImage from '../assets/marketing/branding/حولي بركي..png';
 import heroBackground from '../assets/marketing/branding/hero-background.webp';
+import heroBackgroundMobile from '../assets/marketing/branding/hero-background-mobile.webp';
 
 import { useSettings } from '../hooks/useSettings';
 import ContactSellerModal from '../components/ContactSellerModal';
@@ -163,7 +164,14 @@ export default function Home({ onNavigate }: Props) {
   const notificationsRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
 
-  const filteredCities = moroccanCities.filter(city => city.includes(citySearch));
+  const filteredCities = moroccanCities.filter(city => {
+    const normSearch = normalizeArabic(citySearch);
+    if (!normSearch) return true;
+    if (normalizeArabic(city).includes(normSearch)) return true;
+    const mapped = cityMapping[citySearch.toLowerCase()] || cityMapping[citySearch];
+    if (mapped && normalizeArabic(city).includes(normalizeArabic(mapped))) return true;
+    return false;
+  });
 
   useEffect(() => {
     if (!user) {
@@ -453,13 +461,16 @@ export default function Home({ onNavigate }: Props) {
         {/* Hero & Search Section - 100vh with vertical centering */}
         <section className="relative min-h-[calc(100dvh-64px)] flex items-center justify-center bg-[#FDFCF8] px-4 z-20 overflow-hidden">
           <div className="absolute inset-0 z-0">
-            <img 
-              alt="مرعى أخضر في جبال الأطلس" 
-              className="w-full h-full object-cover" 
-              src={heroBackground} 
-              fetchpriority="high" 
-              referrerPolicy="no-referrer"
-            />
+            <picture className="w-full h-full">
+              <source media="(max-width: 767px)" srcSet={heroBackgroundMobile} />
+              <img 
+                alt="مرعى أخضر في جبال الأطلس" 
+                className="w-full h-full object-cover" 
+                src={heroBackground} 
+                fetchpriority="high" 
+                referrerPolicy="no-referrer"
+              />
+            </picture>
             <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-transparent"></div>
           </div>
 
@@ -473,34 +484,7 @@ export default function Home({ onNavigate }: Props) {
 
           <div className="relative z-10 max-w-5xl w-full text-center mt-[100px] md:mt-0">
             <div className="flex flex-col items-center mb-8 animate-in fade-in slide-in-from-top-4 duration-1000 relative">
-              {/* Left floating circle - Sheep */}
-              <motion.div 
-                animate={{ y: [0, -5, 0], rotate: [0, 5, 0] }}
-                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-                className="absolute -left-2 md:-left-12 top-0 w-24 h-24 md:w-32 md:h-32 opacity-90 hidden sm:block"
-              >
-                <img 
-                  src="https://i.pinimg.com/474x/f1/c4/f3/f1c4f375f585d2c88ef5bf4b453cd01e.jpg" 
-                  alt="خروف صحي ممتاز" 
-                  className="w-full h-full object-contain rounded-full border-4 border-white/30 shadow-2xl backdrop-blur-sm" 
-                  referrerPolicy="no-referrer"
-                />
-              </motion.div>
-
               <EidCountdown />
-
-              {/* Right floating circle - Barki */}
-              <motion.div 
-                animate={{ y: [0, 5, 0], rotate: [0, -5, 0] }}
-                transition={{ duration: 5, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
-                className="absolute -right-2 md:-right-12 bottom-0 w-24 h-24 md:w-32 md:h-32 opacity-95 hidden sm:block"
-              >
-                <img 
-                  src={barkiImage} 
-                  alt="حولي بركي" 
-                  className="w-full h-full object-cover rounded-full border-4 border-white/30 shadow-2xl backdrop-blur-sm"
-                />
-              </motion.div>
             </div>
 
             <h1 className="text-4xl md:text-7xl font-black text-white mb-6 tracking-tight font-headline leading-[1.1] drop-shadow-lg">
@@ -544,7 +528,14 @@ export default function Home({ onNavigate }: Props) {
                               >
                                 الكل
                               </button>
-                              {moroccanCities.filter(c => c.includes(citySearch)).sort().map(city => (
+                              {moroccanCities.filter(city => {
+                                const normSearch = normalizeArabic(citySearch);
+                                if (!normSearch) return true;
+                                if (normalizeArabic(city).includes(normSearch)) return true;
+                                const mapped = cityMapping[citySearch.toLowerCase()] || cityMapping[citySearch];
+                                if (mapped && normalizeArabic(city).includes(normalizeArabic(mapped))) return true;
+                                return false;
+                              }).sort().map(city => (
                                 <button
                                   key={city}
                                   onClick={() => { setCitySearch(city); setIsOpenCity(false); }}
