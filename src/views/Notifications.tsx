@@ -101,7 +101,18 @@ export default function Notifications({ onNavigate, hideHeader = false }: Props)
                     <div className="flex items-center gap-4 pt-2">
                       <div className="flex items-center gap-2 text-xs text-on-surface-variant/60 font-bold">
                         <Clock className="w-3.5 h-3.5" />
-                        <span>{notif.createdAt?.toDate?.()?.toLocaleString('ar-MA') || 'منذ وقت قصير'}</span>
+                        <span>{(() => {
+                          if (!notif.createdAt) return 'منذ وقت قصير';
+                          try {
+                            const date = notif.createdAt.toDate ? notif.createdAt.toDate() : 
+                                       (notif.createdAt._seconds ? new Date(notif.createdAt._seconds * 1000) : 
+                                       new Date(notif.createdAt));
+                            if (isNaN(date.getTime())) return 'منذ وقت قصير';
+                            return date.toLocaleString('ar-MA');
+                          } catch (e) {
+                            return 'منذ وقت قصير';
+                          }
+                        })()}</span>
                       </div>
                       {notif.relatedId && (
                         <button className="text-xs font-black text-primary hover:underline">

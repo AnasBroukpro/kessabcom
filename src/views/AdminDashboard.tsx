@@ -26,6 +26,29 @@ interface Props {
   activeSubView?: string;
 }
 
+const formatDateSafe = (date: any): string => {
+  try {
+    if (!date) return '—';
+    let d: Date;
+    if (date instanceof Date) d = date;
+    else if (typeof date?.toDate === 'function') d = date.toDate();
+    else if (date?.seconds !== undefined) d = new Date(date.seconds * 1000);
+    else if (date?._seconds !== undefined) d = new Date(date._seconds * 1000);
+    else d = new Date(date);
+    
+    if (isNaN(d.getTime())) return '—';
+    
+    const year = d.getFullYear();
+    if (year > 9999 || year < 1900) return '—'; // Fallback for bizarre dates instead of toLocaleDateString
+    
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  } catch (e) {
+    return '—';
+  }
+};
+
 type AdminTab = 'overview' | 'stats' | 'users' | 'farms' | 'auctions' | 'listings' | 'reviews' | 'monetization' | 'ads' | 'settings' | 'stock-market' | 'donations' | 'reports' | 'support_requests' | 'profile' | 'notifications';
 
 interface StockMarketViewProps {
@@ -471,7 +494,7 @@ function ReviewsModerationView() {
                         <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${review.type === 'seller' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
                           {review.type === 'seller' ? 'تقييم كساب' : 'تقييم إعلان'}
                         </span>
-                        <span className="text-[10px] text-on-surface-variant">{review.createdAt?.toDate?.()?.toLocaleString('ar-MA')}</span>
+                        <span className="text-[10px] text-on-surface-variant">{formatDateSafe(review.createdAt)}</span>
                       </div>
                     </div>
                   </div>
@@ -564,6 +587,7 @@ export default function AdminDashboard({ onNavigate, activeSubView }: Props) {
   const [selectedListingId, setSelectedListingId] = useState<string | null>(null);
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [listingsPage, setListingsPage] = useState(1);
+  const [usersPage, setUsersPage] = useState(1);
   const itemsPerPage = 10;
   const [reports, setReports] = useState<any[]>([]);
   const [reportSubTab, setReportSubTab] = useState<'listing' | 'request' | 'offer'>('listing');
@@ -582,6 +606,10 @@ export default function AdminDashboard({ onNavigate, activeSubView }: Props) {
   useEffect(() => {
     setListingsPage(1);
   }, [listingFilter, listingCityFilter, listingSearch]);
+
+  useEffect(() => {
+    setUsersPage(1);
+  }, [userSubTab, userStatusFilter, userSearch, userCityFilter]);
   
   const [notifications, setNotifications] = useState<any[]>([]);
   const [supportRequests, setSupportRequests] = useState<any[]>([]);
@@ -604,6 +632,12 @@ export default function AdminDashboard({ onNavigate, activeSubView }: Props) {
   const [prefCompactMode, setPrefCompactMode] = useState(profile?.preferences?.compactMode ?? false);
   const [showDeleteSupportConfirm, setShowDeleteSupportConfirm] = useState(false);
   const [supportRequestToDelete, setSupportRequestToDelete] = useState<string | null>(null);
+
+  const [showBanConfirm, setShowBanConfirm] = useState(false);
+  const [userToBan, setUserToBan] = useState<any>(null);
+  
+  const [showDeleteUserConfirm, setShowDeleteUserConfirm] = useState(false);
+  const [userToDeleteConfirm, setUserToDeleteConfirm] = useState<string | null>(null);
 
   const { refreshProfile } = useAuth();
 
@@ -823,6 +857,12 @@ export default function AdminDashboard({ onNavigate, activeSubView }: Props) {
     });
   }, [users, userSubTab, userStatusFilter, userSearch, userCityFilter]);
 
+  const paginatedUsers = React.useMemo(() => {
+    const startIndex = (usersPage - 1) * itemsPerPage;
+    return filteredUsers.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredUsers, usersPage]);
+  const totalUsersPages = Math.ceil(filteredUsers.length / itemsPerPage);
+
   const isAllSelected = filteredUsers.length > 0 && selectedUserIds.length === filteredUsers.length;
 
   const toggleSelectAll = () => {
@@ -1033,7 +1073,7 @@ export default function AdminDashboard({ onNavigate, activeSubView }: Props) {
       u.status || "active",
       u.isVerified ? "Yes" : "No",
       (u.location || u.city || "N/A"),
-      u.createdAt?.toDate?.()?.toLocaleDateString() || "N/A"
+      formatDateSafe(u.createdAt)
     ]);
 
     const csvContent = [
@@ -1064,7 +1104,7 @@ export default function AdminDashboard({ onNavigate, activeSubView }: Props) {
       (l.city || l.location || "N/A").replace(/,/g, ' '),
       l.price || "Negotiable",
       l.status || "active",
-      l.createdAt?.toDate?.()?.toLocaleDateString() || "N/A"
+      formatDateSafe(l.createdAt)
     ]);
 
     const csvContent = [
@@ -1225,18 +1265,20 @@ export default function AdminDashboard({ onNavigate, activeSubView }: Props) {
     };
 
     const KpiCard = ({ icon, label, value, sub, iconBg, delta }: { icon: React.ReactNode; label: string; value: number | string; sub?: string; iconBg: string; delta?: number }) => (
-      <div className="bg-surface rounded-2xl p-5 border border-outline-variant/20 shadow-sm flex items-center gap-4 hover:shadow-md transition-shadow">
-        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${iconBg}`}>{icon}</div>
+      <div className="bg-surface rounded-2xl p-5 border border-outline-variant/20 shadow-sm flex items-center justify-between hover:shadow-md transition-shadow relative overflow-hidden group">
         <div className="flex-1 min-w-0">
-          <p className="text-xs font-bold text-on-surface-variant mb-0.5">{label}</p>
-          <p className="text-2xl font-black text-on-surface leading-none">{value}</p>
-          {sub && <p className="text-[10px] text-on-surface-variant/70 font-medium mt-1">{sub}</p>}
+          <p className="text-[10px] font-bold text-on-surface-variant mb-2 opacity-80">{label}</p>
+          <div className="flex items-baseline gap-2">
+            <p className="text-3xl font-black text-on-surface leading-none">{value}</p>
+            {delta !== undefined && (
+              <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-lg ${delta >= 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                {delta >= 0 ? '+' : ''}{delta}
+              </span>
+            )}
+          </div>
+          {sub && <p className="text-[10px] text-on-surface-variant/70 font-medium mt-2">{sub}</p>}
         </div>
-        {delta !== undefined && (
-          <span className={`text-[10px] font-black px-2 py-1 rounded-full shrink-0 ${delta >= 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-            {delta >= 0 ? '+' : ''}{delta} هذا الأسبوع
-          </span>
-        )}
+        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${iconBg} transition-transform group-hover:scale-110 duration-300`}>{icon}</div>
       </div>
     );
 
@@ -1275,19 +1317,14 @@ export default function AdminDashboard({ onNavigate, activeSubView }: Props) {
                 منذ البداية
               </button>
             </div>
-            <button
-              onClick={() => firestoreService.getAdminStats(statsTimeFilter).then(setPlatformStats)}
-              className="flex items-center gap-2 px-4 py-2 bg-primary/10 text-primary rounded-xl text-sm font-black hover:bg-primary/20 transition-all"
-            >
-              <RefreshCw className="w-4 h-4" />
-              تحديث
-            </button>
           </div>
         </div>
 
         {/* ── Row 1: Hero KPI Cards ── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           <KpiCard icon={<Users className="w-6 h-6 text-indigo-600" />} label={statsTimeFilter === 'all' ? "إجمالي المستخدمين" : "مستخدمون جدد"} value={s.totalUsers} iconBg="bg-indigo-100" delta={statsTimeFilter === 'all' ? s.newUsersThisWeek : undefined} />
+          <KpiCard icon={<Phone className="w-6 h-6 text-teal-600" />} label="إجمالي الاتصالات" value={users.reduce((acc, u) => acc + (u.contactClicks || 0), 0)} iconBg="bg-teal-100" />
+          <KpiCard icon={<MapPin className="w-6 h-6 text-blue-600" />} label="تحديد المواقع" value={users.reduce((acc, u) => acc + (u.locationClicks || 0), 0)} iconBg="bg-blue-100" />
           <KpiCard icon={<Tag className="w-6 h-6 text-emerald-600" />} label={statsTimeFilter === 'all' ? "إعلانات نشطة" : "إعلانات جديدة"} value={s.activeAds} sub={statsTimeFilter === 'all' ? `من أصل ${s.totalAds} إعلان` : undefined} iconBg="bg-emerald-100" delta={statsTimeFilter === 'all' ? s.newListingsThisWeek : undefined} />
           <KpiCard icon={<ShoppingBag className="w-6 h-6 text-violet-600" />} label={statsTimeFilter === 'all' ? "طلبات مفتوحة" : "طلبات جديدة"} value={s.openRequests} sub={statsTimeFilter === 'all' ? `${s.closedRequests} مغلق` : undefined} iconBg="bg-violet-100" />
           <KpiCard icon={<Zap className="w-6 h-6 text-amber-600" />} label={statsTimeFilter === 'all' ? "إعلانات مدفوعة" : "إعلانات مميزة جديدة"} value={s.boostedAds} sub={statsTimeFilter === 'all' ? `${s.pendingAds} في الانتظار` : undefined} iconBg="bg-amber-100" />
@@ -1531,7 +1568,7 @@ const renderDonations = () => {
                 </td>
                 <td className="p-4 font-mono">{req.phone}</td>
                 {donationSubTab === 'donations' && <td className="p-4 font-bold text-primary">{req.sheepCount}</td>}
-                <td className="p-4 text-sm">{req.createdAt?.toDate?.()?.toLocaleDateString('ar-MA') || 'اليوم'}</td>
+                <td className="p-4 text-sm">{formatDateSafe(req.createdAt)}</td>
                 <td className="p-4">
                   <span className={`px-3 py-1 rounded-full text-xs font-bold ${req.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
                     {req.status === 'approved' ? 'تمت الموافقة' : 'قيد الانتظار'}
@@ -1559,13 +1596,7 @@ const renderDonations = () => {
 };
 
   const renderReports = () => {
-    const formatDate = (ts: any) => {
-      try {
-        if (!ts) return 'اليوم';
-        const d = ts.toDate ? ts.toDate() : new Date(ts);
-        return new Intl.DateTimeFormat('ar-MA', { dateStyle: 'short', timeStyle: 'short' }).format(d);
-      } catch { return 'اليوم'; }
-    };
+    // Using global formatDateSafe
 
     const filteredReports = (Array.isArray(reports) ? reports : []).filter(r => {
       const type = (r.targetType || r.type || '').toLowerCase();
@@ -1646,7 +1677,7 @@ const renderDonations = () => {
                       {report.reason || 'بدون سبب'}
                     </span>
                   </td>
-                  <td className="p-4 text-xs text-on-surface-variant font-medium">{formatDate(report.createdAt)}</td>
+                  <td className="p-4 text-xs text-on-surface-variant font-medium">{formatDateSafe(report.createdAt)}</td>
                   <td className="p-4">
                     <div className="flex gap-2 justify-center">
                       {reportSubTab === 'listing' && (
@@ -1788,13 +1819,7 @@ const renderOverview = () => (
                     <span className="font-bold">{activity.user || 'النظام'}</span> {activity.msg || activity.message || activity.action}
                   </p>
                   <p className="text-xs text-on-surface-variant">
-                    {(() => {
-                      if (!activity.createdAt) return 'اليوم';
-                      if (typeof activity.createdAt.toDate === 'function') return activity.createdAt.toDate().toLocaleString('ar-MA');
-                      if (activity.createdAt._seconds) return new Date(activity.createdAt._seconds * 1000).toLocaleString('ar-MA');
-                      if (activity.createdAt.seconds) return new Date(activity.createdAt.seconds * 1000).toLocaleString('ar-MA');
-                      return new Date(activity.createdAt).toLocaleString('ar-MA');
-                    })()}
+                    {formatDateSafe(activity.createdAt)}
                   </p>
                 </div>
                 <button className="p-2 text-on-surface-variant hover:bg-surface-variant rounded-full">
@@ -2358,10 +2383,10 @@ const renderOverview = () => (
         )}
 
         <div className="bg-surface rounded-3xl border border-outline-variant/30 shadow-md overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <div className="overflow-x-auto no-scrollbar">
+          <div className="overflow-x-auto no-scrollbar relative overflow-y-auto max-h-[70vh]">
             <table className="w-full text-right border-collapse min-w-[1000px]">
-              <thead>
-                <tr className="bg-surface-container-low/50 text-on-surface-variant text-[10px] uppercase tracking-wider border-b border-outline-variant/20">
+              <thead className="sticky top-0 z-20 bg-surface-container-low/95 backdrop-blur-md shadow-sm border-b border-outline-variant/20">
+                <tr className="text-on-surface-variant text-[10px] uppercase tracking-wider">
                   <th className="p-5 text-right w-10">
                     <input 
                       type="checkbox" 
@@ -2379,7 +2404,7 @@ const renderOverview = () => (
                 </tr>
               </thead>
               <tbody className="divide-y divide-outline-variant/10">
-                {filteredUsers.map((user, i) => (
+                {paginatedUsers.map((user, i) => (
                   <tr key={user.id || i} className="hover:bg-primary/[0.02] transition-colors group">
                     <td className="p-5 text-right">
                       <input 
@@ -2400,10 +2425,8 @@ const renderOverview = () => (
                         </div>
                         <div>
                           <p className="font-black text-on-surface text-base mb-0.5">{user.displayName || user.name}</p>
+                          <p className="text-[11px] font-bold text-on-surface-variant mb-1" dir="ltr">{(user.phoneNumber || user.phone || '—').replace(/^\+212/, '0')}</p>
                           <div className="flex items-center gap-2">
-                            <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${user.plan === 'احترافي' ? 'bg-yellow-100 text-yellow-700' : user.plan === 'شركات' ? 'bg-blue-100 text-blue-700' : 'bg-surface-container-high text-on-surface-variant'}`}>
-                              {user.plan || 'حساب عادي'}
-                            </span>
                             {user.isVerified && <BadgeCheck className="w-3.5 h-3.5 text-primary" />}
                           </div>
                         </div>
@@ -2413,13 +2436,29 @@ const renderOverview = () => (
                       <div className="space-y-1.5">
                         <div className="flex items-center gap-2 text-xs text-on-surface-variant font-bold">
                           <MapPin className="w-3 h-3" />
-                          <span>
-                            {getDisplayCity({ location: user.location || user.city })}
-                          </span>
+                          <div className="relative">
+                            <input
+                              list={`city-list-${user.id}`}
+                              defaultValue={user.city || user.location || ''}
+                              placeholder="غير محدد"
+                              onBlur={async (e) => {
+                                if (e.target.value !== (user.city || user.location || '')) {
+                                  await updateDoc(doc(db, 'users', user.id), { city: e.target.value, location: e.target.value });
+                                  fetchAdminData();
+                                }
+                              }}
+                              className="bg-transparent border-none outline-none focus:ring-0 text-xs font-bold p-0 m-0 w-24"
+                            />
+                            <datalist id={`city-list-${user.id}`}>
+                              {Object.keys(cityCoords).sort().map(city => (
+                                <option key={city} value={city}>{city}</option>
+                              ))}
+                            </datalist>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2 text-[10px] text-on-surface-variant/70 font-mono">
+                        <div className="flex items-center gap-2 text-[10px] text-on-surface-variant/70 font-mono mt-1">
                           <Clock className="w-3 h-3" />
-                          <span>انضم {user.createdAt?.toDate?.()?.toLocaleDateString() || 'قديماً'}</span>
+                          <span>انضم {formatDateSafe(user.createdAt)}</span>
                         </div>
                       </div>
                     </td>
@@ -2443,12 +2482,12 @@ const renderOverview = () => (
                         )}
                         <div className="flex items-center gap-3">
                           <div className="flex items-center gap-1 text-[10px] font-bold text-on-surface">
-                            <Tag className="w-3 h-3 text-primary" />
-                            <span>{user.herdsCount || 0} إعلان</span>
+                            <Phone className="w-3 h-3 text-primary" />
+                            <span>{user.contactClicks || 0} اتّصال</span>
                           </div>
                           <div className="flex items-center gap-1 text-[10px] font-bold text-on-surface">
                             <Eye className="w-3 h-3 text-on-surface-variant" />
-                            <span>{user.visitsCount || 0}</span>
+                            <span>{announcements.filter(a => a.sellerId === user.id).reduce((acc, curr) => acc + (curr.views || 0), 0)} مشاهدة</span>
                           </div>
                         </div>
                       </div>
@@ -2503,10 +2542,9 @@ const renderOverview = () => (
                           <TrendingUp className="w-4 h-4" />
                         </button>
                         <button 
-                          onClick={async () => {
-                            const isBlocked = user.status === 'blocked';
-                            await firestoreService.toggleUserStatus(user.id, !isBlocked);
-                            fetchAdminData();
+                          onClick={() => {
+                            setUserToBan(user);
+                            setShowBanConfirm(true);
                           }}
                           className={`p-2.5 rounded-2xl transition-all shadow-sm border border-transparent ${user.status === 'blocked' ? 'bg-red-600 text-white hover:shadow-lg' : 'bg-surface-container-high text-on-surface-variant hover:bg-red-50 hover:text-red-700 hover:border-red-200'}`}
                           title={user.status === 'blocked' ? 'إلغاء حظر' : 'حظر'}
@@ -2514,7 +2552,10 @@ const renderOverview = () => (
                           <Ban className="w-4 h-4" />
                         </button>
                         <button 
-                          onClick={() => handleDeleteUser(user.id)}
+                          onClick={() => {
+                            setUserToDeleteConfirm(user.id);
+                            setShowDeleteUserConfirm(true);
+                          }}
                           className="p-2.5 bg-red-50 text-red-700 hover:bg-red-600 hover:text-white rounded-2xl transition-all shadow-sm border border-red-100 hover:border-transparent"
                           title="حذف"
                         >
@@ -2527,6 +2568,35 @@ const renderOverview = () => (
               </tbody>
             </table>
           </div>
+          {totalUsersPages > 1 && (
+            <div className="p-4 border-t border-outline-variant/20 flex justify-center items-center gap-2 bg-surface-container-lowest">
+              <button
+                onClick={() => setUsersPage(p => Math.max(1, p - 1))}
+                disabled={usersPage === 1}
+                className="p-2 rounded-xl text-on-surface-variant hover:bg-surface-container-high disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+              >
+                <ChevronLeft className="w-5 h-5 rotate-180" />
+              </button>
+              <div className="flex gap-1">
+                {Array.from({ length: totalUsersPages }, (_, i) => i + 1).map(pageNum => (
+                  <button
+                    key={pageNum}
+                    onClick={() => setUsersPage(pageNum)}
+                    className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${usersPage === pageNum ? 'bg-primary text-on-primary shadow-sm' : 'text-on-surface-variant hover:bg-surface-container-high'}`}
+                  >
+                    {pageNum}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={() => setUsersPage(p => Math.min(totalUsersPages, p + 1))}
+                disabled={usersPage === totalUsersPages}
+                className="p-2 rounded-xl text-on-surface-variant hover:bg-surface-container-high disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+            </div>
+          )}
           {filteredUsers.length === 0 && (
             <div className="p-20 text-center bg-surface-container-lowest/30">
               <div className="w-20 h-20 bg-surface-container-high rounded-full flex items-center justify-center mx-auto mb-6 text-on-surface-variant/20">
@@ -2663,7 +2733,7 @@ const renderOverview = () => (
                           </div>
                           <div>
                             <p className="font-black text-on-surface text-sm mb-0.5">{request.title}</p>
-                            <p className="text-[10px] text-on-surface-variant font-bold">{request.createdAt?.toDate?.()?.toLocaleDateString() || 'اليوم'}</p>
+                            <p className="text-[10px] text-on-surface-variant font-bold">{formatDateSafe(request.createdAt)}</p>
                           </div>
                         </div>
                       </td>
@@ -2774,7 +2844,7 @@ const renderOverview = () => (
                       return (rawCity && cityMapping[rawCity.toLowerCase()]) || rawCity;
                     })()}
                   </span>
-                  <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {listing.createdAt?.toDate?.()?.toLocaleString() || 'اليوم'}</span>
+                  <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {formatDateSafe(listing.createdAt)}</span>
                 </div>
               </div>
               <div className="flex gap-2 shrink-0">
@@ -3125,7 +3195,7 @@ const renderOverview = () => (
                         </div>
                         <div className="text-left">
                           <p className="text-sm font-black text-primary">{offer.price} درهم</p>
-                          <p className="text-[9px] text-on-surface-variant font-bold">{offer.createdAt?.toDate?.()?.toLocaleDateString() || 'اليوم'}</p>
+                          <p className="text-[9px] text-on-surface-variant font-bold">{formatDateSafe(offer.createdAt)}</p>
                         </div>
                       </div>
                       <p className="text-xs text-on-surface-variant font-medium leading-relaxed mb-4 line-clamp-3">
@@ -3374,7 +3444,7 @@ const renderOverview = () => (
         <div className="divide-y divide-outline-variant/10 font-mono text-[11px]">
           {logs.map((log, i) => (
             <div key={log.id || i} className="p-3 flex gap-4 hover:bg-surface-container-lowest transition-colors">
-              <span className="text-on-surface-variant shrink-0">{log.createdAt?.toDate?.()?.toLocaleString('ar-MA') || 'اليوم'}</span>
+              <span className="text-on-surface-variant shrink-0">{formatDateSafe(log.createdAt)}</span>
               <span className={`font-black shrink-0 ${log.level === 'خطأ' ? 'text-error' : log.level === 'تحذير' ? 'text-orange-600' : log.level === 'نجاح' ? 'text-green-600' : 'text-blue-600'}`}>
                 [{log.level || 'معلومات'}]
               </span>
@@ -4171,7 +4241,20 @@ const renderOverview = () => (
                         <div className={`w-4 h-4 rounded-full absolute top-0.5 shadow-sm transition-all ${settings.guestBuyerMode ? 'bg-on-primary left-0.5' : 'bg-surface right-0.5'}`}></div>
                       </div>
                     </div>
-
+                    
+                    {/* Disable Search Radius */}
+                    <div className="flex items-center justify-between p-4 bg-surface-container-low rounded-xl border border-primary/20">
+                      <div>
+                        <h4 className="font-bold text-on-surface text-sm text-primary">تعطيل محيط البحث</h4>
+                        <p className="text-[10px] text-on-surface-variant">إخفاء شريط محيط البحث (كم) وإجبار البحث على مستوى المدينة فقط</p>
+                      </div>
+                      <div 
+                        className={`w-10 h-5 rounded-full relative cursor-pointer transition-colors ${settings.disableSearchRadius ? 'bg-primary' : 'bg-surface-variant'}`}
+                        onClick={() => updateSettings({ disableSearchRadius: !settings.disableSearchRadius })}
+                      >
+                        <div className={`w-4 h-4 rounded-full absolute top-0.5 shadow-sm transition-all ${settings.disableSearchRadius ? 'bg-on-primary left-0.5' : 'bg-surface right-0.5'}`}></div>
+                      </div>
+                    </div>
                     {/* Max Home Listings */}
                     <div className="flex items-center justify-between p-4 bg-surface-container-low rounded-xl border border-primary/20">
                       <div>
@@ -4387,7 +4470,7 @@ const renderOverview = () => (
               
               <div className="px-8 pb-8 -mt-12 text-right">
                 <div className="flex items-end justify-between mb-8">
-                  <div className="w-24 h-24 rounded-3xl bg-surface border-4 border-white shadow-xl flex items-center justify-center overflow-hidden">
+                  <div className="w-24 h-24 rounded-3xl bg-surface border-4 border-white shadow-xl flex items-center justify-center overflow-hidden relative z-10">
                     {selectedUser.photoURL ? (
                       <img src={selectedUser.photoURL} alt="" className="w-full h-full object-cover" />
                     ) : (
@@ -4408,7 +4491,7 @@ const renderOverview = () => (
                   <div className="space-y-6">
                     <div>
                       <h2 className="text-2xl font-black text-on-surface mb-1">{selectedUser.displayName || selectedUser.name}</h2>
-                      <p className="text-on-surface-variant font-bold text-sm">{selectedUser.email}</p>
+                      <p className="text-on-surface-variant font-bold text-sm" dir="ltr">{(selectedUser.phoneNumber || selectedUser.phone || '—').replace(/^\+212/, '0')}</p>
                     </div>
                     
                     <div className="space-y-4">
@@ -4418,7 +4501,7 @@ const renderOverview = () => (
                         </div>
                         <div className="text-right flex-1">
                           <p className="text-[10px] font-black text-on-surface-variant uppercase">رقم الهاتف</p>
-                          <p className="text-sm font-black text-on-surface" dir="ltr">{selectedUser.phone || 'غير مسجل'}</p>
+                          <p className="text-sm font-black text-on-surface" dir="ltr">{(selectedUser.phone || 'غير مسجل').replace(/^\+212/, '0')}</p>
                         </div>
                       </div>
                       
@@ -4431,15 +4514,35 @@ const renderOverview = () => (
                           <p className="text-sm font-black text-on-surface">{selectedUser.location || selectedUser.city || 'غير محدد'}</p>
                         </div>
                       </div>
+
+                      <div className="flex items-center gap-4 p-4 bg-surface-container-low rounded-2xl border border-outline-variant/10">
+                        <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600">
+                          <Calendar className="w-5 h-5" />
+                        </div>
+                        <div className="text-right flex-1">
+                          <p className="text-[10px] font-black text-on-surface-variant uppercase">عضو منذ</p>
+                          <p className="text-sm font-black text-on-surface">{formatDateSafe(selectedUser.createdAt)}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-4 p-4 bg-surface-container-low rounded-2xl border border-outline-variant/10">
+                        <div className="w-10 h-10 rounded-xl bg-yellow-50 flex items-center justify-center text-yellow-600">
+                          <Star className="w-5 h-5" />
+                        </div>
+                        <div className="text-right flex-1">
+                          <p className="text-[10px] font-black text-on-surface-variant uppercase">التقييم</p>
+                          <p className="text-sm font-black text-on-surface">4.8/5</p>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     {[
-                      { label: 'عدد الإعلانات', value: selectedUser.herdsCount || 0, icon: <Tag className="w-5 h-5" />, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-                      { label: 'إجمالي المشاهدات', value: selectedUser.visitsCount || 0, icon: <Eye className="w-5 h-5" />, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-                      { label: 'عضو منذ', value: selectedUser.createdAt?.toDate?.()?.getFullYear() || '2024', icon: <Calendar className="w-5 h-5" />, color: 'text-amber-600', bg: 'bg-amber-50' },
-                      { label: 'التقييم', value: '4.8/5', icon: <Star className="w-5 h-5" />, color: 'text-yellow-600', bg: 'bg-yellow-50' },
+                      { label: 'عدد الإعلانات', value: announcements.filter(a => a.sellerId === selectedUser.id).length, icon: <Tag className="w-5 h-5" />, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+                      { label: 'إجمالي المشاهدات', value: announcements.filter(a => a.sellerId === selectedUser.id).reduce((acc, curr) => acc + (curr.views || 0), 0), icon: <Eye className="w-5 h-5" />, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+                      { label: 'زبناء حددو الموقع', value: selectedUser.locationClicks || 0, icon: <MapPin className="w-5 h-5" />, color: 'text-blue-600', bg: 'bg-blue-50' },
+                      { label: 'اتصالات الزبناء', value: selectedUser.contactClicks || 0, icon: <Phone className="w-5 h-5" />, color: 'text-green-600', bg: 'bg-green-50' },
                     ].map((card, i) => (
                       <div key={i} className="p-4 bg-surface-container-low rounded-3xl border border-outline-variant/10 flex flex-col items-center justify-center text-center">
                         <div className={`w-10 h-10 rounded-2xl flex items-center justify-center mb-2 ${card.bg} ${card.color}`}>
@@ -4458,11 +4561,6 @@ const renderOverview = () => (
                     className="flex-1 py-4 bg-surface-container-high text-on-surface font-black rounded-2xl transition-all hover:bg-surface-container-highest"
                   >
                     إغلاق
-                  </button>
-                  <button 
-                    className="flex-1 py-4 bg-primary text-on-primary font-black rounded-2xl shadow-xl shadow-primary/20 transition-all hover:scale-[1.02] active:scale-95"
-                  >
-                    تعديل البيانات
                   </button>
                 </div>
               </div>
@@ -4502,6 +4600,82 @@ const renderOverview = () => (
                   className="py-4 bg-red-600 text-white font-bold rounded-2xl transition-colors border border-transparent hover:bg-transparent hover:text-red-600 hover:border-red-600 shadow-lg shadow-red-200 flex items-center justify-center gap-2"
                 >
                   نعم، مسح الطلب
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        {showBanConfirm && userToBan && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+            <div className="bg-surface w-full max-w-md rounded-3xl p-8 shadow-2xl border border-outline-variant/20 animate-in zoom-in-95 duration-200">
+              <div className="w-20 h-20 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Ban className="w-10 h-10" />
+              </div>
+              <h3 className="text-2xl font-black text-on-surface text-center mb-4 font-headline">
+                {userToBan.status === 'blocked' ? 'هل أنت متأكد من إلغاء حظر هذا المستخدم؟' : 'هل أنت متأكد من حظر هذا المستخدم؟'}
+              </h3>
+              <p className="text-on-surface-variant text-center mb-8 font-medium">
+                {userToBan.status === 'blocked' ? 'سيتمكن من الدخول للمنصة مجدداً.' : 'لن يتمكن هذا المستخدم من الدخول إلى المنصة بعد الآن.'}
+              </p>
+              <div className="grid grid-cols-2 gap-4">
+                <button 
+                  onClick={() => {
+                    setShowBanConfirm(false);
+                    setUserToBan(null);
+                  }}
+                  className="py-4 bg-surface-container-high text-on-surface font-bold rounded-2xl transition-colors border border-transparent hover:bg-transparent hover:text-on-surface hover:border-on-surface"
+                >
+                  إلغاء
+                </button>
+                <button 
+                  onClick={async () => {
+                    if (userToBan) {
+                      const isBlocked = userToBan.status === 'blocked';
+                      await firestoreService.toggleUserStatus(userToBan.id, !isBlocked);
+                      fetchAdminData();
+                      setShowBanConfirm(false);
+                      setUserToBan(null);
+                    }
+                  }}
+                  className={`py-4 ${userToBan.status === 'blocked' ? 'bg-green-600 shadow-green-200 hover:text-green-600 hover:border-green-600' : 'bg-red-600 shadow-red-200 hover:text-red-600 hover:border-red-600'} text-white font-bold rounded-2xl transition-colors border border-transparent hover:bg-transparent shadow-lg flex items-center justify-center gap-2`}
+                >
+                  {userToBan.status === 'blocked' ? 'نعم، إلغاء الحظر' : 'نعم، حظر المستخدم'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        {showDeleteUserConfirm && userToDeleteConfirm && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+            <div className="bg-surface w-full max-w-md rounded-3xl p-8 shadow-2xl border border-outline-variant/20 animate-in zoom-in-95 duration-200">
+              <div className="w-20 h-20 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                <X className="w-10 h-10" />
+              </div>
+              <h3 className="text-2xl font-black text-on-surface text-center mb-4 font-headline">واش بصح بغيتي تمسح هاد الحساب؟</h3>
+              <p className="text-on-surface-variant text-center mb-8 font-medium">
+                هاد العملية ما يمكنش ترجع فيها. واش متأكد؟
+              </p>
+              <div className="grid grid-cols-2 gap-4">
+                <button 
+                  onClick={() => {
+                    setShowDeleteUserConfirm(false);
+                    setUserToDeleteConfirm(null);
+                  }}
+                  className="py-4 bg-surface-container-high text-on-surface font-bold rounded-2xl transition-colors border border-transparent hover:bg-transparent hover:text-on-surface hover:border-on-surface"
+                >
+                  إلغاء
+                </button>
+                <button 
+                  onClick={async () => {
+                    if (userToDeleteConfirm) {
+                      await handleDeleteUser(userToDeleteConfirm);
+                      setShowDeleteUserConfirm(false);
+                      setUserToDeleteConfirm(null);
+                    }
+                  }}
+                  className="py-4 bg-red-600 text-white font-bold rounded-2xl transition-colors border border-transparent hover:bg-transparent hover:text-red-600 hover:border-red-600 shadow-lg shadow-red-200 flex items-center justify-center gap-2"
+                >
+                  نعم، مسح الحساب
                 </button>
               </div>
             </div>

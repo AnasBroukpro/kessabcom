@@ -679,7 +679,15 @@ export default function ListingDetails({ onNavigate, listingId }: Props) {
                                   <div className="flex items-center justify-between mb-1">
                                     <h4 className="font-black text-[#1A1A1A] text-sm">{review.authorName || 'مشتري'}</h4>
                                     <p className="text-[10px] text-[#757575] shrink-0">
-                                      {review.createdAt?.toDate ? review.createdAt.toDate().toLocaleDateString('ar-MA') : 'اليوم'}
+                                      {(() => {
+                                        if (!review.createdAt) return 'اليوم';
+                                        try {
+                                          const d = review.createdAt.toDate ? review.createdAt.toDate() : 
+                                                  (review.createdAt._seconds ? new Date(review.createdAt._seconds * 1000) : 
+                                                  new Date(review.createdAt));
+                                          return isNaN(d.getTime()) ? 'اليوم' : d.toLocaleDateString('ar-MA');
+                                        } catch (e) { return 'اليوم'; }
+                                      })()}
                                     </p>
                                   </div>
                                   <div className="flex items-center gap-0.5 mb-2" dir="ltr">

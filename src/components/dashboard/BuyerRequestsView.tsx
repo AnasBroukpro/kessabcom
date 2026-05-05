@@ -33,14 +33,25 @@ function BuyerRequestItem({ request, onSelect, onDetails, onReport, hasSubmitted
   else if (isClosed) buttonText = 'مغلق';
 
   const dateText = (() => {
-    const date = request.createdAt.toDate ? request.createdAt.toDate() : new Date((request.createdAt.seconds || 0) * 1000);
-    const now = new Date();
-    const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 3600 * 24));
-    const timeStr = date.toLocaleTimeString('ar-MA', { hour: '2-digit', minute: '2-digit' });
-    
-    if (diffDays === 0) return `اليوم ${timeStr}`;
-    if (diffDays === 1) return `البارحة ${timeStr}`;
-    return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()} ${timeStr}`;
+    if (!request.createdAt) return 'اليوم';
+    try {
+      const date = request.createdAt.toDate ? request.createdAt.toDate() : 
+                 (request.createdAt._seconds ? new Date(request.createdAt._seconds * 1000) : 
+                 (request.createdAt.seconds ? new Date(request.createdAt.seconds * 1000) : 
+                 new Date(request.createdAt)));
+      
+      if (isNaN(date.getTime())) return 'اليوم';
+
+      const now = new Date();
+      const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 3600 * 24));
+      const timeStr = date.toLocaleTimeString('ar-MA', { hour: '2-digit', minute: '2-digit' });
+      
+      if (diffDays === 0) return `اليوم ${timeStr}`;
+      if (diffDays === 1) return `البارحة ${timeStr}`;
+      return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()} ${timeStr}`;
+    } catch (e) {
+      return 'اليوم';
+    }
   })();
 
   const breed = (request.breed || request.breeds || request.races || 'غير محدد').split(', ')[0];

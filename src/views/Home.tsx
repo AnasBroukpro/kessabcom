@@ -567,46 +567,48 @@ export default function Home({ onNavigate }: Props) {
                     </div>
                   </div>
 
-                  <div
-                    onClick={() => { setIsOpenRadius(!isOpenRadius); setIsOpenCity(false); }}
-                    className="w-full md:w-[180px] flex items-center px-3 md:px-4 py-2 md:py-2 relative group bg-white rounded-xl border border-outline-variant/10 shadow-sm transition-all hover:border-[#2E7D32]/30 cursor-pointer"
-                  >
-                    <Route className="w-6 h-6 text-[#2E7D32] shrink-0" />
-                    <div className="flex flex-col text-right mr-4 flex-1">
-                      <span className="text-[10px] font-black text-[#2E7D32] uppercase tracking-wider mb-0.5">المسافة</span>
-                      <button
-                        onClick={() => { setIsOpenRadius(!isOpenRadius); setIsOpenCity(false); }}
-                        className="bg-transparent border-none outline-none w-full text-xl font-black text-[#1A1A1A] text-right flex items-center justify-between"
-                      >
-                        <span className="truncate">
-                          {radiusSearch === '10' ? '10 كلم' :
-                            radiusSearch === '20' ? '20 كلم' :
-                              radiusSearch === '50' ? '50 كلم' : 'اختيار'}
-                        </span>
-                      </button>
+                  {!settings.disableSearchRadius && (
+                    <div
+                      onClick={() => { setIsOpenRadius(!isOpenRadius); setIsOpenCity(false); }}
+                      className="w-full md:w-[180px] flex items-center px-3 md:px-4 py-2 md:py-2 relative group bg-white rounded-xl border border-outline-variant/10 shadow-sm transition-all hover:border-[#2E7D32]/30 cursor-pointer"
+                    >
+                      <Route className="w-6 h-6 text-[#2E7D32] shrink-0" />
+                      <div className="flex flex-col text-right mr-4 flex-1">
+                        <span className="text-[10px] font-black text-[#2E7D32] uppercase tracking-wider mb-0.5">المسافة</span>
+                        <button
+                          onClick={() => { setIsOpenRadius(!isOpenRadius); setIsOpenCity(false); }}
+                          className="bg-transparent border-none outline-none w-full text-xl font-black text-[#1A1A1A] text-right flex items-center justify-between"
+                        >
+                          <span className="truncate">
+                            {radiusSearch === '10' ? '10 كلم' :
+                              radiusSearch === '20' ? '20 كلم' :
+                                radiusSearch === '50' ? '50 كلم' : 'اختيار'}
+                          </span>
+                        </button>
 
-                      {isOpenRadius && (
-                        <div className={`absolute ${openUpwards ? 'bottom-full mb-2' : 'top-full mt-2'} left-0 right-0 w-full bg-white rounded-xl shadow-2xl border border-outline-variant/10 z-[100] p-1 animate-in ${openUpwards ? 'slide-in-from-bottom-2' : 'slide-in-from-top-2'} duration-200`}>
-                          <div className="flex flex-col gap-0.5">
-                            {[
-                              { val: '10', label: '10 كلم دايرة بيك' },
-                              { val: '20', label: '20 كلم دايرة بيك' },
-                              { val: '50', label: '50 كلم دايرة بيك' }
-                            ].map(dist => (
-                              <button
-                                key={dist.val}
-                                onClick={() => { setRadiusSearch(dist.val); setIsOpenRadius(false); }}
-                                className={`w-full text-right px-4 py-2 rounded-lg text-lg font-bold transition-colors ${radiusSearch === dist.val ? 'bg-[#2E7D32] text-white' : 'hover:bg-[#F9F9F6] text-[#4A4A4A]'}`}
-                              >
-                                {dist.label}
-                              </button>
-                            ))}
+                        {isOpenRadius && (
+                          <div className={`absolute ${openUpwards ? 'bottom-full mb-2' : 'top-full mt-2'} left-0 right-0 w-full bg-white rounded-xl shadow-2xl border border-outline-variant/10 z-[100] p-1 animate-in ${openUpwards ? 'slide-in-from-bottom-2' : 'slide-in-from-top-2'} duration-200`}>
+                            <div className="flex flex-col gap-0.5">
+                              {[
+                                { val: '10', label: '10 كلم دايرة بيك' },
+                                { val: '20', label: '20 كلم دايرة بيك' },
+                                { val: '50', label: '50 كلم دايرة بيك' }
+                              ].map(dist => (
+                                <button
+                                  key={dist.val}
+                                  onClick={() => { setRadiusSearch(dist.val); setIsOpenRadius(false); }}
+                                  className={`w-full text-right px-4 py-2 rounded-lg text-lg font-bold transition-colors ${radiusSearch === dist.val ? 'bg-[#2E7D32] text-white' : 'hover:bg-[#F9F9F6] text-[#4A4A4A]'}`}
+                                >
+                                  {dist.label}
+                                </button>
+                              ))}
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        )}
+                      </div>
+                      <ChevronDown className={`w-6 h-6 text-[#757575] mr-2 transition-transform ${isOpenRadius ? 'rotate-180' : ''}`} />
                     </div>
-                    <ChevronDown className={`w-6 h-6 text-[#757575] mr-2 transition-transform ${isOpenRadius ? 'rotate-180' : ''}`} />
-                  </div>
+                  )}
 
                   <div className="md:pr-1">
                     <button
@@ -811,8 +813,7 @@ export default function Home({ onNavigate }: Props) {
                         }
 
                         const city = getDisplayCity(listing);
-
-                        if (dist === 0 || dist >= 999) return city;
+                        if (dist === 0 || dist >= 999 || settings.disableSearchRadius) return city;
                         if (dist < 5) return `${city} (قريب ليك)`;
                         if (dist < 25) return `${city} (على بعد ${Math.round(dist)} كلم)`;
                         if (dist < 80) return `${city} (بعيد شوية، ${Math.round(dist)} كلم)`;

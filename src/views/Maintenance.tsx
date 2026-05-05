@@ -33,14 +33,17 @@ export default function Maintenance({ activationDate, onNavigate }: Props) {
               <span className="text-xl font-bold">موعد العودة المتوقع:</span>
             </div>
             <div className="text-3xl font-black text-on-surface">
-              {new Date(activationDate).toLocaleString('ar-MA', { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-              })}
+              {(() => {
+                const date = new Date(activationDate);
+                return isNaN(date.getTime()) ? 'قريباً' : date.toLocaleString('ar-MA', { 
+                  weekday: 'long', 
+                  year: 'numeric', 
+                  month: 'long', 
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                });
+              })()}
             </div>
           </div>
         )}

@@ -11,6 +11,18 @@
 
 // ─── City coordinates (Arabic name → { lat, lng }) ───────────────────────────
 export const cityCoords: { [key: string]: { lat: number; lng: number } } = {
+  "حد السوالم": {
+    "lat": 33.4167,
+    "lng": -7.8436
+  },
+  "سيدي بوزيد": {
+    "lat": 33.2386,
+    "lng": -8.5447
+  },
+  "مارتيل": {
+    "lat": 35.6171,
+    "lng": -5.2752
+  },
   "آس": {
     "lat": 28.60986,
     "lng": -9.42986
@@ -223,7 +235,7 @@ export const cityCoords: { [key: string]: { lat: number; lng: number } } = {
     "lat": 35.15,
     "lng": -4.45
   },
-  "إيفران": {
+  "إفران": {
     "lat": 31.70217,
     "lng": -6.3494
   },
@@ -1491,12 +1503,13 @@ export const cityMapping: { [key: string]: string } = {
   "Guisser": "ݣيسر",
   "Had Bouhssoussen": "أحد بوحسوسن",
   "Had Kourt": "حد كورت",
+  "Had Soualem": "حد السوالم",
   "Harhoura": "الهرهورة",
   "Harte Lyamine": "حارة اليمين",
   "Hattane": "حطان",
   "Hrara": "حرارة",
   "Ida Ougnidif": "إدا أوغنديف",
-  "Ifrane": "إيفران",
+  "Ifrane": "إفران",
   "Ifri": "إفري",
   "Igdamen": "إغدامن",
   "Ighil n'Oumgoun": "إغيل نومغون",
@@ -1567,7 +1580,7 @@ export const cityMapping: { [key: string]: string } = {
   "M'semrir": "مسمرير",
   "Madagh": "مدّاغ",
   "Marrakech": "مراكش",
-  "Martil": "مرتيل",
+  "Martil": "مارتيل",
   "Massa (Maroc)": "ماسة (المغرب)",
   "Mechra Bel Ksiri": "مشرع بلقصيري",
   "Mediouna": "مديونة‬",
@@ -1637,7 +1650,7 @@ export const cityMapping: { [key: string]: string } = {
   "Ribate El Kheir": "رباط الخير",
   "Rissani": "الريصاني",
   "Rommani": "الرماني",
-  "Sabaa Aiyoun": "واد إيفران",
+  "Sabaa Aiyoun": "واد إفران",
   "Safi": "أسفي",
   "Saidia": "السعيدية",
   "Sale": "سلا",
@@ -1940,12 +1953,13 @@ export const cityMapping: { [key: string]: string } = {
   "guisser": "ݣيسر",
   "had bouhssoussen": "أحد بوحسوسن",
   "had kourt": "حد كورت",
+  "had soualem": "حد السوالم",
   "harhoura": "الهرهورة",
   "harte lyamine": "حارة اليمين",
   "hattane": "حطان",
   "hrara": "حرارة",
   "ida ougnidif": "إدا أوغنديف",
-  "ifrane": "إيفران",
+  "ifrane": "إفران",
   "ifri": "إفري",
   "igdamen": "إغدامن",
   "ighil n'oumgoun": "إغيل نومغون",
@@ -2016,7 +2030,7 @@ export const cityMapping: { [key: string]: string } = {
   "m'semrir": "مسمرير",
   "madagh": "مدّاغ",
   "marrakech": "مراكش",
-  "martil": "مرتيل",
+  "martil": "مارتيل",
   "massa (maroc)": "ماسة (المغرب)",
   "mechra bel ksiri": "مشرع بلقصيري",
   "mediouna": "مديونة‬",
@@ -2086,7 +2100,7 @@ export const cityMapping: { [key: string]: string } = {
   "ribate el kheir": "رباط الخير",
   "rissani": "الريصاني",
   "rommani": "الرماني",
-  "sabaa aiyoun": "واد إيفران",
+  "sabaa aiyoun": "واد إفران",
   "safi": "أسفي",
   "saidia": "السعيدية",
   "sale": "سلا",

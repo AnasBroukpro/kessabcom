@@ -15,6 +15,7 @@ export interface AppSettings {
   auctionSystemEnabled: boolean;
   maxListingsPerFreeUser: number;
   maxHomeListings: number;
+  disableSearchRadius: boolean;
   stockMarket: {
     sheep: number;
     goats: number;
@@ -69,6 +70,7 @@ const defaultSettings: AppSettings = {
   auctionSystemEnabled: true,
   maxListingsPerFreeUser: 5,
   maxHomeListings: 6,
+  disableSearchRadius: false,
   stockMarket: {
     sheep: 70,
     goats: 55,

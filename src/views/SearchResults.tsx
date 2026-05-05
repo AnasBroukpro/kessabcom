@@ -163,7 +163,9 @@ export default function SearchResults({ onNavigate, initialCity, initialRadius, 
     listing.calculatedDistance = dist; // Store for display
 
     let matchesDistance = true;
-    if (radiusSearch !== 'all' && normalizedSearch !== 'الكل') {
+    if (settings.disableSearchRadius) {
+      matchesDistance = matchesCityName || !citySearch || normalizedSearch === 'الكل';
+    } else if (radiusSearch !== 'all' && normalizedSearch !== 'الكل') {
       const radius = parseInt(radiusSearch);
       // It's a match if within radius OR if city name directly matches the text
       matchesDistance = (dist !== 999 && dist <= radius) || matchesCityName;
@@ -194,7 +196,7 @@ export default function SearchResults({ onNavigate, initialCity, initialRadius, 
           {/* Row 1: Title (Right) */}
           <div className="flex flex-col text-right">
             <h1 className="text-xl md:text-3xl font-black text-[#1A1A1A] font-headline mb-1 tracking-tight">
-              نتائج البحث في {citySearch} {radiusSearch !== 'all' && `ضمن محيط (${radiusSearch} كلم)`}
+              نتائج البحث في {citySearch} {!settings.disableSearchRadius && radiusSearch !== 'all' && `ضمن محيط (${radiusSearch} كلم)`}
             </h1>
             <p className="text-[#757575] font-black text-xs md:text-sm">لقيت ليك {filteredListings.length} ضيعات قريبة ليك</p>
           </div>
@@ -539,7 +541,9 @@ export default function SearchResults({ onNavigate, initialCity, initialRadius, 
                   <div className="p-4 border-b border-outline-variant/20 bg-white flex items-center justify-between shrink-0">
                     <div>
                       <h2 className="text-base font-black text-[#1A1A1A]">{filteredListings.length} حولي فـ المنطقة</h2>
-                      <p className="text-[10px] text-[#757575] font-bold">شعاع {radiusSearch === 'all' ? '150' : radiusSearch} كلم من {citySearch}</p>
+                      <p className="text-[10px] text-[#757575] font-bold">
+                        {!settings.disableSearchRadius ? `شعاع ${radiusSearch === 'all' ? '150' : radiusSearch} كلم من ${citySearch}` : `نتائج البحث في ${citySearch}`}
+                      </p>
                     </div>
                     <button
                       onClick={() => setShowListingSidebar(false)}
@@ -576,7 +580,7 @@ export default function SearchResults({ onNavigate, initialCity, initialRadius, 
                                 <MapPin className="w-3 h-3 text-[#2E7D32] shrink-0" />
                                 <span className="truncate">
                                   {getDisplayCity(listing)}
-                                  {listing.calculatedDistance && listing.calculatedDistance !== 999 && ` (${Math.round(listing.calculatedDistance)} كلم)`}
+                                  {!settings.disableSearchRadius && listing.calculatedDistance && listing.calculatedDistance !== 999 && ` (${Math.round(listing.calculatedDistance)} كلم)`}
                                 </span>
                               </div>
                               <div className="flex items-center gap-2">
@@ -642,7 +646,7 @@ export default function SearchResults({ onNavigate, initialCity, initialRadius, 
                           <MapPin className="w-3 h-3 sm:w-4 sm:h-4 text-[#2E7D32] shrink-0" />
                           <span className="truncate">
                             {getDisplayCity(listing)}
-                            {listing.calculatedDistance && listing.calculatedDistance !== 999 && ` (${Math.round(listing.calculatedDistance)} كلم)`}
+                            {!settings.disableSearchRadius && listing.calculatedDistance && listing.calculatedDistance !== 999 && ` (${Math.round(listing.calculatedDistance)} كلم)`}
                           </span>
                         </div>
                       </div>
@@ -720,7 +724,7 @@ export default function SearchResults({ onNavigate, initialCity, initialRadius, 
                         const dist = listing.calculatedDistance || listing.distance || 0;
                         const city = getDisplayCity(listing);
                         
-                        if (dist === 0 || dist >= 999) return city;
+                        if (dist === 0 || dist >= 999 || settings.disableSearchRadius) return city;
                         if (dist < 5) return `${city} (قريب ليك)`;
                         if (dist < 25) return `${city} (على بعد ${Math.round(dist)} كلم)`;
                         if (dist < 80) return `${city} (بعيد شوية، ${Math.round(dist)} كلم)`;

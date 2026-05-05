@@ -5,6 +5,7 @@ import { ViewType } from '../App';
 import { useAuth } from '../contexts/AuthContext';
 import MobileSidebar from './MobileSidebar';
 import NotificationSidebar from './NotificationSidebar';
+import { useSettings } from '../hooks/useSettings';
 import { firestoreService } from '../services/firestoreService';
 import { cityCoords, getClosestCity, normalizeArabic, cityMapping } from '../constants/cityMapping';
 import logoV2 from '../assets/marketing/branding/logo v2.png';
@@ -19,6 +20,7 @@ const moroccanCities = Object.keys(cityCoords).sort();
 
 export default function SearchHeader({ onNavigate, initialCity = '', initialRadius = '10' }: Props) {
   const { user, profile, signOut } = useAuth();
+  const { settings } = useSettings();
   const [citySearch, setCitySearch] = useState(initialCity);
   const [isLocating, setIsLocating] = useState(false);
   const [radiusSearch, setRadiusSearch] = useState(initialRadius);
@@ -368,47 +370,49 @@ export default function SearchHeader({ onNavigate, initialCity = '', initialRadi
           </button>
 
           {/* Distance Selector */}
-          <div 
-            onClick={() => { setIsOpenRadius(!isOpenRadius); setIsOpenCity(false); }}
-            className="w-[85px] sm:w-[120px] flex items-center px-1.5 sm:px-3 py-1.5 relative group bg-white rounded-[10px] border border-outline-variant/10 shadow-sm transition-all hover:border-[#2E7D32]/30 cursor-pointer shrink-0"
-          >
-            <Navigation className="hidden sm:block w-3.5 h-3.5 text-[#2E7D32] shrink-0" />
-            <div className="flex flex-col text-right sm:mr-3 flex-1">
-              <button 
-                onClick={(e) => { e.stopPropagation(); setIsOpenRadius(!isOpenRadius); setIsOpenCity(false); }}
-                className="bg-transparent border-none outline-none w-full text-xs sm:text-sm font-bold text-[#1A1A1A] text-right flex items-center justify-between"
-              >
-                <span className="truncate">
-                  {radiusSearch === '10' ? '10 كلم' : 
-                   radiusSearch === '20' ? '20 كلم' : 
-                   radiusSearch === '50' ? '50 كلم' : 
-                   radiusSearch === 'all' ? 'الكل' : 'المسافة'}
-                </span>
-              </button>
+          {!settings.disableSearchRadius && (
+            <div 
+              onClick={() => { setIsOpenRadius(!isOpenRadius); setIsOpenCity(false); }}
+              className="w-[85px] sm:w-[120px] flex items-center px-1.5 sm:px-3 py-1.5 relative group bg-white rounded-[10px] border border-outline-variant/10 shadow-sm transition-all hover:border-[#2E7D32]/30 cursor-pointer shrink-0"
+            >
+              <Navigation className="hidden sm:block w-3.5 h-3.5 text-[#2E7D32] shrink-0" />
+              <div className="flex flex-col text-right sm:mr-3 flex-1">
+                <button 
+                  onClick={(e) => { e.stopPropagation(); setIsOpenRadius(!isOpenRadius); setIsOpenCity(false); }}
+                  className="bg-transparent border-none outline-none w-full text-xs sm:text-sm font-bold text-[#1A1A1A] text-right flex items-center justify-between"
+                >
+                  <span className="truncate">
+                    {radiusSearch === '10' ? '10 كلم' : 
+                    radiusSearch === '20' ? '20 كلم' : 
+                    radiusSearch === '50' ? '50 كلم' : 
+                    radiusSearch === 'all' ? 'الكل' : 'المسافة'}
+                  </span>
+                </button>
 
-              {isOpenRadius && (
-                <div className="absolute top-full mt-2 left-0 right-0 w-full bg-white rounded-[10px] shadow-2xl border border-outline-variant/10 z-[100] p-1 animate-in slide-in-from-top-2 duration-200">
-                  <div className="flex flex-col gap-0.5">
-                    {[
-                      { val: '10', label: '10 كلم' },
-                      { val: '20', label: '20 كلم' },
-                      { val: '50', label: '50 كلم' },
-                      { val: 'all', label: 'الكل' }
-                    ].map(dist => (
-                      <button 
-                        key={dist.val}
-                        onClick={(e) => { e.stopPropagation(); setRadiusSearch(dist.val); setIsOpenRadius(false); }}
-                        className={`w-full text-right px-4 py-2 rounded-[10px] text-sm font-bold transition-colors ${radiusSearch === dist.val ? 'bg-[#2E7D32] text-white' : 'hover:bg-[#F9F9F6] text-[#4A4A4A]'}`}
-                      >
-                        {dist.label}
-                      </button>
-                    ))}
+                {isOpenRadius && (
+                  <div className="absolute top-full mt-2 left-0 right-0 w-full bg-white rounded-[10px] shadow-2xl border border-outline-variant/10 z-[100] p-1 animate-in slide-in-from-top-2 duration-200">
+                    <div className="flex flex-col gap-0.5">
+                      {[
+                        { val: '10', label: '10 كلم' },
+                        { val: '20', label: '20 كلم' },
+                        { val: '50', label: '50 كلم' },
+                        { val: 'all', label: 'الكل' }
+                      ].map(dist => (
+                        <button 
+                          key={dist.val}
+                          onClick={(e) => { e.stopPropagation(); setRadiusSearch(dist.val); setIsOpenRadius(false); }}
+                          className={`w-full text-right px-4 py-2 rounded-[10px] text-sm font-bold transition-colors ${radiusSearch === dist.val ? 'bg-[#2E7D32] text-white' : 'hover:bg-[#F9F9F6] text-[#4A4A4A]'}`}
+                        >
+                          {dist.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
+              <ChevronDown className={`hidden sm:block w-3 h-3 text-[#757575] ml-1 transition-transform ${isOpenRadius ? 'rotate-180' : ''}`} />
             </div>
-            <ChevronDown className={`hidden sm:block w-3 h-3 text-[#757575] ml-1 transition-transform ${isOpenRadius ? 'rotate-180' : ''}`} />
-          </div>
+          )}
           
           <button onClick={() => {
             if (!citySearch && radiusSearch !== 'all') {
