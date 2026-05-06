@@ -52,7 +52,7 @@ const mapOptions = {
   ],
 };
 
-const MapContent: React.FC<MapContentProps> = ({ listings, onListingClick, hoveredListingId, setHoveredListingId }) => {
+const MapContent: React.FC<MapContentProps> = ({ listings, onListingClick, hoveredListingId, setHoveredListingId, zoom }) => {
   const { isLoaded, loadError } = useGoogleMaps();
 
   const mapCenter = useMemo(() => {
