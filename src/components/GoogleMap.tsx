@@ -204,20 +204,20 @@ const MapContent: React.FC<MapContentProps> = ({ listings, onListingClick, hover
                   
                   {/* Overlay content inside circle (visible when scaled) */}
                   {isScaled && (
-                    <div className="absolute inset-0 flex flex-col justify-between items-center py-1.5 px-1 bg-transparent animate-in fade-in duration-500">
-                      {/* Top: 5 Stars */}
-                      <div className="flex gap-[1px] mt-1.5">
-                        {[...Array(5)].map((_, i) => (
-                          <Star 
-                            key={i} 
-                            className={`w-[4px] h-[4px] ${i < Math.floor(listing.rating || 5) ? 'fill-[#FFC107] text-[#FFC107]' : 'text-white/40'}`} 
-                          />
-                        ))}
+                    <div className="absolute inset-0 flex flex-col items-center animate-in fade-in duration-500">
+                      {/* Top: Rating Pill (Number + 1 Star) */}
+                      <div className="bg-white rounded-full px-1.5 py-0.5 flex items-center gap-0.5 shadow-md mt-2 border border-black/5">
+                        <span className="text-[4.5px] font-black text-[#1A1A1A] leading-none mt-[0.5px]">
+                          {(listing.rating || 5.0).toFixed(1)}
+                        </span>
+                        <Star 
+                          className="w-[4.5px] h-[4.5px] fill-[#FFC107] text-[#FFC107]" 
+                        />
                       </div>
                       
-                      {/* Bottom: Farm Name with DARK OVERLAY only behind text */}
-                      <div className="w-full text-center py-1 bg-black/60 mt-auto px-0.5">
-                        <p className="text-[4px] font-black text-white leading-tight" dir="rtl">
+                      {/* Bottom: Farm Name with DARK GRADIENT overlay */}
+                      <div className="w-full text-center py-2 bg-gradient-to-t from-black/80 via-black/40 to-transparent mt-auto px-1">
+                        <p className="text-[4.5px] font-black text-white leading-tight drop-shadow-sm" dir="rtl">
                           ضيعة {listing.title.includes('ضيعة') ? listing.title.split('ضيعة')[1].trim() : listing.title.split(' - ')[0].trim()}
                         </p>
                       </div>
