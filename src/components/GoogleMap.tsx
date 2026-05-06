@@ -164,8 +164,6 @@ const MapContent: React.FC<MapContentProps> = ({ listings, onListingClick, hover
                   )}
                 </div>
                 
-                {/* Pointing Triangle */}
-                <div className={`absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-4 h-4 rotate-45 shadow-xl transition-colors duration-300 ${hoveredListingId === listing.id ? 'bg-[#2E7D32]' : 'bg-white'}`}></div>
               </div>
             </div>
           </OverlayView>
@@ -174,7 +172,7 @@ const MapContent: React.FC<MapContentProps> = ({ listings, onListingClick, hover
             <OverlayView
               position={{ lat: listing.lat, lng: listing.lng }}
               mapPaneName="floatPane"
-              getPixelPositionOffset={(width, height) => ({ x: -(width / 2), y: -(height + 45) })}
+              getPixelPositionOffset={(width, height) => ({ x: -(width / 2), y: -(height + 65) })}
             >
               <div 
                 className="w-48 bg-white rounded-2xl overflow-hidden shadow-2xl border border-outline-variant/10 cursor-pointer transition-transform hover:scale-105 pointer-events-auto" 

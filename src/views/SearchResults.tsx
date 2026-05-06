@@ -85,7 +85,11 @@ export default function SearchResults({ onNavigate, initialCity, initialRadius, 
         return;
       }
 
-      const response = await firestoreService.getAnnouncements(selectedCategory === 'الكل' ? undefined : selectedCategory);
+      const response = await firestoreService.getAnnouncements(
+        selectedCategory === 'الكل' ? undefined : selectedCategory,
+        undefined,
+        50
+      );
       if (response && response.data) {
         setListings(response.data);
         setNextCursor(response.nextCursor);
@@ -104,12 +108,16 @@ export default function SearchResults({ onNavigate, initialCity, initialRadius, 
     try {
       const response = await firestoreService.getAnnouncements(
         selectedCategory === 'الكل' ? undefined : selectedCategory,
-        nextCursor
+        nextCursor,
+        50
       );
       
       if (response && response.data) {
         setListings(prev => [...prev, ...response.data]);
         setNextCursor(response.nextCursor);
+        // Automatically move to the next page
+        setCurrentPage(p => p + 1);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       }
     } catch (error) {
       console.error("Error loading more listings:", error);
