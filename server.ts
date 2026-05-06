@@ -1922,7 +1922,7 @@ async function startServer() {
           };
 
           await resend.emails.send({
-            from: 'Kessabcom <notifications@kessabcom.ma>',
+            from: 'Kessabcom <onboarding@resend.dev>', // Fallback to resend default if domain not verified
             to: ['kessabcom.maroc@gmail.com'],
             subject: `طلب دعم جديد: ${subjectMap[type] || type}`,
             html: `
@@ -1942,6 +1942,8 @@ async function startServer() {
         } catch (mailErr) {
           console.error(`❌ Failed to send email for ${docRef.id}:`, mailErr);
         }
+      } else if (!resend && emailTypes.includes(type)) {
+        console.warn(`⚠️ Skipping email for ${docRef.id} because RESEND_API_KEY is not set.`);
       }
 
       res.status(201).json({ id: docRef.id });

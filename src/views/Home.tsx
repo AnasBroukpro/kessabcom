@@ -1002,6 +1002,7 @@ export default function Home({ onNavigate }: Props) {
                 hoveredListingId={hoveredMapId}
                 setHoveredListingId={setHoveredMapId}
                 zoom={11}
+                interactive={false}
               />
               
               {/* Floating hint */}

@@ -26,6 +26,7 @@ interface Props {
   hoveredListingId: string | null;
   setHoveredListingId: (id: string | null) => void;
   zoom?: number;
+  interactive?: boolean;
 }
 
 interface MapContentProps extends Props {}
@@ -52,7 +53,7 @@ const mapOptions = {
   ],
 };
 
-const MapContent: React.FC<MapContentProps> = ({ listings, onListingClick, hoveredListingId, setHoveredListingId, zoom }) => {
+const MapContent: React.FC<MapContentProps> = ({ listings, onListingClick, hoveredListingId, setHoveredListingId, zoom, interactive }) => {
   const { isLoaded, loadError } = useGoogleMaps();
 
   const mapCenter = useMemo(() => {
@@ -105,7 +106,14 @@ const MapContent: React.FC<MapContentProps> = ({ listings, onListingClick, hover
       mapContainerStyle={mapContainerStyle}
       center={mapCenter}
       zoom={zoom || (listings.length > 0 ? 10 : 6)}
-      options={mapOptions}
+      options={{
+        ...mapOptions,
+        gestureHandling: interactive === false ? 'none' : 'cooperative',
+        zoomControl: interactive !== false,
+        scrollwheel: interactive !== false,
+        disableDoubleClickZoom: interactive === false,
+        draggable: interactive !== false,
+      }}
     >
       {listings.map((listing) => (
         <React.Fragment key={listing.id}>
