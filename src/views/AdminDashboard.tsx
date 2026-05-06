@@ -4,7 +4,7 @@ import { ViewType } from '../App';
 import { useAuth } from '../contexts/AuthContext';
 import { firestoreService } from '../services/firestoreService';
 import { collection, query, orderBy, onSnapshot, updateDoc, doc, where, limit, getDocs, deleteDoc, deleteField } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { db, auth } from '../lib/firebase';
 import { 
   LayoutDashboard, Users, Tag, Layers, Settings, Bell, User, Search, 
   CheckCircle2, Ban, Eye, TrendingUp, DollarSign, ShieldCheck, BadgeCheck,
@@ -2112,6 +2112,21 @@ const renderOverview = () => (
       return '0' + clean;
     };
 
+    const findUserByPhone = (phone: string) => {
+      if (!phone) return null;
+      let clean = phone.replace(/\D/g, '');
+      if (clean.startsWith('212')) clean = clean.substring(3);
+      if (clean.startsWith('0')) clean = clean.substring(1);
+      const formats = [phone, `+212${clean}`, `0${clean}`, clean];
+      return users.find(u => {
+        const uPhone = (u.phoneNumber || u.phone || '').replace(/\D/g, '');
+        let uClean = uPhone;
+        if (uClean.startsWith('212')) uClean = uClean.substring(3);
+        if (uClean.startsWith('0')) uClean = uClean.substring(1);
+        return formats.includes(uPhone) || formats.includes(`+212${uClean}`) || formats.includes(`0${uClean}`) || formats.includes(uClean);
+      });
+    };
+
     const filteredRequests = supportRequests.filter(req => {
       if (supportSubTab === 'password') {
         return req.type === 'password_reset' || !req.type; // Fallback for old ones
@@ -2149,6 +2164,7 @@ const renderOverview = () => (
               <tr className="bg-surface-container-low/50 border-b border-outline-variant/20">
                 <th className="p-5 font-black text-xs">نوع الطلب</th>
                 <th className="p-5 font-black text-xs">المستخدم</th>
+                <th className="p-5 font-black text-xs">الدور</th>
                 <th className="p-5 font-black text-xs">رقم الهاتف</th>
                 <th className="p-5 font-black text-xs">التاريخ</th>
                 <th className="p-5 font-black text-xs">الحالة</th>
@@ -2165,8 +2181,33 @@ const renderOverview = () => (
                      req.type === 'contact' ? 'اتصال عام' :
                      req.type === 'other' ? 'موضوع آخر' : req.type}
                   </td>
-                  <td className="p-5 font-bold text-sm text-primary">
-                    {req.name || 'غير معروف'}
+                  <td className="p-5">
+                    {(() => {
+                      const u = findUserByPhone(req.phone);
+                      return (
+                        <div className="flex flex-col">
+                          <span className="font-bold text-sm text-primary">
+                            {u?.fullName || u?.displayName || req.name || 'غير معروف'}
+                          </span>
+                          {u && <span className="text-[9px] text-on-surface-variant opacity-60">ID: {u.id.slice(0,8)}...</span>}
+                        </div>
+                      );
+                    })()}
+                  </td>
+                  <td className="p-5">
+                    {(() => {
+                      const u = findUserByPhone(req.phone);
+                      if (!u) return <span className="text-[10px] text-on-surface-variant italic opacity-50">زائر</span>;
+                      return (
+                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-black ${
+                          u.role === 'admin' ? 'bg-red-100 text-red-700' :
+                          u.role === 'seller' ? 'bg-indigo-100 text-indigo-700' :
+                          'bg-blue-100 text-blue-700'
+                        }`}>
+                          {u.role === 'admin' ? 'مدير' : u.role === 'seller' ? 'كساب' : 'مشتري'}
+                        </span>
+                      );
+                    })()}
                   </td>
                   <td className="p-5 font-mono text-sm" dir="ltr">{formatSupportPhone(req.phone)}</td>
                   <td className="p-5 text-xs text-on-surface-variant font-bold">
