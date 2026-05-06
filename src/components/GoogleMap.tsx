@@ -27,6 +27,7 @@ interface Props {
   setHoveredListingId: (id: string | null) => void;
   zoom?: number;
   interactive?: boolean;
+  scaleOnHover?: boolean;
 }
 
 interface MapContentProps extends Props {}
@@ -53,7 +54,7 @@ const mapOptions = {
   ],
 };
 
-const MapContent: React.FC<MapContentProps> = ({ listings, onListingClick, hoveredListingId, setHoveredListingId, zoom, interactive }) => {
+const MapContent: React.FC<MapContentProps> = ({ listings, onListingClick, hoveredListingId, setHoveredListingId, zoom, interactive, scaleOnHover }) => {
   const { isLoaded, loadError } = useGoogleMaps();
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [localHoveredId, setLocalHoveredId] = useState<string | null>(null);
@@ -140,8 +141,8 @@ const MapContent: React.FC<MapContentProps> = ({ listings, onListingClick, hover
       {listings.map((listing) => {
         const isHovered = activeId === listing.id;
         const isDirectHover = localHoveredId === listing.id;
-        // Scale if: 1. Sidebar hovered (scaledId) OR 2. Manually clicked (manualScaledId)
-        const isScaled = (scaledId === listing.id) || (manualScaledId === listing.id);
+        // Scale if: 1. Sidebar hovered (scaledId) OR 2. Manually clicked (manualScaledId) OR 3. scaleOnHover && hovered
+        const isScaled = (scaledId === listing.id) || (manualScaledId === listing.id) || (scaleOnHover && isDirectHover);
         
         return (
           <React.Fragment key={listing.id}>

@@ -1015,7 +1015,9 @@ export default function Home({ onNavigate }: Props) {
                 onListingClick={(item) => onNavigate('listing-details', item.id)}
                 hoveredListingId={hoveredMapId}
                 setHoveredListingId={setHoveredMapId}
-                interactive={true}
+                interactive={false}
+                scaleOnHover={true}
+                zoom={11}
               />
             </div>
           </section>
