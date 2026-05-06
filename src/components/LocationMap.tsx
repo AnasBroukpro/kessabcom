@@ -46,7 +46,12 @@ export default function LocationMap({
   
   useEffect(() => {
     if (!isDraggingRef.current) {
-      setMapCenter((lat && lng) ? { lat, lng } : defaultCenter);
+      const newCenter = (lat && lng) ? { lat, lng } : defaultCenter;
+      setMapCenter(newCenter);
+      // Force pan if map is already loaded to ensure synchronization
+      if (mapRef.current) {
+        mapRef.current.panTo(newCenter);
+      }
     }
   }, [lat, lng]);
 

@@ -68,6 +68,15 @@ export default function SearchResults({ onNavigate, initialCity, initialRadius, 
   const [hoveredMarker, setHoveredMarker] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'map' | 'list'>('map');
   const [showListingSidebar, setShowListingSidebar] = useState(false);
+  const [showCityAlert, setShowCityAlert] = useState(false);
+
+  useEffect(() => {
+    if (viewMode === 'map' && !citySearch) {
+      setShowCityAlert(true);
+    } else {
+      setShowCityAlert(false);
+    }
+  }, [viewMode, citySearch]);
 
   const { settings } = useSettings();
   const { profile } = useAuth();
@@ -539,6 +548,33 @@ export default function SearchResults({ onNavigate, initialCity, initialRadius, 
                   setHoveredListingId={setHoveredMarker}
                 />
               </div>
+
+              {/* City Selection Required Alert */}
+              <AnimatePresence>
+                {showCityAlert && (
+                  <motion.div
+                    initial={{ y: 100, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    exit={{ y: 100, opacity: 0 }}
+                    className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[80] w-[90%] max-w-sm bg-red-600 text-white p-4 rounded-2xl shadow-2xl flex items-center gap-3 border border-red-500/20"
+                    dir="rtl"
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+                      <MapPin className="w-5 h-5 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-black leading-tight">عافاك اختار المدينة فين كتقلب أولاً</p>
+                      <p className="text-[10px] font-bold opacity-80 mt-0.5">باش نقدروا نلقاو ليك أحسن العروض قريب ليك</p>
+                    </div>
+                    <button 
+                      onClick={() => setShowCityAlert(false)}
+                      className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               {/* ── Right sidebar (slides in) ── */}
               {showListingSidebar && (
