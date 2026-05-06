@@ -48,7 +48,7 @@ export default function SearchResults({ onNavigate, initialCity, initialRadius, 
   const [maxPrice, setMaxPrice] = useState<string>('');
   const [sortBy, setSortBy] = useState<'newest' | 'price-asc' | 'price-desc' | 'rating'>('newest');
   const [listings, setListings] = useState<any[]>([]);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   const toggleSelection = <T,>(item: T, currentArray: T[], setArray: React.Dispatch<React.SetStateAction<T[]>>) => {
@@ -76,55 +76,47 @@ export default function SearchResults({ onNavigate, initialCity, initialRadius, 
 
   useEffect(() => {
     const fetchListings = async () => {
-      const cacheKey = `search_results_${selectedCategory}`;
+      setIsLoading(true);
+      setCurrentPage(1);
+
+      const cacheKey = `search_results_${selectedCategory}_all`;
       const cached = getCachedData(cacheKey);
       if (cached) {
         setListings(cached.listings);
-        setNextCursor(cached.nextCursor);
+        setHasMore(false);
         setIsLoading(false);
         return;
       }
 
-      const response = await firestoreService.getAnnouncements(
-        selectedCategory === 'الكل' ? undefined : selectedCategory,
-        undefined,
-        50
-      );
-      if (response && response.data) {
-        setListings(response.data);
-        setNextCursor(response.nextCursor);
-        setCachedData(cacheKey, { listings: response.data, nextCursor: response.nextCursor });
-      }
+      // Load all listings in one shot (limit 200)
+      let allListings: any[] = [];
+      let cursor: string | null = null;
+      let iterations = 0;
+      do {
+        const response = await firestoreService.getAnnouncements(
+          selectedCategory === 'الكل' ? undefined : selectedCategory,
+          cursor || undefined,
+          200
+        );
+        if (response && response.data) {
+          allListings = [...allListings, ...response.data];
+          cursor = response.nextCursor || null;
+        } else {
+          break;
+        }
+        iterations++;
+      } while (cursor && iterations < 5); // safety cap
+
+      setListings(allListings);
+      setHasMore(false);
+      setCachedData(cacheKey, { listings: allListings });
       setIsLoading(false);
-      setCurrentPage(1); // Reset local pagination
     };
     fetchListings();
   }, [selectedCategory]);
 
-  const handleLoadMore = async () => {
-    if (!nextCursor || isLoadingMore) return;
-    
-    setIsLoadingMore(true);
-    try {
-      const response = await firestoreService.getAnnouncements(
-        selectedCategory === 'الكل' ? undefined : selectedCategory,
-        nextCursor,
-        50
-      );
-      
-      if (response && response.data) {
-        setListings(prev => [...prev, ...response.data]);
-        setNextCursor(response.nextCursor);
-        // Automatically move to the next page
-        setCurrentPage(p => p + 1);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      }
-    } catch (error) {
-      console.error("Error loading more listings:", error);
-    } finally {
-      setIsLoadingMore(false);
-    }
-  };
+  // No-op — all data is loaded upfront
+  const handleLoadMore = async () => {};
 
   const filteredListings = (Array.isArray(listings) ? listings : []).filter(listing => {
     const matchesTypes = selectedTypes.length === 0 || selectedTypes.includes(listing.category);
@@ -892,73 +884,45 @@ export default function SearchResults({ onNavigate, initialCity, initialRadius, 
           </div>
         )}
 
-        {/* Pagination / Load More */}
-        {filteredListings.length > 0 && (
+        {/* Pagination — pure local, all data already loaded */}
+        {filteredListings.length > 0 && Math.ceil(filteredListings.length / pageSize) > 1 && (
           <div className="flex flex-col items-center gap-6 mt-12 mb-20">
-            {/* Numbered Pagination */}
             <div className="flex items-center gap-2">
-              <button
+              {/* Prev */}
+<button
                 disabled={currentPage === 1}
-                onClick={() => {
-                  setCurrentPage(p => p - 1);
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
+                onClick={() => { setCurrentPage(p => p - 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                 className="p-2 rounded-xl bg-white border border-outline-variant/20 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#F9F9F6] transition-colors"
               >
                 <ChevronRight className="w-5 h-5" />
               </button>
-              
+
+              {/* Page numbers */}
               <div className="flex items-center gap-1">
-                {/* Pages we already have */}
                 {[...Array(Math.ceil(filteredListings.length / pageSize))].map((_, i) => (
                   <button
                     key={i}
-                    onClick={() => {
-                      setCurrentPage(i + 1);
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }}
+                    onClick={() => { setCurrentPage(i + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                     className={`w-10 h-10 rounded-xl font-black text-sm transition-all ${
-                      currentPage === i + 1 
-                        ? 'bg-[#2E7D32] text-white shadow-lg' 
+                      currentPage === i + 1
+                        ? 'bg-[#2E7D32] text-white shadow-lg'
                         : 'bg-white text-[#757575] border border-outline-variant/10 hover:border-[#2E7D32]/30'
                     }`}
                   >
                     {i + 1}
                   </button>
                 ))}
-
-                {/* "Next" virtual page if server has more */}
-                {nextCursor && (
-                  <button
-                    disabled={isLoadingMore}
-                    onClick={handleLoadMore}
-                    className="w-10 h-10 rounded-xl font-black text-sm bg-white text-[#2E7D32] border-2 border-dashed border-[#2E7D32]/30 hover:border-[#2E7D32] hover:bg-[#2E7D32]/5 transition-all flex items-center justify-center group"
-                  >
-                    {isLoadingMore ? <Loader2 className="w-4 h-4 animate-spin" /> : Math.ceil(filteredListings.length / pageSize) + 1}
-                  </button>
-                )}
               </div>
 
+              {/* Next */}
               <button
-                disabled={currentPage === Math.ceil(filteredListings.length / pageSize) && !nextCursor}
-                onClick={() => {
-                  if (currentPage < Math.ceil(filteredListings.length / pageSize)) {
-                    setCurrentPage(p => p + 1);
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                  } else if (nextCursor) {
-                    handleLoadMore();
-                  }
-                }}
+                disabled={currentPage === Math.ceil(filteredListings.length / pageSize)}
+                onClick={() => { setCurrentPage(p => p + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                 className="p-2 rounded-xl bg-white border border-outline-variant/20 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#F9F9F6] transition-colors"
               >
                 <ChevronLeft className="w-5 h-5" />
               </button>
             </div>
-
-            {/* Load More Info */}
-            {nextCursor && !isLoadingMore && (
-              <p className="text-[10px] text-[#757575] font-bold">كاينين عروض أخرى، ضغط على الصفحة {Math.ceil(filteredListings.length / pageSize) + 1} باش تشوفهم</p>
-            )}
           </div>
         )}
       </main>
