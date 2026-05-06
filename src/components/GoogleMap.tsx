@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { GoogleMap, OverlayView, Circle } from '@react-google-maps/api';
-import { MapPin, Star, ChevronLeft } from 'lucide-react';
+import { MapPin, Star } from 'lucide-react';
 import { useSettings } from '../hooks/useSettings';
 import { useGoogleMaps } from '../contexts/GoogleMapsProvider';
 
@@ -57,8 +57,6 @@ const MapContent: React.FC<MapContentProps> = ({ listings, onListingClick, hover
   const { isLoaded, loadError } = useGoogleMaps();
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [localHoveredId, setLocalHoveredId] = useState<string | null>(null);
-  
-  // Track if we've initialized the center to avoid snapping back
   const hasInitializedCenter = useRef(false);
 
   const activeId = localHoveredId || hoveredListingId;
@@ -76,15 +74,15 @@ const MapContent: React.FC<MapContentProps> = ({ listings, onListingClick, hover
     setMap(mapInstance);
   }, []);
 
-  // Effect to pan when external hover changes (e.g. from sidebar list)
+  // Pan to center whenever the active listing changes
   useEffect(() => {
-    if (map && hoveredListingId) {
-      const listing = listings.find(l => l.id === hoveredListingId);
+    if (map && activeId) {
+      const listing = listings.find(l => l.id === activeId);
       if (listing) {
         map.panTo({ lat: listing.lat, lng: listing.lng });
       }
     }
-  }, [map, hoveredListingId, listings]);
+  }, [map, activeId, listings]);
 
   if (loadError) {
     return (
@@ -114,7 +112,6 @@ const MapContent: React.FC<MapContentProps> = ({ listings, onListingClick, hover
   return (
     <GoogleMap
       mapContainerStyle={mapContainerStyle}
-      // Only pass center once to avoid snapping back on re-renders
       center={!hasInitializedCenter.current ? initialCenter : undefined}
       onTilesLoaded={() => { hasInitializedCenter.current = true; }}
       zoom={zoom || (listings.length > 0 ? 10 : 6)}
@@ -134,13 +131,13 @@ const MapContent: React.FC<MapContentProps> = ({ listings, onListingClick, hover
           <React.Fragment key={listing.id}>
             <Circle
               center={{ lat: listing.lat, lng: listing.lng }}
-              radius={2000}
+              radius={1000}
               options={{
                 fillColor: '#2E7D32',
-                fillOpacity: isHovered ? 0.15 : 0.08,
+                fillOpacity: isHovered ? 0.1 : 0.05,
                 strokeColor: '#2E7D32',
-                strokeOpacity: isHovered ? 0.3 : 0.15,
-                strokeWeight: 1,
+                strokeOpacity: 0,
+                strokeWeight: 0,
                 clickable: false,
               }}
             />
@@ -151,8 +148,8 @@ const MapContent: React.FC<MapContentProps> = ({ listings, onListingClick, hover
             >
               <div
                 style={{
-                  transform: `translate(-50%, -50%) scale(${isHovered ? 1.12 : 1})`,
-                  transition: 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                  // Center the overlay
+                  transform: 'translate(-50%, -50%)',
                   zIndex: isHovered ? 100 : 10,
                   position: 'relative',
                   cursor: 'pointer',
@@ -161,13 +158,13 @@ const MapContent: React.FC<MapContentProps> = ({ listings, onListingClick, hover
                 onMouseEnter={() => { 
                   setLocalHoveredId(listing.id); 
                   setHoveredListingId(listing.id);
-                  // Disabled movement on direct marker hover as requested
                 }}
                 onMouseLeave={() => { 
                   setLocalHoveredId(null); 
                   setHoveredListingId(null); 
                 }}
               >
+                {/* Consolidated 3x Scale Circle Image */}
                 <div
                   style={{
                     width: '52px',
@@ -175,10 +172,14 @@ const MapContent: React.FC<MapContentProps> = ({ listings, onListingClick, hover
                     borderRadius: '50%',
                     border: isHovered ? '3px solid #2E7D32' : '3px solid white',
                     boxShadow: isHovered
-                      ? '0 8px 24px rgba(0,0,0,0.2)'
+                      ? '0 20px 50px rgba(0,0,0,0.4), 0 0 0 10px rgba(46,125,50,0.1)'
                       : '0 4px 12px rgba(0,0,0,0.15)',
                     overflow: 'hidden',
-                    transition: 'all 0.3s ease',
+                    // Scale to 3x on hover over 1 second duration
+                    transform: isHovered ? 'scale(3)' : 'scale(1)',
+                    transition: 'transform 1s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.3s ease, box-shadow 0.6s ease',
+                    position: 'relative',
+                    backgroundColor: 'white',
                   }}
                 >
                   <img
@@ -189,81 +190,33 @@ const MapContent: React.FC<MapContentProps> = ({ listings, onListingClick, hover
                       width: '100%',
                       height: '100%',
                       objectFit: 'cover',
-                      transform: isHovered ? 'scale(1.15)' : 'scale(1)',
-                      transition: 'transform 0.5s ease',
                     }}
                   />
+                  
+                  {/* Overlay content inside circle (visible when scaled) */}
+                  {isHovered && (
+                    <div className="absolute inset-0 flex flex-col justify-between items-center py-2 px-1 bg-black/40 backdrop-blur-[2px] animate-in fade-in duration-700">
+                      {/* Top: 5 Stars */}
+                      <div className="flex gap-0.5 mt-2">
+                        {[...Array(5)].map((_, i) => (
+                          <Star 
+                            key={i} 
+                            className={`w-2.5 h-2.5 ${i < Math.floor(listing.rating || 5) ? 'fill-[#FFC107] text-[#FFC107]' : 'text-white/40'}`} 
+                          />
+                        ))}
+                      </div>
+                      
+                      {/* Bottom: Farm Name */}
+                      <div className="text-center mb-2 px-1">
+                        <p className="text-[6.5px] font-black text-white leading-tight drop-shadow-lg" dir="rtl">
+                          ضيعة {listing.title.includes('ضيعة') ? listing.title.split('ضيعة')[1].trim() : (listing.title.length > 12 ? listing.title.substring(0, 10) + '...' : listing.title)}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </OverlayView>
-
-            {/* Modern Tooltip */}
-            {isHovered && (
-              <OverlayView
-                position={{ lat: listing.lat, lng: listing.lng }}
-                mapPaneName="floatPane"
-                getPixelPositionOffset={(width, height) => ({ x: -(width / 2), y: -(height + 42) })}
-              >
-                <div
-                  className="relative group cursor-pointer pointer-events-auto"
-                  onClick={() => onListingClick(listing)}
-                  onMouseEnter={() => { setLocalHoveredId(listing.id); setHoveredListingId(listing.id); }}
-                  onMouseLeave={() => { setLocalHoveredId(null); setHoveredListingId(null); }}
-                >
-                  {/* Modern Sleek Card */}
-                  <div className="w-[220px] bg-white rounded-[24px] overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-outline-variant/10 animate-in zoom-in-95 duration-300">
-                    {/* Top Image Section */}
-                    <div className="relative h-28 overflow-hidden">
-                      <img
-                        src={listing.image}
-                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                        alt={listing.title}
-                        referrerPolicy="no-referrer"
-                      />
-                      <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-md px-2 py-1 rounded-lg shadow-sm">
-                        <div className="flex items-center gap-1">
-                          <Star className="w-3 h-3 fill-[#FFC107] text-[#FFC107]" />
-                          <span className="text-[10px] font-black text-[#1A1A1A]">{(listing.rating || 5).toFixed(1)}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Content Section */}
-                    <div className="p-4" dir="rtl">
-                      <h4 className="font-black text-sm text-[#1A1A1A] mb-1.5 leading-tight">
-                         ضيعة {listing.title.includes('ضيعة') ? listing.title.split('ضيعة')[1].trim() : listing.title}
-                      </h4>
-                      
-                      <div className="flex items-center gap-1.5 text-[#757575] mb-4">
-                        <MapPin className="w-3.5 h-3.5 text-[#2E7D32]" />
-                        <span className="text-[11px] font-bold truncate">{listing.location}</span>
-                      </div>
-
-                      <div className="flex items-center justify-between pt-3 border-t border-outline-variant/5">
-                        <span className="text-[10px] font-black text-[#2E7D32]">تواصل دابا</span>
-                        <ChevronLeft className="w-3.5 h-3.5 text-[#2E7D32]" />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Triangle Arrow */}
-                  <div
-                    style={{
-                      position: 'absolute',
-                      bottom: '-10px',
-                      left: '50%',
-                      transform: 'translateX(-50%)',
-                      width: 0,
-                      height: 0,
-                      borderLeft: '10px solid transparent',
-                      borderRight: '10px solid transparent',
-                      borderTop: '11px solid white',
-                      filter: 'drop-shadow(0 4px 4px rgba(0,0,0,0.05))',
-                    }}
-                  />
-                </div>
-              </OverlayView>
-            )}
           </React.Fragment>
         );
       })}
