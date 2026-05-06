@@ -28,6 +28,7 @@ interface Props {
   zoom?: number;
   interactive?: boolean;
   scaleOnHover?: boolean;
+  center?: { lat: number; lng: number };
 }
 
 interface MapContentProps extends Props {}
@@ -54,7 +55,7 @@ const mapOptions = {
   ],
 };
 
-const MapContent: React.FC<MapContentProps> = ({ listings, onListingClick, hoveredListingId, setHoveredListingId, zoom, interactive, scaleOnHover }) => {
+const MapContent: React.FC<MapContentProps> = ({ listings, onListingClick, hoveredListingId, setHoveredListingId, zoom, interactive, scaleOnHover, center }) => {
   const { isLoaded, loadError } = useGoogleMaps();
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [localHoveredId, setLocalHoveredId] = useState<string | null>(null);
@@ -66,13 +67,14 @@ const MapContent: React.FC<MapContentProps> = ({ listings, onListingClick, hover
   const activeId = localHoveredId || hoveredListingId || manualScaledId;
 
   const initialCenter = useMemo(() => {
+    if (center) return center;
     if (listings.length > 0) {
       const lat = listings.reduce((sum, l) => sum + l.lat, 0) / listings.length;
       const lng = listings.reduce((sum, l) => sum + l.lng, 0) / listings.length;
       return { lat, lng };
     }
     return defaultCenter;
-  }, [listings]);
+  }, [listings, center]);
 
   const onMapLoad = useCallback((mapInstance: google.maps.Map) => {
     setMap(mapInstance);

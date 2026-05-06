@@ -237,21 +237,11 @@ export default function Home({ onNavigate }: Props) {
   const [hoveredMapId, setHoveredMapId] = useState<string | null>(null);
   const regionalListings = React.useMemo(() => {
     const currentCity = citySearch || profile?.city || 'سطات';
-    const coords = cityCoords[currentCity];
     
-    // 1. Try to find local ones (80km)
     let filtered = announcements.filter(l => {
       if (!l.lat || !l.lng) return false;
-      if (!coords) return true; // If no coords for city, just take anything with coords
-      if (l.location === currentCity) return true;
-      const dist = calculateDistance(coords.lat, coords.lng, l.lat, l.lng);
-      return dist < 80;
+      return l.location === currentCity;
     });
-
-    // 2. Fallback to any listings with coordinates if none found nearby
-    if (filtered.length === 0) {
-      filtered = announcements.filter(l => l.lat && l.lng);
-    }
     
     return filtered.slice(0, 100);
   }, [citySearch, profile, announcements]);
@@ -995,6 +985,7 @@ export default function Home({ onNavigate }: Props) {
             </div>
             <div className="w-full h-[420px] md:h-[520px]">
               <GoogleMapComponent
+                center={cityCoords[citySearch || profile?.city || 'سطات']}
                 listings={regionalListings
                   .filter(l => l.lat && l.lng)
                   .slice(0, 60)
