@@ -247,7 +247,7 @@ export default function Home({ onNavigate }: Props) {
         const dist = calculateDistance(coords.lat, coords.lng, l.lat, l.lng);
         return dist < 80; // 80km radius
       })
-      .slice(0, 20);
+      .slice(0, 100);
   }, [citySearch, profile, announcements]);
 
   useEffect(() => {

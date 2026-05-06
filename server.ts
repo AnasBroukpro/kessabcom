@@ -7,9 +7,17 @@ import fs from "fs";
 import fetch from "node-fetch";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
-import { Resend } from "resend";
+import nodemailer from "nodemailer";
 
-const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST || 'smtp.gmail.com',
+  port: parseInt(process.env.SMTP_PORT || '587'),
+  secure: process.env.SMTP_SECURE === 'true',
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
+});
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1912,7 +1920,7 @@ async function startServer() {
 
       // Email Notification Logic
       const emailTypes = ['certified_badge', 'home_page', 'banner', 'other'];
-      if (resend && emailTypes.includes(type)) {
+      if (emailTypes.includes(type) && process.env.SMTP_USER) {
         try {
           const subjectMap: any = {
             'certified_badge': 'طلب الحصول على شارة معتمد (ONSSA)',
@@ -1921,9 +1929,9 @@ async function startServer() {
             'other': 'موضوع آخر'
           };
 
-          await resend.emails.send({
-            from: 'Kessabcom <onboarding@resend.dev>', // Fallback to resend default if domain not verified
-            to: ['kessabcom.maroc@gmail.com'],
+          await transporter.sendMail({
+            from: `"Kessabcom Notifications" <${process.env.SMTP_USER}>`,
+            to: 'kessabcom.maroc@gmail.com',
             subject: `طلب دعم جديد: ${subjectMap[type] || type}`,
             html: `
               <div dir="rtl" style="font-family: sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
@@ -1942,8 +1950,8 @@ async function startServer() {
         } catch (mailErr) {
           console.error(`❌ Failed to send email for ${docRef.id}:`, mailErr);
         }
-      } else if (!resend && emailTypes.includes(type)) {
-        console.warn(`⚠️ Skipping email for ${docRef.id} because RESEND_API_KEY is not set.`);
+      } else if (emailTypes.includes(type) && !process.env.SMTP_USER) {
+        console.warn(`⚠️ Skipping email for ${docRef.id} because SMTP_USER is not set.`);
       }
 
       res.status(201).json({ id: docRef.id });
