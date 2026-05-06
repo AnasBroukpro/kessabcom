@@ -967,59 +967,11 @@ export default function Home({ onNavigate }: Props) {
           </div>
         )}
 
-        {/* Regional Map Section (Desktop Only) */}
+        {/* Regional Map Section (Desktop Only) - Hidden for now
         <section className="hidden md:block py-20 bg-[#F9F9F6] border-y border-outline-variant/10 w-full overflow-hidden">
-          <div className="max-w-[100vw] mx-auto">
-            <div className="max-w-7xl mx-auto px-6 mb-12">
-              <div className="flex flex-row justify-between items-end">
-                <div className="text-right">
-                  <span className="text-[#2E7D32] font-black text-sm uppercase tracking-widest mb-2 block">خريطة الكساب</span>
-                  <h2 className="text-3xl md:text-4xl font-black text-[#1A1A1A] font-headline">الكسابة لي فـ جهة {citySearch || profile?.city || 'المغرب'}</h2>
-                  <p className="text-[#757575] font-bold mt-3 text-lg">اكتشف الضيعات لي قريبة منك وتواصل مع الكساب ديريكت</p>
-                </div>
-                <div className="flex items-center gap-3 bg-white px-5 py-3 rounded-2xl shadow-sm border border-outline-variant/20">
-                  <div className="w-3 h-3 bg-[#2E7D32] rounded-full animate-pulse" />
-                  <span className="text-sm font-black text-[#2E7D32]">{regionalListings.length} ضيعة فـ الخريطة</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="h-[700px] w-full shadow-2xl relative group border-y-4 border-white">
-              <GoogleMapComponent
-                listings={regionalListings.map(l => ({
-                  id: l.id,
-                  title: l.sellerName || l.title,
-                  breed: l.breed || l.category,
-                  location: l.location,
-                  weight: l.weight || '',
-                  verified: l.verified || false,
-                  rating: l.rating || 5,
-                  image: l.images?.[0] || '',
-                  lat: l.lat,
-                  lng: l.lng
-                }))}
-                onListingClick={(l) => onNavigate('listing-details', l.id)}
-                hoveredListingId={hoveredMapId}
-                setHoveredListingId={setHoveredMapId}
-                zoom={11}
-                interactive={false}
-              />
-              
-              {/* Floating hint */}
-              <div className="absolute bottom-12 left-12 right-12 md:right-auto md:w-72 bg-white/90 backdrop-blur-md p-5 rounded-2xl border border-white/50 shadow-xl z-10 animate-in fade-in slide-in-from-bottom-4 duration-1000">
-                <div className="flex items-start gap-3">
-                  <div className="p-2 bg-[#E8F5E9] rounded-xl">
-                    <Navigation className="w-5 h-5 text-[#2E7D32]" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-black text-[#1A1A1A] mb-1">تصفح الضيعات</p>
-                    <p className="text-[10px] text-[#757575] font-bold leading-relaxed">كليكي على أي ضيعة باش تشوف التفاصيل والصور ديال الحولي</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+          ...
         </section>
+        */}
 
         {/* Sales Phases Section */}
         <section className="bg-white py-20 border-y border-outline-variant/10">
