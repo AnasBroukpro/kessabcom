@@ -2199,14 +2199,42 @@ const renderOverview = () => (
                       {req.status === 'pending' && supportSubTab === 'password' && (
                         <button 
                           onClick={async () => {
-                            const tempPass = Math.floor(100000 + Math.random() * 900000).toString();
-                            const message = `مرحبا ${req.name || 'مستخدم كسابكوم'}،\n\nبناءً على طلبك، كلمة المرور المؤقتة الخاصة بك هي: *${tempPass}*\n\nيرجى تسجيل الدخول وتغييرها فوراً من إعدادات حسابك.\n\nفريق كسابكوم.`;
-                            const cleanPhone = (req.phone || '').replace(/\+/g, '');
-                            const whatsappUrl = `https://wa.me/${cleanPhone.startsWith('0') ? '212' + cleanPhone.slice(1) : cleanPhone}?text=${encodeURIComponent(message)}`;
-                            
-                            window.open(whatsappUrl, '_blank');
-                            
-                            setSentPasswords(prev => ({ ...prev, [req.id]: true }));
+                            try {
+                              const tempPass = Math.floor(100000 + Math.random() * 900000).toString();
+                              const idToken = await auth.currentUser?.getIdToken();
+                              
+                              if (!idToken) throw new Error("لم يتم العثور على رمز الجلسة");
+
+                              // Call server to reset password in Firebase Auth
+                              const response = await fetch('/api/admin/users/reset-password', {
+                                method: 'POST',
+                                headers: {
+                                  'Content-Type': 'application/json',
+                                  'Authorization': `Bearer ${idToken}`
+                                },
+                                body: JSON.stringify({
+                                  phone: req.phone,
+                                  newPassword: tempPass,
+                                  requestId: req.id
+                                })
+                              });
+
+                              if (!response.ok) {
+                                const errorData = await response.json();
+                                throw new Error(errorData.error || "فشل تحديث كلمة المرور");
+                              }
+
+                              const message = `مرحبا ${req.name || 'مستخدم كسابكوم'}،\n\nبناءً على طلبك، كلمة المرور المؤقتة الخاصة بك هي: *${tempPass}*\n\nيرجى تسجيل الدخول وتغييرها فوراً من إعدادات حسابك.\n\nفريق كسابكوم.`;
+                              const cleanPhone = (req.phone || '').replace(/\+/g, '');
+                              const whatsappUrl = `https://wa.me/${cleanPhone.startsWith('0') ? '212' + cleanPhone.slice(1) : cleanPhone}?text=${encodeURIComponent(message)}`;
+                              
+                              window.open(whatsappUrl, '_blank');
+                              
+                              setSentPasswords(prev => ({ ...prev, [req.id]: true }));
+                            } catch (e: any) {
+                              console.error("Password reset error:", e);
+                              alert("خطأ: " + e.message);
+                            }
                           }}
                           className={`flex items-center gap-2 px-3 py-2 ${sentPasswords[req.id] ? 'bg-blue-600 hover:bg-blue-700' : 'bg-green-600 hover:bg-green-700'} text-white rounded-xl transition-all text-[10px] font-black`}
                           title="إرسال كلمة المرور عبر واتساب"

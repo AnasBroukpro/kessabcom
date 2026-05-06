@@ -1958,6 +1958,52 @@ async function startServer() {
     }
   });
 
+  app.post("/api/admin/users/reset-password", verifyToken, isAdmin, async (req: any, res) => {
+    try {
+      const { phone, newPassword, requestId } = req.body;
+      if (!phone || !newPassword) {
+        return res.status(400).json({ error: "Phone and newPassword are required" });
+      }
+
+      // 1. Find user by phone number in Firestore to get UID
+      let clean = phone.replace(/\D/g, '');
+      if (clean.startsWith('212')) clean = clean.substring(3);
+      if (clean.startsWith('0')) clean = clean.substring(1);
+      
+      const formats = [phone, `+212${clean}`, `0${clean}`, clean];
+      const userSnap = await db.collection('users')
+        .where('phoneNumber', 'in', formats)
+        .limit(1)
+        .get();
+
+      if (userSnap.empty) {
+        return res.status(404).json({ error: "User not found with this phone number" });
+      }
+
+      const uid = userSnap.docs[0].id;
+
+      // 2. Update password in Firebase Auth
+      await auth.updateUser(uid, {
+        password: newPassword
+      });
+
+      // 3. Mark support request as resolved if requestId is provided
+      if (requestId) {
+        await db.collection('supportRequests').doc(requestId).update({
+          status: 'resolved',
+          resolvedAt: FieldValue.serverTimestamp(),
+          tempPasswordSent: true
+        });
+      }
+
+      console.log(`✅ Admin: Password reset for user ${uid} (${phone})`);
+      res.json({ status: "ok", message: "Password updated successfully" });
+    } catch (e: any) {
+      console.error("❌ Admin: Password reset failed:", e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   // --- VITE MIDDLEWARE (production only) ---
   // In development, Vite runs separately on port 5173 via `npm run dev:client`
   // and proxies /api calls to this server on port 3000.
