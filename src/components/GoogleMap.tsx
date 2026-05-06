@@ -57,9 +57,9 @@ const MapContent: React.FC<MapContentProps> = ({ listings, onListingClick, hover
   const { isLoaded, loadError } = useGoogleMaps();
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [localHoveredId, setLocalHoveredId] = useState<string | null>(null);
-  const [scaledId, setScaledId] = useState<string | null>(null);
   const hasInitializedCenter = useRef(false);
 
+  // activeId determines things like z-index and border color
   const activeId = localHoveredId || hoveredListingId;
 
   const initialCenter = useMemo(() => {
@@ -75,23 +75,15 @@ const MapContent: React.FC<MapContentProps> = ({ listings, onListingClick, hover
     setMap(mapInstance);
   }, []);
 
-  // Pan to center whenever the active listing changes
+  // Pan to center ONLY when hovering from the external list
   useEffect(() => {
-    if (map && activeId) {
-      const listing = listings.find(l => l.id === activeId);
+    if (map && hoveredListingId) {
+      const listing = listings.find(l => l.id === hoveredListingId);
       if (listing) {
         map.panTo({ lat: listing.lat, lng: listing.lng });
       }
-      
-      // Delay the scale animation to wait for the pan to finish
-      const timer = setTimeout(() => {
-        setScaledId(activeId);
-      }, 800);
-      return () => clearTimeout(timer);
-    } else {
-      setScaledId(null);
     }
-  }, [map, activeId, listings]);
+  }, [map, hoveredListingId, listings]);
 
   if (loadError) {
     return (
@@ -136,7 +128,7 @@ const MapContent: React.FC<MapContentProps> = ({ listings, onListingClick, hover
     >
       {listings.map((listing) => {
         const isHovered = activeId === listing.id;
-        const isScaled = scaledId === listing.id;
+        const isScaled = hoveredListingId === listing.id; // Only scale when hovering list
         return (
           <React.Fragment key={listing.id}>
             <Circle
@@ -158,7 +150,6 @@ const MapContent: React.FC<MapContentProps> = ({ listings, onListingClick, hover
             >
               <div
                 style={{
-                  // Center the overlay
                   transform: 'translate(-50%, -50%)',
                   zIndex: isHovered ? 100 : 10,
                   position: 'relative',
@@ -167,11 +158,9 @@ const MapContent: React.FC<MapContentProps> = ({ listings, onListingClick, hover
                 onClick={() => onListingClick(listing)}
                 onMouseEnter={() => { 
                   setLocalHoveredId(listing.id); 
-                  setHoveredListingId(listing.id);
                 }}
                 onMouseLeave={() => { 
                   setLocalHoveredId(null); 
-                  setHoveredListingId(null); 
                 }}
               >
                 {/* Consolidated 3x Scale Circle Image */}
@@ -185,9 +174,9 @@ const MapContent: React.FC<MapContentProps> = ({ listings, onListingClick, hover
                       ? '0 20px 50px rgba(0,0,0,0.4), 0 0 0 10px rgba(46,125,50,0.1)'
                       : '0 4px 12px rgba(0,0,0,0.15)',
                     overflow: 'hidden',
-                    // Scale to 3x on hover OVER 1 second duration, but delayed until pan is done
+                    // Instant scale (no delay), only on list hover
                     transform: isScaled ? 'scale(3)' : 'scale(1)',
-                    transition: 'transform 1s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.3s ease, box-shadow 0.6s ease',
+                    transition: 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.3s ease, box-shadow 0.6s ease',
                     position: 'relative',
                     backgroundColor: 'white',
                   }}
@@ -205,22 +194,21 @@ const MapContent: React.FC<MapContentProps> = ({ listings, onListingClick, hover
                   
                   {/* Overlay content inside circle (visible when scaled) */}
                   {isScaled && (
-                    <div className="absolute inset-0 flex flex-col justify-between items-center py-1 px-1 bg-black/40 backdrop-blur-[2px] animate-in fade-in duration-700">
-                      {/* Top: 5 Stars */}
-                      <div className="flex gap-[1px] mt-1">
-                        {[...Array(5)].map((_, i) => (
-                          <Star 
-                            key={i} 
-                            strokeWidth={3}
-                            className={`w-[4px] h-[4px] ${i < Math.floor(listing.rating || 5) ? 'fill-[#FFC107] text-[#FFC107]' : 'text-white/40'}`} 
-                          />
-                        ))}
+                    <div className="absolute inset-0 flex flex-col justify-between items-center py-1.5 px-1 bg-gradient-to-b from-black/20 via-transparent to-black/40 animate-in fade-in duration-300">
+                      {/* Top: 1 Star with Rating */}
+                      <div className="bg-white/95 rounded-full px-[3px] py-[1.5px] flex items-center justify-center gap-[1.5px] shadow-sm mt-0.5">
+                        <Star 
+                          className="w-[3.5px] h-[3.5px] fill-[#FFC107] text-[#FFC107]" 
+                        />
+                        <span className="text-[3.5px] font-black text-[#1A1A1A] leading-none mt-[0.5px]">
+                          {(listing.rating || 5).toFixed(1)}
+                        </span>
                       </div>
                       
                       {/* Bottom: Farm Name */}
-                      <div className="text-center mb-1 px-0.5">
-                        <p className="text-[4px] font-black text-white leading-tight drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]" dir="rtl">
-                          ضيعة {listing.title.includes('ضيعة') ? listing.title.split('ضيعة')[1].trim() : (listing.title.length > 15 ? listing.title.substring(0, 15) + '...' : listing.title)}
+                      <div className="text-center mb-0.5 px-1 w-full">
+                        <p className="text-[4px] font-black text-white leading-tight drop-shadow-[0_1px_1px_rgba(0,0,0,1)] truncate w-full" dir="rtl">
+                          ضيعة {listing.title.includes('ضيعة') ? listing.title.split('ضيعة')[1].trim() : listing.title.split(' - ')[0].trim()}
                         </p>
                       </div>
                     </div>
