@@ -517,11 +517,11 @@ export default function Home({ onNavigate }: Props) {
               <EidCountdown />
             </div>
 
-            <div className="bg-black/20 backdrop-blur-md rounded-[2.5rem] py-8 px-6 md:bg-transparent md:backdrop-blur-none md:p-0 md:rounded-none">
-              <h1 className="text-4xl md:text-7xl font-black text-white mb-6 tracking-tight font-headline leading-[1.1] drop-shadow-lg text-center">
+            <div className="md:bg-transparent md:backdrop-blur-none md:p-0 md:rounded-none">
+              <h1 className="text-4xl md:text-7xl font-black text-white mb-6 tracking-tight font-headline leading-[1.1] drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)] md:drop-shadow-lg text-center">
                 حولي بلا <span className="text-[#2E7D32]" style={{ WebkitTextStroke: '2px white' }}>عذاب</span> <br /> مباشرة من عند الكساب
               </h1>
-              <p className="text-base md:text-xl text-white/90 mb-0 md:mb-14 max-w-2xl mx-auto font-medium leading-relaxed px-4 drop-shadow-md text-center">
+              <p className="hidden md:block text-base md:text-xl text-white/90 mb-14 max-w-2xl mx-auto font-medium leading-relaxed px-4 drop-shadow-md text-center">
                 منصة kessabcom.ma كتقرب ليك جميع الكسابة بلاما تضرب تمارة قلب، اختار، تواصل مع كساب ووزورو فالضيعة
               </p>
             </div>
