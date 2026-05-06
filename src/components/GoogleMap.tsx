@@ -105,8 +105,6 @@ const MapContent: React.FC<MapContentProps> = ({ listings, onListingClick, hover
       mapContainerStyle={mapContainerStyle}
       center={mapCenter}
       zoom={zoom || (listings.length > 0 ? 10 : 6)}
-      onLoad={onLoad}
-      onUnmount={onUnmount}
       options={mapOptions}
     >
       {listings.map((listing) => (
