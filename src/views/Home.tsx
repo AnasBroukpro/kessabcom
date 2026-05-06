@@ -221,9 +221,9 @@ export default function Home({ onNavigate }: Props) {
     const detectIPCity = async () => {
       if (citySearch || profile?.city) return;
       try {
-        const res = await fetch('https://ipapi.co/json/');
+        const res = await fetch('https://freeipapi.com/api/json');
         const data = await res.json();
-        if (data.city) {
+        if (data.cityName) {
           const closest = getClosestCity(data.latitude, data.longitude);
           if (closest) setCitySearch(closest);
         }

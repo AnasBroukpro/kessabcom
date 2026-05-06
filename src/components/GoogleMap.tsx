@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { GoogleMap, OverlayView, Circle } from '@react-google-maps/api';
 import { MapPin, Star } from 'lucide-react';
 import { useSettings } from '../hooks/useSettings';
@@ -55,6 +55,7 @@ const mapOptions = {
 
 const MapContent: React.FC<MapContentProps> = ({ listings, onListingClick, hoveredListingId, setHoveredListingId, zoom, interactive }) => {
   const { isLoaded, loadError } = useGoogleMaps();
+  const [map, setMap] = useState<google.maps.Map | null>(null);
   // Local hover state to make individual marker hover reliable
   const [localHoveredId, setLocalHoveredId] = useState<string | null>(null);
 
@@ -68,6 +69,10 @@ const MapContent: React.FC<MapContentProps> = ({ listings, onListingClick, hover
     }
     return center;
   }, [listings]);
+
+  const onMapLoad = useCallback((mapInstance: google.maps.Map) => {
+    setMap(mapInstance);
+  }, []);
 
   if (loadError) {
     return (
@@ -98,6 +103,7 @@ const MapContent: React.FC<MapContentProps> = ({ listings, onListingClick, hover
     <GoogleMap
       mapContainerStyle={mapContainerStyle}
       center={mapCenter}
+      onLoad={onMapLoad}
       zoom={zoom || (listings.length > 0 ? 10 : 6)}
       options={{
         ...mapOptions,
@@ -140,7 +146,13 @@ const MapContent: React.FC<MapContentProps> = ({ listings, onListingClick, hover
                   cursor: 'pointer',
                 }}
                 onClick={() => onListingClick(listing)}
-                onMouseEnter={() => { setLocalHoveredId(listing.id); setHoveredListingId(listing.id); }}
+                onMouseEnter={() => { 
+                  setLocalHoveredId(listing.id); 
+                  setHoveredListingId(listing.id);
+                  if (map) {
+                    map.panTo({ lat: listing.lat, lng: listing.lng });
+                  }
+                }}
                 onMouseLeave={() => { setLocalHoveredId(null); setHoveredListingId(null); }}
               >
                 {/* Glow ring */}
@@ -203,7 +215,7 @@ const MapContent: React.FC<MapContentProps> = ({ listings, onListingClick, hover
               <OverlayView
                 position={{ lat: listing.lat, lng: listing.lng }}
                 mapPaneName="floatPane"
-                getPixelPositionOffset={(width, height) => ({ x: -(width / 2), y: -(height + 72) })}
+                getPixelPositionOffset={(width, height) => ({ x: -(width / 2), y: -(height + 45) })}
               >
                 <div
                   style={{ position: 'relative', cursor: 'pointer', pointerEvents: 'auto' }}
@@ -243,19 +255,19 @@ const MapContent: React.FC<MapContentProps> = ({ listings, onListingClick, hover
                     </div>
                   </div>
 
-                  {/* Triangle pointer */}
+                  {/* Triangle pointer (Pointe / Flèche) */}
                   <div
                     style={{
                       position: 'absolute',
-                      bottom: '-10px',
+                      bottom: '-8px',
                       left: '50%',
                       transform: 'translateX(-50%)',
                       width: 0,
                       height: 0,
                       borderLeft: '10px solid transparent',
                       borderRight: '10px solid transparent',
-                      borderTop: '11px solid white',
-                      filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.08))',
+                      borderTop: '10px solid white',
+                      filter: 'drop-shadow(0 4px 4px rgba(0,0,0,0.1))',
                     }}
                   />
                 </div>

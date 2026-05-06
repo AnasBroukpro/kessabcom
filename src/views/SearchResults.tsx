@@ -427,7 +427,18 @@ export default function SearchResults({ onNavigate, initialCity, initialRadius, 
 
               {/* Row: Views (horizontal) + Filter (next to views) */}
                 <div className="flex flex-row items-start gap-2">
-                  {/* View switcher + List button in one pill */}
+                  {/* Detached List button — only visible when sidebar is hidden */}
+                  {!showListingSidebar && (
+                    <button
+                      onClick={() => setShowListingSidebar(true)}
+                      className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl bg-[#2E7D32] text-white text-xs font-black transition-all hover:bg-[#1B5E20] shadow-lg backdrop-blur-md border border-white/10 animate-in fade-in slide-in-from-right-2 duration-300"
+                    >
+                      <ListIcon className="w-4 h-4" />
+                      <span>القائمة ({filteredListings.length})</span>
+                    </button>
+                  )}
+
+                  {/* View switcher pill */}
                   <div className="bg-white/90 backdrop-blur-md border border-white/20 rounded-2xl p-1 shadow-lg flex flex-row gap-1">
                     {/* Grid — rightmost */}
                     <button
@@ -453,14 +464,6 @@ export default function SearchResults({ onNavigate, initialCity, initialRadius, 
                       title="خريطة"
                     >
                       <MapIcon className="w-4 h-4" />
-                    </button>
-                    {/* القائمة button — green, always visible in map mode */}
-                    <button
-                      onClick={() => setShowListingSidebar(!showListingSidebar)}
-                      className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#2E7D32] text-white text-xs font-black transition-all hover:bg-[#1B5E20] shadow-sm"
-                    >
-                      <ListIcon className="w-3.5 h-3.5" />
-                      <span>القائمة ({filteredListings.length})</span>
                     </button>
                   </div>
 
