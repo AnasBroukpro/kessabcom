@@ -74,6 +74,15 @@ const MapContent: React.FC<MapContentProps> = ({ listings, onListingClick, hover
     setMap(mapInstance);
   }, []);
 
+  React.useEffect(() => {
+    if (map && hoveredListingId) {
+      const listing = listings.find(l => l.id === hoveredListingId);
+      if (listing) {
+        map.panTo({ lat: listing.lat, lng: listing.lng });
+      }
+    }
+  }, [map, hoveredListingId, listings]);
+
   if (loadError) {
     return (
       <div className="w-full h-full bg-[#fff5f5] flex items-center justify-center p-6 text-center">
