@@ -975,8 +975,7 @@ export default function Home({ onNavigate }: Props) {
 
 
         {/* ── IP-Based Regional Map Section ── */}
-        {regionalListings.filter(l => l.lat && l.lng).length > 0 && (
-          <section className="py-20 bg-[#F9F9F6] border-y border-outline-variant/10 w-full overflow-hidden">
+        <section className="py-20 bg-[#F9F9F6] border-y border-outline-variant/10 w-full overflow-hidden">
             <div className="max-w-7xl mx-auto px-6 mb-8">
               <div className="flex items-center justify-between">
                 <div>
@@ -1020,8 +1019,6 @@ export default function Home({ onNavigate }: Props) {
               />
             </div>
           </section>
-        )}
-
 
         {/* Sales Phases Section */}
         <section className="bg-white py-20 border-y border-outline-variant/10">

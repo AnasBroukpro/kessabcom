@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { ViewType } from '../App';
 import { Search, MapPin, Star, ArrowLeft, SlidersHorizontal, Heart, LayoutGrid, List as ListIcon, Map as MapIcon, Scale, BadgeCheck, X, PlusCircle, Loader2, TrendingUp, ChevronDown, Phone, ChevronRight, ChevronLeft } from 'lucide-react';
 import SearchHeader from '../components/SearchHeader';
