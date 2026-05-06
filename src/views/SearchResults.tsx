@@ -516,7 +516,7 @@ export default function SearchResults({ onNavigate, initialCity, initialRadius, 
                     .filter(l => l.coordinates && l.coordinates.lat && l.coordinates.lng)
                     .map((l: any) => ({
                       id: l.id,
-                      title: l.title,
+                      title: l.sellerPseudo || l.sellerName || l.title || 'ضيعة',
                       breed: l.category || 'سردي',
                       location: l.location || 'غير محدد',
                       weight: l.sizes?.[0] || '~50kg',
