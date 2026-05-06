@@ -79,7 +79,7 @@ export default function FlockView({
                     <div className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${announcement.status === 'active' ? 'bg-[#115E2C]' : 'bg-red-200'}`}>
                       <input 
                         type="checkbox" 
-                        className="sr-only" 
+                        className="absolute w-full h-full opacity-0 cursor-pointer z-10 m-0" 
                         checked={announcement.status === 'active'}
                         onChange={async () => {
                           const newStatus = announcement.status === 'active' ? 'inactive' : 'active';
@@ -90,7 +90,7 @@ export default function FlockView({
                           }
                         }}
                       />
-                      <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${announcement.status === 'active' ? 'translate-x-4' : 'translate-x-1'}`} />
+                      <span className={`absolute h-3.5 w-3.5 rounded-full bg-white transition-all ${announcement.status === 'active' ? 'left-1' : 'right-1'}`} />
                     </div>
                   </label>
                 </div>

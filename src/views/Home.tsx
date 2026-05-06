@@ -752,7 +752,7 @@ export default function Home({ onNavigate }: Props) {
           <div className="flex justify-between items-end mb-12">
             <div className="text-right">
               <span className="text-[#2E7D32] font-bold text-sm tracking-widest uppercase mb-2 block">الضيعات لي قريبة ليك</span>
-              <h2 className="text-3xl font-black text-[#1A1A1A] font-headline">الضيعات المتاحة</h2>
+              <h2 className="text-3xl font-black text-[#1A1A1A] font-headline">الضيعات اللي كيزوروهم الناس بزاف</h2>
             </div>
             <button onClick={() => onNavigate('search-results')} className="text-[#2E7D32] font-bold flex items-center gap-2 hover:gap-3 transition-all">
               <span>شوف كلشي</span>
@@ -964,54 +964,7 @@ export default function Home({ onNavigate }: Props) {
         )}
 
 
-        {/* ── IP-Based Regional Map Section ── */}
-        <section className="py-20 bg-[#F9F9F6] border-y border-outline-variant/10 w-full overflow-hidden">
-            <div className="max-w-7xl mx-auto px-6 mb-8">
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="text-[#2E7D32] font-bold text-sm tracking-widest uppercase mb-2 block">الخريطة</span>
-                  <h2 className="text-3xl md:text-4xl font-black text-[#1A1A1A] font-headline">
-                    الكسابة قراب ليك فـ <span className="text-[#2E7D32]">{citySearch || profile?.city || 'منطقتك'}</span>
-                  </h2>
-                </div>
-                <button
-                  onClick={() => onNavigate('search-results', undefined, citySearch || profile?.city || '')}
-                  className="hidden md:flex items-center gap-2 text-[#2E7D32] font-bold px-4 py-2 rounded-xl border border-[#2E7D32]/20 hover:bg-[#E8F5E9] transition-colors"
-                >
-                  <span>شوف كولشي</span>
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m15 18-6-6 6-6"/></svg>
-                </button>
-              </div>
-            </div>
-            <div className="w-full h-[420px] md:h-[520px]">
-              <GoogleMapComponent
-                center={cityCoords[citySearch || profile?.city || 'سطات']}
-                listings={regionalListings
-                  .filter(l => l.lat && l.lng)
-                  .slice(0, 60)
-                  .map((l: any) => ({
-                    id: l.id,
-                    title: l.sellerPseudo || l.sellerName || l.title || 'ضيعة',
-                    breed: l.category || 'سردي',
-                    location: l.farmLocation || l.location || '',
-                    weight: l.sizes?.[0] || '~50kg',
-                    verified: true,
-                    rating: l.ratingCount > 0 ? (l.rating / l.ratingCount) : 5,
-                    image: l.images?.[0] || l.image || 'https://picsum.photos/seed/sheep/200/200',
-                    lat: l.lat,
-                    lng: l.lng,
-                    phone: l.phone,
-                    whatsapp: l.whatsapp,
-                  }))}
-                onListingClick={(item) => onNavigate('listing-details', item.id)}
-                hoveredListingId={hoveredMapId}
-                setHoveredListingId={setHoveredMapId}
-                interactive={false}
-                scaleOnHover={true}
-                zoom={11}
-              />
-            </div>
-          </section>
+
 
         {/* Sales Phases Section */}
         <section className="bg-white py-20 border-y border-outline-variant/10">
