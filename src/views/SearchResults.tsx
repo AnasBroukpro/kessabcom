@@ -425,17 +425,11 @@ export default function SearchResults({ onNavigate, initialCity, initialRadius, 
               {/* ── Floating top-right: View switcher + Filter + Breed buttons ── */}
               <div className={`absolute top-3 right-3 z-[60] flex flex-col items-end gap-2 transition-all ${showListingSidebar ? 'md:right-[390px]' : ''}`} dir="rtl">
 
-                {/* Row: Views (horizontal) + Filter (next to views) */}
+              {/* Row: Views (horizontal) + Filter (next to views) */}
                 <div className="flex flex-row items-start gap-2">
-                  {/* View switcher — horizontal */}
+                  {/* View switcher + List button in one pill */}
                   <div className="bg-white/90 backdrop-blur-md border border-white/20 rounded-2xl p-1 shadow-lg flex flex-row gap-1">
-                    <button
-                      onClick={() => setViewMode('map')}
-                      className={`p-2.5 rounded-xl transition-all ${viewMode === 'map' ? 'bg-[#2E7D32] text-white shadow-sm' : 'text-[#757575] hover:bg-[#F9F9F6]'}`}
-                      title="خريطة"
-                    >
-                      <MapIcon className="w-4 h-4" />
-                    </button>
+                    {/* Grid — rightmost */}
                     <button
                       onClick={() => setViewMode('grid')}
                       className={`p-2.5 rounded-xl transition-all ${viewMode === 'grid' ? 'bg-[#2E7D32] text-white shadow-sm' : 'text-[#757575] hover:bg-[#F9F9F6]'}`}
@@ -443,12 +437,30 @@ export default function SearchResults({ onNavigate, initialCity, initialRadius, 
                     >
                       <LayoutGrid className="w-4 h-4" />
                     </button>
+                    {/* List — middle */}
                     <button
                       onClick={() => setViewMode('list')}
                       className={`p-2.5 rounded-xl transition-all ${viewMode === 'list' ? 'bg-[#2E7D32] text-white shadow-sm' : 'text-[#757575] hover:bg-[#F9F9F6]'}`}
                       title="قائمة"
                     >
                       <ListIcon className="w-4 h-4" />
+                    </button>
+                    {/* Map — leftmost (divider) */}
+                    <div className="w-px bg-outline-variant/20 my-1" />
+                    <button
+                      onClick={() => setViewMode('map')}
+                      className={`p-2.5 rounded-xl transition-all ${viewMode === 'map' ? 'bg-[#2E7D32] text-white shadow-sm' : 'text-[#757575] hover:bg-[#F9F9F6]'}`}
+                      title="خريطة"
+                    >
+                      <MapIcon className="w-4 h-4" />
+                    </button>
+                    {/* القائمة button — green, always visible in map mode */}
+                    <button
+                      onClick={() => setShowListingSidebar(!showListingSidebar)}
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#2E7D32] text-white text-xs font-black transition-all hover:bg-[#1B5E20] shadow-sm"
+                    >
+                      <ListIcon className="w-3.5 h-3.5" />
+                      <span>القائمة ({filteredListings.length})</span>
                     </button>
                   </div>
 
@@ -491,17 +503,8 @@ export default function SearchResults({ onNavigate, initialCity, initialRadius, 
                   </div>
                 </div>
 
-                {/* List sidebar trigger (mobile & desktop) - Positioned below the view options */}
-                {!showListingSidebar && (
-                  <button
-                    onClick={() => setShowListingSidebar(true)}
-                    className="flex items-center gap-2 bg-[#1A1A1A]/90 backdrop-blur-md text-white px-4 py-2.5 rounded-xl text-xs font-black shadow-lg border border-white/10"
-                  >
-                    <ListIcon className="w-4 h-4" />
-                    <span>القائمة ({filteredListings.length})</span>
-                  </button>
-                )}
-              </div>
+                </div>
+
 
               {/* ── The map itself (full screen) ── */}
               <div className="w-full h-full">

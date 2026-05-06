@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { GoogleMap, OverlayView, Circle } from '@react-google-maps/api';
 import { MapPin, Star } from 'lucide-react';
 import { useSettings } from '../hooks/useSettings';
@@ -55,26 +55,19 @@ const mapOptions = {
 
 const MapContent: React.FC<MapContentProps> = ({ listings, onListingClick, hoveredListingId, setHoveredListingId, zoom, interactive }) => {
   const { isLoaded, loadError } = useGoogleMaps();
+  // Local hover state to make individual marker hover reliable
+  const [localHoveredId, setLocalHoveredId] = useState<string | null>(null);
+
+  const activeId = localHoveredId || hoveredListingId;
 
   const mapCenter = useMemo(() => {
     if (listings.length > 0) {
-      // Calculate average center
       const lat = listings.reduce((sum, l) => sum + l.lat, 0) / listings.length;
       const lng = listings.reduce((sum, l) => sum + l.lng, 0) / listings.length;
       return { lat, lng };
     }
     return center;
   }, [listings]);
-
-  const renderStars = (rating: number) => {
-    return (
-      <div className="flex items-center gap-0.5">
-        {[...Array(5)].map((_, i) => (
-          <Star key={i} className={`w-2 h-2 ${i < rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`} />
-        ))}
-      </div>
-    );
-  };
 
   if (loadError) {
     return (
@@ -84,7 +77,7 @@ const MapContent: React.FC<MapContentProps> = ({ listings, onListingClick, hover
             <MapPin className="w-8 h-8" />
           </div>
           <h3 className="text-lg font-bold text-red-900">خطأ في تحميل الخريطة</h3>
-          <p className="text-sm text-red-600">المفتاح المستخدم قد يكون غير صالح (InvalidKeyMapError). يرجى التأكد من صلاحية المفتاح في إعدادات التطبيق.</p>
+          <p className="text-sm text-red-600">المفتاح المستخدم قد يكون غير صالح. يرجى التأكد من صلاحية المفتاح في إعدادات التطبيق.</p>
         </div>
       </div>
     );
@@ -115,91 +108,162 @@ const MapContent: React.FC<MapContentProps> = ({ listings, onListingClick, hover
         draggable: interactive !== false,
       }}
     >
-      {listings.map((listing) => (
-        <React.Fragment key={listing.id}>
-          {/* Hotspot Circle with Pulse Effect */}
-          <Circle
-            center={{ lat: listing.lat, lng: listing.lng }}
-            radius={3000}
-            options={{
-              fillColor: '#2E7D32',
-              fillOpacity: 0.12,
-              strokeColor: '#2E7D32',
-              strokeOpacity: 0.2,
-              strokeWeight: 1.5,
-              clickable: false,
-            }}
-          />
-          
-          <OverlayView
-            position={{ lat: listing.lat, lng: listing.lng }}
-            mapPaneName="overlayMouseTarget"
-          >
-            <div 
-              className={`relative -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-all duration-500 ${hoveredListingId === listing.id ? 'scale-110 z-[100]' : 'scale-100 z-10'}`}
-              onClick={() => onListingClick(listing)}
-              onMouseEnter={() => setHoveredListingId(listing.id)}
-              onMouseLeave={() => setHoveredListingId(null)}
+      {listings.map((listing) => {
+        const isHovered = activeId === listing.id;
+        return (
+          <React.Fragment key={listing.id}>
+            {/* Hotspot Circle with Pulse Effect */}
+            <Circle
+              center={{ lat: listing.lat, lng: listing.lng }}
+              radius={3000}
+              options={{
+                fillColor: '#2E7D32',
+                fillOpacity: isHovered ? 0.20 : 0.12,
+                strokeColor: '#2E7D32',
+                strokeOpacity: isHovered ? 0.35 : 0.2,
+                strokeWeight: 1.5,
+                clickable: false,
+              }}
+            />
+
+            {/* Marker: circle image */}
+            <OverlayView
+              position={{ lat: listing.lat, lng: listing.lng }}
+              mapPaneName="overlayMouseTarget"
             >
-              {/* Marker Container */}
-              <div className="relative group">
-                {/* Glow Background */}
-                <div className={`absolute inset-0 rounded-full blur-md transition-all duration-500 ${hoveredListingId === listing.id ? 'bg-[#2E7D32]/40 scale-125' : 'bg-black/10'}`}></div>
-                
-                {/* Image Circle */}
-                <div className={`relative w-14 h-14 rounded-full border-[3px] shadow-2xl overflow-hidden transition-all duration-300 ${hoveredListingId === listing.id ? 'border-[#2E7D32] ring-4 ring-[#2E7D32]/10' : 'border-white hover:border-[#2E7D32]/50'}`}>
-                  <img 
-                    src={listing.image} 
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
-                    alt="" 
-                    referrerPolicy="no-referrer" 
+              <div
+                style={{
+                  transform: `translate(-50%, -50%) scale(${isHovered ? 1.15 : 1})`,
+                  transition: 'transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                  zIndex: isHovered ? 100 : 10,
+                  position: 'relative',
+                  cursor: 'pointer',
+                }}
+                onClick={() => onListingClick(listing)}
+                onMouseEnter={() => { setLocalHoveredId(listing.id); setHoveredListingId(listing.id); }}
+                onMouseLeave={() => { setLocalHoveredId(null); setHoveredListingId(null); }}
+              >
+                {/* Glow ring */}
+                <div
+                  style={{
+                    position: 'absolute',
+                    inset: '-6px',
+                    borderRadius: '50%',
+                    background: '#2E7D32',
+                    opacity: isHovered ? 0.25 : 0,
+                    filter: 'blur(8px)',
+                    transition: 'opacity 0.3s ease',
+                    pointerEvents: 'none',
+                  }}
+                />
+
+                {/* Circle image */}
+                <div
+                  style={{
+                    width: '56px',
+                    height: '56px',
+                    borderRadius: '50%',
+                    border: isHovered ? '3px solid #2E7D32' : '3px solid white',
+                    boxShadow: isHovered
+                      ? '0 0 0 4px rgba(46,125,50,0.15), 0 8px 24px rgba(0,0,0,0.25)'
+                      : '0 4px 12px rgba(0,0,0,0.2)',
+                    overflow: 'hidden',
+                    transition: 'border-color 0.3s ease, box-shadow 0.3s ease',
+                    position: 'relative',
+                  }}
+                >
+                  <img
+                    src={listing.image}
+                    alt=""
+                    referrerPolicy="no-referrer"
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      // Smooth pan/focus: shift image position on hover
+                      objectPosition: isHovered ? '55% 45%' : '50% 50%',
+                      transform: isHovered ? 'scale(1.18)' : 'scale(1)',
+                      transition: 'transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94), object-position 0.6s ease',
+                    }}
                   />
-                  {/* Verified Badge Mini */}
+                  {/* Verified Badge */}
                   {listing.verified && (
-                    <div className="absolute bottom-0 right-0 bg-white rounded-full p-0.5 shadow-md">
-                      <div className="bg-[#2E7D32] rounded-full p-0.5">
-                        <Star className="w-2 h-2 text-white fill-white" />
+                    <div style={{ position: 'absolute', bottom: 0, right: 0, background: 'white', borderRadius: '50%', padding: '2px' }}>
+                      <div style={{ background: '#2E7D32', borderRadius: '50%', padding: '2px' }}>
+                        <Star style={{ width: '8px', height: '8px', color: 'white', fill: 'white' }} />
                       </div>
                     </div>
                   )}
                 </div>
-                
-              </div>
-            </div>
-          </OverlayView>
-
-          {(hoveredListingId === listing.id || (window as any).activeListingId === listing.id) && (
-            <OverlayView
-              position={{ lat: listing.lat, lng: listing.lng }}
-              mapPaneName="floatPane"
-              getPixelPositionOffset={(width, height) => ({ x: -(width / 2), y: -(height + 65) })}
-            >
-              <div 
-                className="w-48 bg-white rounded-2xl overflow-hidden shadow-2xl border border-outline-variant/10 cursor-pointer transition-transform hover:scale-105 pointer-events-auto" 
-                dir="rtl"
-                onClick={() => onListingClick(listing)}
-              >
-                <div className="relative h-24">
-                  <img src={listing.image} className="w-full h-full object-cover" alt={listing.title} referrerPolicy="no-referrer" />
-                </div>
-                <div className="p-3">
-                  <h4 className="font-black text-xs text-[#1A1A1A] mb-1">ضيعة {listing.title.includes('ضيعة') ? listing.title.split('ضيعة')[1].trim() : listing.title}</h4>
-                  
-                  <div className="flex items-center gap-1 text-[9px] text-[#757575] font-bold mb-2">
-                    <MapPin className="w-2.5 h-2.5 text-[#2E7D32]" />
-                    <span className="truncate">موقع الضيعة: {listing.location}</span>
-                  </div>
-
-                  <div className="flex items-center gap-1">
-                    <Star className="w-3 h-3 fill-[#FFC107] text-[#FFC107]" />
-                    <span className="text-[10px] font-black text-[#1A1A1A]">{(listing.rating || 5).toFixed(1)}</span>
-                  </div>
-                </div>
               </div>
             </OverlayView>
-          )}
-        </React.Fragment>
-      ))}
+
+            {/* Tooltip — shown on hover */}
+            {isHovered && (
+              <OverlayView
+                position={{ lat: listing.lat, lng: listing.lng }}
+                mapPaneName="floatPane"
+                getPixelPositionOffset={(width, height) => ({ x: -(width / 2), y: -(height + 72) })}
+              >
+                <div
+                  style={{ position: 'relative', cursor: 'pointer', pointerEvents: 'auto' }}
+                  onClick={() => onListingClick(listing)}
+                  onMouseEnter={() => { setLocalHoveredId(listing.id); setHoveredListingId(listing.id); }}
+                  onMouseLeave={() => { setLocalHoveredId(null); setHoveredListingId(null); }}
+                >
+                  {/* Card */}
+                  <div
+                    className="w-48 bg-white rounded-2xl overflow-hidden shadow-2xl border border-outline-variant/10 animate-in zoom-in-95 duration-200"
+                    dir="rtl"
+                  >
+                    <div className="relative h-24 overflow-hidden">
+                      <img
+                        src={listing.image}
+                        className="w-full h-full object-cover"
+                        alt={listing.title}
+                        referrerPolicy="no-referrer"
+                        style={{
+                          transform: 'scale(1.05)',
+                          transition: 'transform 0.4s ease',
+                        }}
+                      />
+                    </div>
+                    <div className="p-3">
+                      <h4 className="font-black text-xs text-[#1A1A1A] mb-1">
+                        ضيعة {listing.title.includes('ضيعة') ? listing.title.split('ضيعة')[1].trim() : listing.title}
+                      </h4>
+                      <div className="flex items-center gap-1 text-[9px] text-[#757575] font-bold mb-2">
+                        <MapPin className="w-2.5 h-2.5 text-[#2E7D32]" />
+                        <span className="truncate">موقع الضيعة: {listing.location}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Star className="w-3 h-3 fill-[#FFC107] text-[#FFC107]" />
+                        <span className="text-[10px] font-black text-[#1A1A1A]">{(listing.rating || 5).toFixed(1)}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Triangle pointer */}
+                  <div
+                    style={{
+                      position: 'absolute',
+                      bottom: '-10px',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      width: 0,
+                      height: 0,
+                      borderLeft: '10px solid transparent',
+                      borderRight: '10px solid transparent',
+                      borderTop: '11px solid white',
+                      filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.08))',
+                    }}
+                  />
+                </div>
+              </OverlayView>
+            )}
+          </React.Fragment>
+        );
+      })}
     </GoogleMap>
   );
 };
