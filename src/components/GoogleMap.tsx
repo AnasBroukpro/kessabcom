@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { GoogleMap, OverlayView, Circle } from '@react-google-maps/api';
-import { MapPin, Star } from 'lucide-react';
+import { MapPin, Star, Maximize2 } from 'lucide-react';
 import { useSettings } from '../hooks/useSettings';
 import { useGoogleMaps } from '../contexts/GoogleMapsProvider';
 
@@ -58,10 +58,11 @@ const MapContent: React.FC<MapContentProps> = ({ listings, onListingClick, hover
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [localHoveredId, setLocalHoveredId] = useState<string | null>(null);
   const [scaledId, setScaledId] = useState<string | null>(null);
+  const [manualScaledId, setManualScaledId] = useState<string | null>(null);
   const hasInitializedCenter = useRef(false);
 
-  // activeId determines things like z-index and border color
-  const activeId = localHoveredId || hoveredListingId;
+  // activeId determines things like z-index
+  const activeId = localHoveredId || hoveredListingId || manualScaledId;
 
   const initialCenter = useMemo(() => {
     if (listings.length > 0) {
@@ -134,11 +135,13 @@ const MapContent: React.FC<MapContentProps> = ({ listings, onListingClick, hover
         draggable: interactive !== false,
       }}
       onLoad={onMapLoad}
+      onClick={() => setManualScaledId(null)}
     >
       {listings.map((listing) => {
         const isHovered = activeId === listing.id;
-        // Scale instantly for local hover, or delayed for external list hover
-        const isScaled = (scaledId === listing.id) || (localHoveredId === listing.id);
+        const isDirectHover = localHoveredId === listing.id;
+        // Scale if: 1. Sidebar hovered (scaledId) OR 2. Manually clicked (manualScaledId)
+        const isScaled = (scaledId === listing.id) || (manualScaledId === listing.id);
         
         return (
           <React.Fragment key={listing.id}>
@@ -166,12 +169,15 @@ const MapContent: React.FC<MapContentProps> = ({ listings, onListingClick, hover
                   position: 'relative',
                   cursor: 'pointer',
                 }}
-                onClick={() => onListingClick(listing)}
-                onMouseEnter={() => { 
-                  setLocalHoveredId(listing.id); 
-                }}
-                onMouseLeave={() => { 
-                  setLocalHoveredId(null); 
+                onMouseEnter={() => setLocalHoveredId(listing.id)}
+                onMouseLeave={() => setLocalHoveredId(null)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (isScaled) {
+                    onListingClick(listing);
+                  } else {
+                    setManualScaledId(listing.id);
+                  }
                 }}
               >
                 {/* 3x Scale Circle Image */}
@@ -180,13 +186,13 @@ const MapContent: React.FC<MapContentProps> = ({ listings, onListingClick, hover
                     width: '52px',
                     height: '52px',
                     borderRadius: '50%',
-                    border: isHovered ? '3px solid #2E7D32' : '3px solid white',
+                    border: '3px solid white', // Always white as requested
                     boxShadow: isHovered
-                      ? '0 20px 50px rgba(0,0,0,0.4), 0 0 0 10px rgba(46,125,50,0.1)'
+                      ? '0 20px 50px rgba(0,0,0,0.4)'
                       : '0 4px 12px rgba(0,0,0,0.15)',
                     overflow: 'hidden',
                     transform: isScaled ? 'scale(3)' : 'scale(1)',
-                    transition: 'transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.3s ease, box-shadow 0.6s ease',
+                    transition: 'transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.6s ease',
                     position: 'relative',
                     backgroundColor: 'white',
                   }}
@@ -202,22 +208,32 @@ const MapContent: React.FC<MapContentProps> = ({ listings, onListingClick, hover
                     }}
                   />
                   
-                  {/* Overlay content inside circle (visible when scaled) */}
+                  {/* Overlay when DIRECTLY hovering (but not scaled yet) */}
+                  {isDirectHover && !isScaled && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/40 animate-in fade-in duration-300">
+                      <div className="flex flex-col items-center gap-0.5">
+                        <Maximize2 className="w-3 h-3 text-white" />
+                        <span className="text-[6px] font-black text-white uppercase tracking-tighter">Agrandir</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* UI content inside circle (visible when scaled) */}
                   {isScaled && (
                     <div className="absolute inset-0 flex flex-col items-center animate-in fade-in duration-500 overflow-hidden">
                       {/* Top: Rating Pill (Even smaller, closer to top border) */}
-                      <div className="absolute top-1 bg-white rounded-full px-1 py-0.5 flex items-center gap-0.5 shadow-md border border-black/5 z-10">
-                        <span className="text-[3.5px] font-black text-[#1A1A1A] leading-none mt-[0.5px]">
+                      <div className="absolute top-1 bg-white rounded-full px-0.5 py-0.2 flex items-center gap-0.5 shadow-md border border-black/5 z-10 scale-[0.8]">
+                        <span className="text-[3.5px] font-black text-[#1A1A1A] leading-none">
                           {(listing.rating || 5.0).toFixed(1)}
                         </span>
                         <Star 
-                          className="w-[3.5px] h-[3.5px] fill-[#FFC107] text-[#FFC107]" 
+                          className="w-[3px] h-[3px] fill-[#FFC107] text-[#FFC107]" 
                         />
                       </div>
                       
-                      {/* Bottom: Farm Name with GRADIENT overlay (Even smaller, closer to bottom border) */}
+                      {/* Bottom: Farm Name with GRADIENT overlay */}
                       <div className="absolute bottom-0 w-full text-center py-1.5 bg-gradient-to-t from-black/95 via-black/40 to-transparent px-1">
-                        <p className="text-[3.8px] font-black text-white leading-tight drop-shadow-sm" dir="rtl">
+                        <p className="text-[3.5px] font-black text-white leading-tight drop-shadow-sm" dir="rtl">
                           ضيعة {listing.title.includes('ضيعة') ? listing.title.split('ضيعة')[1].trim() : listing.title.split(' - ')[0].trim()}
                         </p>
                       </div>
