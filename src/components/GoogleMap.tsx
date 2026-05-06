@@ -218,13 +218,13 @@ const MapContent: React.FC<MapContentProps> = ({ listings, onListingClick, hover
                   {/* UI content inside circle (visible when scaled) */}
                   {isScaled && (
                     <div className="absolute inset-0 flex flex-col items-center animate-in fade-in duration-500 overflow-hidden">
-                      {/* Top: Rating Pill (Even smaller, closer to top border) */}
-                      <div className="absolute top-1 bg-white rounded-full px-[3px] py-[3px] flex items-center gap-0.5 shadow-md border border-black/5 z-10 scale-[0.7]">
-                        <span className="text-[3.5px] font-black text-[#1A1A1A] leading-none">
+                      {/* Top: Rating Pill (Refined padding and position) */}
+                      <div className="absolute top-0.5 bg-white rounded-full px-[4px] py-[1.5px] flex items-center gap-0.5 shadow-md border border-black/5 z-10">
+                        <span className="text-[4px] font-black text-[#1A1A1A] leading-none">
                           {(listing.rating || 5.0).toFixed(1)}
                         </span>
                         <Star 
-                          className="w-[3px] h-[3px] fill-[#FFC107] text-[#FFC107]" 
+                          className="w-[3.5px] h-[3.5px] fill-[#FFC107] text-[#FFC107]" 
                         />
                       </div>
                       

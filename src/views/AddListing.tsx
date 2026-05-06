@@ -606,47 +606,43 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
                 <ArrowRight className="w-6 h-6 text-white" />
               </motion.button>
 
-              {/* Bottom confirmation — slides up after morph */}
+              {/* Bottom confirmation — centered floating card */}
               <motion.div
-                initial={{ y: '100%' }}
-                animate={{ y: 0 }}
-                exit={{ y: '100%' }}
-                transition={{ delay: 0.2, duration: 0.32, ease: [0.4, 0, 0.2, 1] }}
+                initial={{ y: 100, x: '-50%', opacity: 0 }}
+                animate={{ y: 0, x: '-50%', opacity: 1 }}
+                exit={{ y: 100, x: '-50%', opacity: 0 }}
+                transition={{ delay: 0.2, duration: 0.35, ease: [0.34, 1.56, 0.64, 1] }}
                 onClick={(e) => e.stopPropagation()}
-                className="absolute bottom-0 left-0 right-0 bg-white rounded-t-[28px] shadow-[0_-12px_40px_rgba(0,0,0,0.12)] z-50 px-5 pt-4 pb-8"
+                className="absolute bottom-8 left-1/2 w-[92%] max-w-sm bg-white rounded-[24px] shadow-[0_20px_50px_rgba(0,0,0,0.3)] z-50 p-5 border border-black/5"
               >
-                <div className="w-10 h-1 bg-outline-variant/30 rounded-full mx-auto mb-6" />
-                
                 {/* Information Fiche */}
-                <div className="mb-5 text-right" dir="rtl">
-                  <h4 className="text-xs font-bold text-[#115e2c] tracking-widest uppercase mb-3">عنوان الوجهة</h4>
+                <div className="mb-4 text-right" dir="rtl">
+                  <h4 className="text-[10px] font-black text-[#115e2c] tracking-widest uppercase mb-2 opacity-60">موقع الضيعة المختار</h4>
 
                   {dynamicAddress ? (
-                    <div className="space-y-2">
-                      <p className="text-sm font-black text-on-surface leading-snug line-clamp-2" dir="rtl">{dynamicAddress}</p>
+                    <div className="space-y-1.5">
+                      <p className="text-xs font-black text-on-surface leading-tight line-clamp-2" dir="rtl">{dynamicAddress}</p>
                       {dynamicCity && (
-                        <div className="inline-flex items-center gap-1.5 bg-[#115e2c]/8 rounded-full px-3 py-1">
-                          <MapPin className="w-3 h-3 text-[#115e2c]" />
-                          <span className="text-xs font-black text-[#115e2c]">المدينة : {dynamicCity}</span>
+                        <div className="inline-flex items-center gap-1.5 bg-[#115e2c]/5 rounded-full px-2.5 py-1">
+                          <MapPin className="w-2.5 h-2.5 text-[#115e2c]" />
+                          <span className="text-[10px] font-black text-[#115e2c]">{dynamicCity}</span>
                         </div>
                       )}
                     </div>
                   ) : (
                     <div className="flex items-center justify-end gap-2 text-on-surface-variant">
-                      <span className="text-sm font-medium">جار البحث عن العنوان...</span>
-                      <Loader2 className="w-4 h-4 animate-spin text-[#115e2c]" />
+                      <span className="text-[10px] font-bold">جار البحث...</span>
+                      <Loader2 className="w-3 h-3 animate-spin text-[#115e2c]" />
                     </div>
                   )}
                 </div>
 
-                <div className="flex justify-center w-full">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); closeMap(); }}
-                    className="w-full md:w-auto md:px-16 h-14 bg-[#115e2c] text-white rounded-2xl font-black text-base tracking-wide shadow-xl shadow-green-900/20 active:scale-[0.98] transition-transform"
-                  >
-                    تأكيد موقع ضيعتي
-                  </button>
-                </div>
+                <button
+                  onClick={(e) => { e.stopPropagation(); closeMap(); }}
+                  className="w-full h-12 bg-[#115e2c] text-white rounded-xl font-black text-sm shadow-lg shadow-green-900/20 active:scale-[0.98] transition-transform"
+                >
+                  تأكيد هذا الموقع
+                </button>
               </motion.div>
             </motion.div>
           )}

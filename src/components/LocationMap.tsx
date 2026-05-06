@@ -186,16 +186,6 @@ export default function LocationMap({
     }
   }, [retryTrigger, doGeocode]);
 
-  // ── FIX: Apply padding to map in fullscreen to align getCenter() with visual pin ──
-  useEffect(() => {
-    if (mapRef.current && isFullscreen) {
-      // Matches the bottom sheet height roughly
-      mapRef.current.setPadding(0, 0, Math.round(window.innerHeight * 0.35), 0);
-    } else if (mapRef.current) {
-      mapRef.current.setPadding(0, 0, 0, 0);
-    }
-  }, [isFullscreen]);
-
   // ── Render ──
   if (!hasKey || loadError) {
     return (
@@ -220,9 +210,9 @@ export default function LocationMap({
         options={mapOptions}
       />
 
-      {/* ── Fullscreen: 3-state centered pin ── */}
+      {/* ── Fullscreen: Centered pin (Perfectly aligned with map center) ── */}
       {isFullscreen && (
-        <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center z-10 pb-[35vh]">
+        <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center z-10">
           <div className="relative flex flex-col items-center">
 
             {/* Bubble frame */}
