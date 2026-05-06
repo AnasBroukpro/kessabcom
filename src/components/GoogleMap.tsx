@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { GoogleMap, OverlayView, Circle } from '@react-google-maps/api';
-import { MapPin, Star, Maximize2 } from 'lucide-react';
+import { MapPin, Star, Search } from 'lucide-react';
 import { useSettings } from '../hooks/useSettings';
 import { useGoogleMaps } from '../contexts/GoogleMapsProvider';
 
@@ -211,10 +211,7 @@ const MapContent: React.FC<MapContentProps> = ({ listings, onListingClick, hover
                   {/* Overlay when DIRECTLY hovering (but not scaled yet) */}
                   {isDirectHover && !isScaled && (
                     <div className="absolute inset-0 flex items-center justify-center bg-black/40 animate-in fade-in duration-300">
-                      <div className="flex flex-col items-center gap-0.5">
-                        <Maximize2 className="w-3 h-3 text-white" />
-                        <span className="text-[6px] font-black text-white uppercase tracking-tighter">Agrandir</span>
-                      </div>
+                      <Search className="w-5 h-5 text-white" />
                     </div>
                   )}
 
@@ -222,7 +219,7 @@ const MapContent: React.FC<MapContentProps> = ({ listings, onListingClick, hover
                   {isScaled && (
                     <div className="absolute inset-0 flex flex-col items-center animate-in fade-in duration-500 overflow-hidden">
                       {/* Top: Rating Pill (Even smaller, closer to top border) */}
-                      <div className="absolute top-1 bg-white rounded-full px-0.5 py-0.2 flex items-center gap-0.5 shadow-md border border-black/5 z-10 scale-[0.8]">
+                      <div className="absolute top-1 bg-white rounded-full px-[3px] py-[3px] flex items-center gap-0.5 shadow-md border border-black/5 z-10 scale-[0.7]">
                         <span className="text-[3.5px] font-black text-[#1A1A1A] leading-none">
                           {(listing.rating || 5.0).toFixed(1)}
                         </span>
