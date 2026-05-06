@@ -503,7 +503,7 @@ export const cityCoords: { [key: string]: { lat: number; lng: number } } = {
     "lat": 32.09171,
     "lng": -7.04786
   },
-  "بن حمد": {
+  "بن احمد": {
     "lat": 33.06635,
     "lng": -7.24161
   },
@@ -1850,9 +1850,9 @@ export const cityMapping: { [key: string]: string } = {
   "bab taza": "باب تازة",
   "bejaad": "أبي الجعد",
   "bejaâd": "أبي الجعد",
-  "ben ahmed": "بن حمد",
-  "ibn ahmed": "بن حمد",
-  "ابن أحمد": "بن حمد",
+  "ben ahmed": "بن احمد",
+  "ibn ahmed": "بن احمد",
+  "ابن أحمد": "بن احمد",
   "ben guerir": "ابن جرير",
   "ben sergao": "بن سرجاو",
   "ben taieb": "بن الطيب",

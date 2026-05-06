@@ -17,6 +17,7 @@ import NewsTicker from '../components/NewsTicker';
 import logoV2 from '../assets/marketing/branding/logo v2.png';
 import MobileSidebar from '../components/MobileSidebar';
 import NotificationSidebar from '../components/NotificationSidebar';
+import GoogleMapComponent from '../components/GoogleMap';
 
 interface Props {
   onNavigate: (view: ViewType, listingId?: string, city?: string, radius?: string, subView?: string, breed?: string) => void;
@@ -215,6 +216,39 @@ export default function Home({ onNavigate }: Props) {
     };
     fetchAnnouncements();
   }, []);
+
+  useEffect(() => {
+    const detectIPCity = async () => {
+      if (citySearch || profile?.city) return;
+      try {
+        const res = await fetch('https://ipapi.co/json/');
+        const data = await res.json();
+        if (data.city) {
+          const closest = getClosestCity(data.latitude, data.longitude);
+          if (closest) setCitySearch(closest);
+        }
+      } catch (e) {
+        console.warn('IP Detection failed', e);
+      }
+    };
+    detectIPCity();
+  }, [profile, citySearch]);
+
+  const [hoveredMapId, setHoveredMapId] = useState<string | null>(null);
+  const regionalListings = React.useMemo(() => {
+    const currentCity = citySearch || profile?.city || 'سطات';
+    const coords = cityCoords[currentCity];
+    if (!coords) return announcements.slice(0, 8);
+    
+    return announcements
+      .filter(l => {
+        if (!l.lat || !l.lng) return false;
+        if (l.location === currentCity) return true;
+        const dist = calculateDistance(coords.lat, coords.lng, l.lat, l.lng);
+        return dist < 80; // 80km radius
+      })
+      .slice(0, 20);
+  }, [citySearch, profile, announcements]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -932,6 +966,56 @@ export default function Home({ onNavigate }: Props) {
             )}
           </div>
         )}
+
+        {/* Regional Map Section (Desktop Only) */}
+        <section className="hidden md:block py-20 bg-[#F9F9F6] border-y border-outline-variant/10">
+          <div className="max-w-7xl mx-auto px-6">
+            <div className="flex flex-row justify-between items-end mb-12">
+              <div className="text-right">
+                <span className="text-[#2E7D32] font-black text-sm uppercase tracking-widest mb-2 block">خريطة الكساب</span>
+                <h2 className="text-3xl md:text-4xl font-black text-[#1A1A1A] font-headline">الكسابة لي فـ جهة {citySearch || profile?.city || 'المغرب'}</h2>
+                <p className="text-[#757575] font-bold mt-3 text-lg">اكتشف الضيعات لي قريبة منك وتواصل مع الكساب ديريكت</p>
+              </div>
+              <div className="flex items-center gap-3 bg-white px-5 py-3 rounded-2xl shadow-sm border border-outline-variant/20">
+                <div className="w-3 h-3 bg-[#2E7D32] rounded-full animate-pulse" />
+                <span className="text-sm font-black text-[#2E7D32]">{regionalListings.length} ضيعة فـ الخريطة</span>
+              </div>
+            </div>
+
+            <div className="h-[600px] rounded-[3rem] overflow-hidden shadow-2xl border-8 border-white relative group">
+              <GoogleMapComponent
+                listings={regionalListings.map(l => ({
+                  id: l.id,
+                  title: l.sellerName || l.title,
+                  breed: l.breed || l.category,
+                  location: l.location,
+                  weight: l.weight || '',
+                  verified: l.verified || false,
+                  rating: l.rating || 5,
+                  image: l.images?.[0] || '',
+                  lat: l.lat,
+                  lng: l.lng
+                }))}
+                onListingClick={(l) => onNavigate('listing-details', l.id)}
+                hoveredListingId={hoveredMapId}
+                setHoveredListingId={setHoveredMapId}
+              />
+              
+              {/* Floating hint */}
+              <div className="absolute bottom-8 left-8 right-8 md:right-auto md:w-72 bg-white/90 backdrop-blur-md p-4 rounded-2xl border border-white/50 shadow-xl z-10 animate-in fade-in slide-in-from-bottom-4 duration-1000">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-[#E8F5E9] rounded-xl">
+                    <Navigation className="w-5 h-5 text-[#2E7D32]" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-black text-[#1A1A1A] mb-1">تصفح الضيعات</p>
+                    <p className="text-[10px] text-[#757575] font-bold leading-relaxed">كليكي على أي ضيعة باش تشوف التفاصيل والصور ديال الحولي</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
 
         {/* Sales Phases Section */}
         <section className="bg-white py-20 border-y border-outline-variant/10">

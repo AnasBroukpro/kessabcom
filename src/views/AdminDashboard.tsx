@@ -2153,7 +2153,7 @@ const renderOverview = () => (
               onClick={() => setSupportSubTab('contact')}
               className={`px-5 py-2 rounded-lg text-sm font-black transition-all ${supportSubTab === 'contact' ? 'bg-white text-primary shadow-sm border border-primary/20' : 'text-on-surface-variant hover:text-primary'}`}
             >
-              الصفحة الرئيسية / banner
+              طلبات أخرى
             </button>
           </div>
         </div>
@@ -2177,7 +2177,7 @@ const renderOverview = () => (
                   <td className="p-5 font-bold text-sm">
                     {req.type === 'password_reset' ? 'إعادة تعيين كلمة المرور' : 
                      req.type === 'home_page' ? 'الصفحة الرئيسية' :
-                     req.type === 'banner' ? 'إعلانات البانر' : 
+                     req.type === 'banner' ? 'طلبات أخرى' : 
                      req.type === 'contact' ? 'اتصال عام' :
                      req.type === 'other' ? 'موضوع آخر' : req.type}
                   </td>
