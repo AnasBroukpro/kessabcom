@@ -340,21 +340,23 @@ export default function SearchHeader({ onNavigate, initialCity = '', initialRadi
             {isOpenCity && (
               <div className="absolute top-full mt-1.5 left-0 right-0 w-full bg-white rounded-[10px] shadow-2xl border border-outline-variant/10 z-[100] p-1 animate-in slide-in-from-top-2 duration-200" style={{minWidth: '180px'}}>
                 <div className="max-h-60 overflow-y-auto custom-scrollbar p-1">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setCitySearch(''); setIsOpenCity(false); onNavigate('search-results', undefined, '', radiusSearch); }}
-                    className={`w-full text-right px-4 py-2 rounded-[10px] text-sm font-bold transition-colors ${!citySearch ? 'bg-[#2E7D32] text-white' : 'hover:bg-[#F9F9F6] text-[#4A4A4A]'}`}
-                  >
-                    الكل
-                  </button>
-                  {filteredCities.slice(0, 20).map(city => (
+                  <div className="flex flex-col gap-0.5">
                     <button
-                      key={city}
-                      onClick={(e) => { e.stopPropagation(); setCitySearch(city); setIsOpenCity(false); onNavigate('search-results', undefined, city, radiusSearch); }}
-                      className={`w-full text-right px-4 py-2 rounded-[10px] text-sm font-bold transition-colors ${citySearch === city ? 'bg-[#2E7D32] text-white' : 'hover:bg-[#F9F9F6] text-[#4A4A4A]'}`}
+                      onClick={(e) => { e.stopPropagation(); setCitySearch(''); setIsOpenCity(false); onNavigate('search-results', undefined, '', radiusSearch); }}
+                      className={`w-full text-right px-4 py-2 rounded-[10px] text-sm font-bold transition-colors ${!citySearch ? 'bg-[#2E7D32] text-white' : 'hover:bg-[#F9F9F6] text-[#4A4A4A]'}`}
                     >
-                      {city}
+                      الكل
                     </button>
-                  ))}
+                    {filteredCities.map(city => (
+                      <button
+                        key={city}
+                        onClick={(e) => { e.stopPropagation(); setCitySearch(city); setIsOpenCity(false); onNavigate('search-results', undefined, city, radiusSearch); }}
+                        className={`w-full text-right px-4 py-2 rounded-[10px] text-sm font-bold transition-colors ${citySearch === city ? 'bg-[#2E7D32] text-white' : 'hover:bg-[#F9F9F6] text-[#4A4A4A]'}`}
+                      >
+                        {city}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}

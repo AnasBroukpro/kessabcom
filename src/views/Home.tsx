@@ -522,10 +522,10 @@ export default function Home({ onNavigate }: Props) {
             </div>
 
             <h1 className="text-4xl md:text-7xl font-black text-white mb-6 tracking-tight font-headline leading-[1.1] drop-shadow-lg">
-              شوف الحولي <span className="text-[#2E7D32]" style={{ WebkitTextStroke: '2px white' }}>حداك</span> <br /> وزورو فالضيعة
+              حولي بلا <span className="text-[#2E7D32]" style={{ WebkitTextStroke: '2px white' }}>عذاب</span> <br /> مباشرة من عند الكساب
             </h1>
-            <p className="text-base md:text-xl text-white/90 mb-14 max-w-2xl mx-auto font-medium leading-relaxed px-6 drop-shadow-md">
-              منصة kessabcom.ma كايوريك الكسابة لي قراب ليك فبلاصتها بلاما تضرب تمارة. قلب، اختار، وشوف الكسيبة بعينيك.
+            <p className="text-base md:text-xl text-white/90 mb-14 max-w-2xl mx-auto font-medium leading-relaxed px-6 drop-shadow-md text-right md:text-center">
+              منصة kessabcom.ma كتقرب ليك جميع الكسابة بلاما تضرب تمارة قلب، اختار، تواصل مع كساب ووزورو فالضيعة
             </p>
 
             <motion.div
@@ -536,7 +536,7 @@ export default function Home({ onNavigate }: Props) {
             >
               <div
                 ref={searchBarRef}
-                className="bg-white/95 backdrop-blur-xl p-2 md:p-3 rounded-2xl shadow-[0_30px_60px_rgba(0,0,0,0.3)] border border-white/20 z-[60] relative"
+                className="bg-white/95 backdrop-blur-xl p-2 md:p-3 rounded-2xl shadow-[0_30px_60px_rgba(0,0,0,0.3)] border border-white/20 z-[100] relative"
               >
                 <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2 md:gap-3">
                   <div className="flex flex-row items-stretch gap-2 w-full md:w-auto">

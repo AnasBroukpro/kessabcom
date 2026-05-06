@@ -192,7 +192,7 @@ export default function SearchResults({ onNavigate, initialCity, initialRadius, 
 
       <main className="max-w-7xl mx-auto px-4 pt-0 pb-6 mt-0 md:mt-0">
         {/* Results Header */}
-        <div className="flex flex-col mb-6 gap-6">
+        <div className="flex flex-col mb-6 gap-6 pt-10">
           {/* Row 1: Title (Right) */}
           <div className="flex flex-col text-right">
             <h1 className="text-xl md:text-3xl font-black text-[#1A1A1A] font-headline mb-1 tracking-tight">
