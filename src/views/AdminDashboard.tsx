@@ -2131,7 +2131,7 @@ const renderOverview = () => (
       if (supportSubTab === 'password') {
         return req.type === 'password_reset' || !req.type; // Fallback for old ones
       } else {
-        return req.type === 'contact' || req.type === 'home_page' || req.type === 'banner' || req.type === 'other';
+        return req.type === 'contact' || req.type === 'home_page' || req.type === 'banner' || req.type === 'other' || req.type === 'certified_badge';
       }
     });
 

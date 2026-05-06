@@ -7,6 +7,9 @@ import fs from "fs";
 import fetch from "node-fetch";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
+import { Resend } from "resend";
+
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1892,17 +1895,55 @@ async function startServer() {
   // --- SUPPORT REQUESTS ENDPOINTS ---
   app.post("/api/support/requests", optionalVerifyToken, async (req: any, res) => {
     try {
-      const { type, phone, details, name } = req.body;
+      const { type, phone, details, name, message } = req.body;
+      const finalDetails = details || message || '';
+      
       const data = {
-        type, // e.g., 'password_reset'
+        type, // e.g., 'password_reset', 'certified_badge', 'home_page', 'banner'
         phone,
-        name: name || 'غير معروف',
-        details: details || '',
+        name: name || 'مستخدم غير معروف',
+        details: finalDetails,
         status: 'pending',
         userId: req.user?.uid || null,
-        createdAt: FieldValue.serverTimestamp()
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
       };
+      
       const docRef = await db.collection('supportRequests').add(data);
+
+      // Email Notification Logic
+      const emailTypes = ['certified_badge', 'home_page', 'banner', 'other'];
+      if (resend && emailTypes.includes(type)) {
+        try {
+          const subjectMap: any = {
+            'certified_badge': 'طلب الحصول على شارة معتمد (ONSSA)',
+            'home_page': 'طلب تواجد في الصفحة الرئيسية',
+            'banner': 'طلب إعلانات البانر (Banner)',
+            'other': 'موضوع آخر'
+          };
+
+          await resend.emails.send({
+            from: 'Kessabcom <notifications@kessabcom.ma>',
+            to: ['kessabcom.maroc@gmail.com'],
+            subject: `طلب دعم جديد: ${subjectMap[type] || type}`,
+            html: `
+              <div dir="rtl" style="font-family: sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+                <h2 style="color: #2E7D32;">طلب دعم جديد من المنصة</h2>
+                <p><strong>نوع الطلب:</strong> ${subjectMap[type] || type}</p>
+                <p><strong>الاسم:</strong> ${name || '---'}</p>
+                <p><strong>الهاتف:</strong> ${phone}</p>
+                <p><strong>الرسالة:</strong></p>
+                <div style="background: #f9f9f9; padding: 15px; border-radius: 5px;">${finalDetails}</div>
+                <hr style="margin-top: 20px; border: 0; border-top: 1px solid #eee;" />
+                <p style="font-size: 12px; color: #777;">تم إرسال هذا الطلب تلقائياً من منصة كسابكوم.</p>
+              </div>
+            `
+          });
+          console.log(`✅ Email sent for support request ${docRef.id}`);
+        } catch (mailErr) {
+          console.error(`❌ Failed to send email for ${docRef.id}:`, mailErr);
+        }
+      }
+
       res.status(201).json({ id: docRef.id });
     } catch (e: any) {
       res.status(500).json({ error: e.message });

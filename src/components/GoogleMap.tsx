@@ -25,6 +25,7 @@ interface Props {
   onContactClick?: (listing: Listing) => void;
   hoveredListingId: string | null;
   setHoveredListingId: (id: string | null) => void;
+  zoom?: number;
 }
 
 interface MapContentProps extends Props {}
@@ -103,7 +104,9 @@ const MapContent: React.FC<MapContentProps> = ({ listings, onListingClick, hover
     <GoogleMap
       mapContainerStyle={mapContainerStyle}
       center={mapCenter}
-      zoom={listings.length > 0 ? 10 : 6}
+      zoom={zoom || (listings.length > 0 ? 10 : 6)}
+      onLoad={onLoad}
+      onUnmount={onUnmount}
       options={mapOptions}
     >
       {listings.map((listing) => (
@@ -111,13 +114,13 @@ const MapContent: React.FC<MapContentProps> = ({ listings, onListingClick, hover
           {/* Hotspot Circle with Pulse Effect */}
           <Circle
             center={{ lat: listing.lat, lng: listing.lng }}
-            radius={2000}
+            radius={3000}
             options={{
               fillColor: '#2E7D32',
-              fillOpacity: 0.08,
+              fillOpacity: 0.12,
               strokeColor: '#2E7D32',
-              strokeOpacity: 0.15,
-              strokeWeight: 1,
+              strokeOpacity: 0.2,
+              strokeWeight: 1.5,
               clickable: false,
             }}
           />
