@@ -47,11 +47,32 @@ export default function ListingDetails({ onNavigate, listingId }: Props) {
   const [relatedListings, setRelatedListings] = useState<any[]>([]);
 
   const RelatedListingCard = ({ relatedListing }: { relatedListing: any }) => (
-    <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-outline-variant/20 hover:shadow-xl transition-all duration-300 group cursor-pointer h-full flex flex-col" onClick={() => onNavigate('listing-details', relatedListing.id)}>
-      <div className="relative h-48 sm:h-64 overflow-hidden shrink-0">
-        <img alt={relatedListing.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" src={relatedListing.images?.[0] || "https://images.unsplash.com/photo-1511117833895-4b473c0b85d6?auto=format&fit=crop&q=80&w=800"} referrerPolicy="no-referrer" />
-        <div className="absolute top-4 right-4 bg-white/90 backdrop-blur text-[#1A1A1A] px-3 py-1 rounded-full text-[10px] sm:text-xs font-bold shadow-sm">
-          {relatedListing.category || 'أغنام'}
+    <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-outline-variant/20 hover:shadow-xl transition-all duration-300 group cursor-pointer" onClick={() => onNavigate('listing-details', relatedListing.id)}>
+      <div className="relative h-64 overflow-hidden">
+        <img alt={relatedListing.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" src={relatedListing.images?.[0] || relatedListing.image || "https://images.unsplash.com/photo-1511117833895-4b473c0b85d6?auto=format&fit=crop&q=80&w=800"} referrerPolicy="no-referrer" />
+        <div className="absolute top-4 right-4 bg-white/90 backdrop-blur text-[#1A1A1A] px-3 py-1 rounded-full text-xs font-bold shadow-sm">
+          كيبدا من {relatedListing.minPrice || relatedListing.price || '0'} درهم
+        </div>
+        <div className="absolute bottom-4 right-4 bg-white/90 backdrop-blur text-[#1A1A1A] px-3 py-1.5 rounded-full text-[10px] font-bold shadow-sm flex items-center gap-1 cursor-pointer hover:bg-white transition-colors" onClick={(e) => {
+          e.stopPropagation();
+          const url = relatedListing.coordinates 
+            ? `https://www.google.com/maps/dir/?api=1&destination=${relatedListing.coordinates.lat},${relatedListing.coordinates.lng}`
+            : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(relatedListing.location || '')}`;
+          window.open(url, '_blank');
+        }}>
+          <MapPin className="w-3 h-3 text-[#2E7D32]" />
+          <span>
+            {(() => {
+              const dist = relatedListing.calculatedDistance || relatedListing.distance || 0;
+              const city = getDisplayCity(relatedListing);
+              
+              if (dist === 0 || dist >= 999 || settings.disableSearchRadius) return city;
+              if (dist < 5) return `${city} (قريب ليك)`;
+              if (dist < 25) return `${city} (على بعد ${Math.round(dist)} كلم)`;
+              if (dist < 80) return `${city} (بعيد شوية، ${Math.round(dist)} كلم)`;
+              return `${city} (بعيد)`;
+            })()}
+          </span>
         </div>
         {!settings.guestBuyerMode && (
           <button className="absolute top-4 left-4 p-2 bg-white/90 backdrop-blur rounded-full text-[#757575] hover:text-red-500 transition-colors shadow-sm">
@@ -59,14 +80,15 @@ export default function ListingDetails({ onNavigate, listingId }: Props) {
           </button>
         )}
       </div>
-      <div className="p-4 sm:p-6 flex-1 flex flex-col justify-between">
+      <div className="p-6">
         <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-[#2E7D32] font-bold text-sm sm:text-base truncate">{relatedListing.title}</p>
-            <div className="flex items-center gap-1.5 shrink-0">
-              <div className="flex gap-1 text-[8px] sm:text-[10px] font-bold text-[#4A4A4A]">
-                {(Array.isArray(relatedListing.sizes) ? relatedListing.sizes : []).slice(0, 2).map((size: string, idx: number) => (
-                  <span key={idx} className="bg-surface-container-high px-1.5 py-0.5 rounded text-[9px] font-bold text-on-surface">
+          <div className="flex items-center justify-between">
+            <p className="text-[#2E7D32] font-bold truncate max-w-[150px]">ضيعة {relatedListing.sellerPseudo || relatedListing.sellerName || 'كساب'}</p>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] font-bold text-[#757575]">الحجم:</span>
+              <div className="flex gap-1 text-[10px] font-bold text-[#4A4A4A]">
+                {(Array.isArray(relatedListing.sizes) ? relatedListing.sizes : []).slice(0, 3).map((size: string, idx: number) => (
+                  <span key={idx} className="bg-[#F9F9F6] px-1.5 py-0.5 rounded border border-outline-variant/10">
                     {size === 'small' ? 'صغير' : size === 'medium' ? 'متوسط' : size === 'large' ? 'كبير' : size === 'extra-large' ? 'كبير جداً' : size}
                   </span>
                 ))}
@@ -74,30 +96,22 @@ export default function ListingDetails({ onNavigate, listingId }: Props) {
             </div>
           </div>
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1 text-[#757575] text-xs font-bold truncate">
-              <MapPin className="w-4 h-4 shrink-0" />
-              <span className="truncate">
-                {(() => {
-                  const dist = relatedListing.distance || 0;
-                  const city = getDisplayCity(relatedListing);
-                  
-                  if (dist < 5) return `${city} (قريب ليك)`;
-                  if (dist < 25) return `${city} (على بعد ${Math.round(dist)} كلم)`;
-                  if (dist < 80) return `${city} (بعيد شوية، ${Math.round(dist)} كلم)`;
-                  return `${city} (بعيد)`;
-                })()}
-              </span>
+            <div className="flex items-center gap-1 text-[#757575] text-sm font-bold">
+              <span className="truncate max-w-[200px]">{relatedListing.farmLocation || 'موقع الضيعة غير محدد'}</span>
             </div>
-            <div className="flex items-center gap-0.5 shrink-0" dir="ltr">
-              {[...Array(5)].map((_, i) => (
-                <Star key={i} className={`w-3 h-3 sm:w-3.5 sm:h-3.5 ${i < (relatedListing.rating || 5) ? 'fill-[#FFC107] text-[#FFC107]' : 'text-[#D1D1D1]'}`} />
-              ))}
+            <div className="flex items-center gap-0.5" dir="ltr">
+              {[...Array(5)].map((_, i) => {
+                const avg = relatedListing.ratingCount > 0 ? (relatedListing.rating || 0) / relatedListing.ratingCount : 5;
+                return (
+                  <Star key={i} className={`w-3.5 h-3.5 ${i < Math.round(avg) ? 'fill-[#FFC107] text-[#FFC107]' : 'text-[#D1D1D1]'}`} />
+                );
+              })}
               {relatedListing.ratingCount > 0 && (
-                <span className="text-[8px] sm:text-[10px] text-on-surface-variant font-bold ml-1">({relatedListing.ratingCount})</span>
+                <span className="text-[10px] text-on-surface-variant font-bold ml-1">({relatedListing.ratingCount})</span>
               )}
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-2 sm:gap-3 mt-4 border-t border-outline-variant/20 pt-4">
+          <div className="grid grid-cols-2 gap-3 mt-4 border-t border-outline-variant/20 pt-4">
             <button 
               onClick={(e) => {
                 e.stopPropagation();
@@ -105,10 +119,10 @@ export default function ListingDetails({ onNavigate, listingId }: Props) {
                 setSelectedSellerWhatsapp(relatedListing.whatsapp);
                 setSelectedListingId(relatedListing.id);
                 setContactModalOpen(true);
-              }}
-              className="py-2 sm:py-2.5 bg-[#2E7D32] text-white font-bold rounded-lg transition-colors border border-transparent hover:bg-white hover:text-[#2E7D32] hover:border-[#2E7D32] text-[10px] sm:text-xs"
+              }} 
+              className="py-2.5 bg-[#2E7D32] text-white font-bold rounded-lg border border-transparent hover:bg-white hover:text-[#2E7D32] hover:border-[#2E7D32] transition-colors text-sm text-center flex items-center justify-center"
             >
-              تواصل
+              تواصل مع الكساب
             </button>
             <button 
               onClick={(e) => {
@@ -120,9 +134,9 @@ export default function ListingDetails({ onNavigate, listingId }: Props) {
                   window.scrollTo(0, 0);
                 }
               }}
-              className="py-2 sm:py-2.5 bg-[#1A1A1A] text-white font-bold rounded-lg transition-colors border border-transparent hover:bg-white hover:text-[#1A1A1A] hover:border-[#1A1A1A] text-[10px] sm:text-xs"
+              className="py-2.5 bg-[#F9F9F6] text-[#1A1A1A] font-bold rounded-lg border border-transparent hover:bg-white hover:text-[#2E7D32] hover:border-[#2E7D32] transition-colors text-sm"
             >
-              التفاصيل
+              شوف التفاصيل
             </button>
           </div>
         </div>

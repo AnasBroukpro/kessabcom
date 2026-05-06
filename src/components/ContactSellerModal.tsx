@@ -9,6 +9,7 @@ import LoginRequiredModal from './LoginRequiredModal';
 // Assets
 import whatsappIcon from '../assets/marketing/features/whatsapp-svgrepo-com.svg';
 import mapPointIcon from '../assets/marketing/features/map-point-svgrepo-com.svg';
+import logoV2 from '../assets/marketing/branding/logo v2.png';
 
 interface ContactSellerModalProps {
   isOpen: boolean;
@@ -75,18 +76,23 @@ export default function ContactSellerModal({
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
-      <div className="bg-white w-full max-w-md rounded-[2.5rem] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300" dir="rtl">
-        <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-          <h3 className="text-xl font-black text-[#1A1A1A]">تواصل مع الكساب</h3>
-          <button onClick={onClose} className="p-2 transition-colors border border-transparent hover:bg-gray-100 rounded-full">
-            <X className="w-5 h-5 text-[#757575]" />
-          </button>
+      <div className="w-full max-w-[440px] bg-white rounded-[32px] p-8 md:p-10 shadow-[0_20px_50px_rgba(0,0,0,0.05)] border border-outline-variant/10 animate-in fade-in slide-in-from-bottom-4 duration-700 relative" dir="rtl">
+        <button onClick={onClose} className="absolute top-6 left-6 p-2 transition-colors border border-transparent hover:bg-gray-100 rounded-full z-10">
+          <X className="w-5 h-5 text-[#757575]" />
+        </button>
+
+        <div className="text-center mb-8">
+          <div className="w-[154px] md:w-[180px] mx-auto mb-6 flex items-center justify-center">
+            <img src={logoV2} alt="منصة kessabcom.ma" className="w-full h-auto" />
+          </div>
+          <h1 className="text-2xl font-black text-[#1A1A1A] mb-3 font-headline">تواصل مع الكساب</h1>
+          <p className="text-[#757575] font-medium leading-relaxed">اتصل بالكساب مباشرة باش تعرف التفاصيل</p>
         </div>
         
-        <div className="p-8 space-y-6 max-h-[80vh] overflow-y-auto no-scrollbar">
+        <div className="space-y-6 max-h-[60vh] overflow-y-auto no-scrollbar">
           <div className="bg-red-50 border border-red-100 p-5 rounded-3xl flex gap-4">
             <AlertTriangle className="w-6 h-6 text-red-600 shrink-0" />
-            <div>
+            <div className="text-right">
               <h4 className="font-bold text-red-800 text-sm mb-1">رد البال!</h4>
               <p className="text-xs text-red-700 leading-relaxed font-medium">
                 ماتصيفطش الفلوس مسبقاً للكساب عبر التحويل البنكي ولا وكالات تحويل الأموال. ديما شوف السلعة عاد خلص.
