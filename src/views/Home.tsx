@@ -489,7 +489,7 @@ export default function Home({ onNavigate }: Props) {
 
       <main className="pt-16">
         {/* Hero & Search Section - 100vh with vertical centering */}
-        <section className="relative min-h-[calc(100dvh-64px)] flex items-center justify-center bg-[#FDFCF8] px-4 z-20 overflow-hidden">
+        <section className="relative min-h-[calc(100dvh-64px)] flex flex-col items-center justify-between bg-[#FDFCF8] px-4 py-8 md:py-20 z-20 overflow-hidden">
           <div className="absolute inset-0 z-0">
             <picture className="w-full h-full">
               <source media="(max-width: 767px)" srcSet={heroBackgroundMobile} />
@@ -512,7 +512,8 @@ export default function Home({ onNavigate }: Props) {
             <NewsTicker isMobile={true} />
           </div>
 
-          <div className="relative z-10 max-w-5xl w-full text-center mt-[100px] md:mt-0">
+          {/* TOP CONTENT: Countdown & Title */}
+          <div className="relative z-10 max-w-5xl w-full text-center mt-16 md:mt-0">
             <div className="flex flex-col items-center mb-8 animate-in fade-in slide-in-from-top-4 duration-1000 relative">
               <EidCountdown />
             </div>
@@ -525,13 +526,15 @@ export default function Home({ onNavigate }: Props) {
                 منصة kessabcom.ma كتقرب ليك جميع الكسابة بلاما تضرب تمارة قلب، اختار، تواصل مع كساب ووزورو فالضيعة
               </p>
             </div>
+          </div>
 
-            <motion.div
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.5, duration: 0.8 }}
-              className="mt-6 md:mt-12 max-w-fit mx-auto relative z-[200]"
-            >
+          {/* BOTTOM CONTENT: Search UI */}
+          <motion.div
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.5, duration: 0.8 }}
+            className="w-full max-w-fit mx-auto relative z-[200] mb-4 md:mb-0"
+          >
               <div
                 ref={searchBarRef}
                 className="bg-white/95 backdrop-blur-xl p-2 md:p-3 rounded-2xl shadow-[0_30px_60px_rgba(0,0,0,0.3)] border border-white/20 z-[100] relative"
@@ -680,7 +683,6 @@ export default function Home({ onNavigate }: Props) {
                 </div>
               </div>
             </motion.div>
-          </div>
         </section>
 
         {/* News Ticker */}
