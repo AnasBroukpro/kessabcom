@@ -340,7 +340,7 @@ export default function BuyerDashboard({ onNavigate, activeSubView }: Props) {
         />
 
         {/* Dynamic Content Area */}
-        <div className="flex-1 overflow-y-auto no-scrollbar">
+        <div className="flex-1 overflow-y-auto no-scrollbar pt-16">
           <div className="p-4 md:p-8 max-w-7xl mx-auto w-full space-y-6 md:space-y-8 text-right">
           {activeView === 'dashboard' && (
             <BuyerHomeView 

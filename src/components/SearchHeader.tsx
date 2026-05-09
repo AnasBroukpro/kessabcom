@@ -9,6 +9,7 @@ import { useSettings } from '../hooks/useSettings';
 import { firestoreService } from '../services/firestoreService';
 import { cityCoords, getClosestCity, normalizeArabic, cityMapping } from '../constants/cityMapping';
 import logoV2 from '../assets/marketing/branding/logo v2.png';
+import ValidationModal from './ValidationModal';
 
 interface Props {
   onNavigate: (view: ViewType, listingId?: string, city?: string, radius?: string, subView?: string, breed?: string) => void;
@@ -28,6 +29,8 @@ export default function SearchHeader({ onNavigate, initialCity = '', initialRadi
   const [isNotificationSidebarOpen, setIsNotificationSidebarOpen] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [showValidationModal, setShowValidationModal] = useState(false);
   
   const [isOpenCity, setIsOpenCity] = useState(false);
   const [isOpenRadius, setIsOpenRadius] = useState(false);
@@ -208,6 +211,7 @@ export default function SearchHeader({ onNavigate, initialCity = '', initialRadi
         isOpen={isSidebarOpen} 
         onClose={() => setIsSidebarOpen(false)} 
         onNavigate={onNavigate} 
+        onShowTutorial={() => setShowTutorial(true)}
       />
       <NotificationSidebar
         isOpen={isNotificationSidebarOpen}
@@ -215,263 +219,174 @@ export default function SearchHeader({ onNavigate, initialCity = '', initialRadi
         notifications={Array.isArray(notifications) ? notifications : []}
         onMarkNotificationAsRead={handleMarkNotifAsRead}
       />
-      <header className="bg-white/90 backdrop-blur-md border-b border-outline-variant/30 sticky top-0 z-50">
-
-      <div className="max-w-7xl mx-auto px-6 pt-1.5 pb-1 md:py-0 md:h-20 flex flex-col md:flex-row md:items-center justify-between gap-1.5 md:gap-8">
-        
-        {/* Top Mobile Row: Actions (Right) + Logo (Left) */}
-        <div className="flex items-center justify-between md:hidden w-full">
-          {/* Actions (Right in RTL) */}
-          <div className="flex items-center gap-2">
-            {user ? (
-              <>
-                {/* 1. Animated Hamburger Button (Right-most) */}
-                <button 
-                  onClick={() => {
-                    setShowProfileMenu(false);
-                    setIsSidebarOpen(!isSidebarOpen);
-                  }}
-                  className="w-9 h-9 flex flex-col items-center justify-center gap-1 bg-[#F9F9F6] rounded-lg border border-outline-variant/10 relative z-[105]"
-                >
-                  <motion.span 
-                    animate={isSidebarOpen ? { rotate: 45, y: 7 } : { rotate: 0, y: 0 }}
-                    className="w-4 h-0.5 bg-[#2E7D32] rounded-full"
-                  />
-                  <motion.span 
-                    animate={isSidebarOpen ? { opacity: 0 } : { opacity: 1 }}
-                    className="w-4 h-0.5 bg-[#2E7D32] rounded-full"
-                  />
-                  <motion.span 
-                    animate={isSidebarOpen ? { rotate: -45, y: -7 } : { rotate: 0, y: 0 }}
-                    className="w-4 h-0.5 bg-[#2E7D32] rounded-full"
-                  />
-                </button>
-
-                {/* 2. Notification */}
-                <div className="relative">
-                  <button 
-                    onClick={() => setIsNotificationSidebarOpen(true)}
-                    className={`p-2 rounded-lg transition-colors border ${isNotificationSidebarOpen ? 'bg-[#E8F5E9] text-[#2E7D32] border-[#2E7D32]' : 'bg-[#F9F9F6] text-[#757575] border-transparent hover:border-[#757575]'}`}
-                  >
-                    <Bell className="w-4.5 h-4.5" />
-                    {(Array.isArray(notifications) ? notifications : []).some(n => !n.read) && (
-                      <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-red-500 rounded-full border border-white"></span>
-                    )}
-                  </button>
-                </div>
-
-                {/* 3. Profile Image */}
-                <button 
-                  onClick={() => {
-                    const role = profile?.role || 'buyer';
-                    onNavigate(role === 'admin' ? 'admin' : role === 'seller' ? 'seller' : 'buyer', undefined, undefined, undefined, role === 'admin' ? 'overview' : 'dashboard');
-                  }}
-                  className="w-9 h-9 rounded-full bg-[#F9F9F6] border border-outline-variant/10 overflow-hidden flex items-center justify-center"
-                >
-                  {profile?.photoURL ? (
-                    <img src={profile.photoURL} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <User className="w-4 h-4 text-[#2E7D32]" />
-                  )}
-                </button>
-              </>
-            ) : (
-              <div className="flex items-center gap-2">
-                <button 
-                  onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                  className="w-9 h-9 flex flex-col items-center justify-center gap-1 bg-[#F9F9F6] rounded-lg border border-outline-variant/10 transition-colors hover:border-[#2E7D32]"
-                >
-                  <span className="w-4 h-0.5 bg-[#2E7D32] rounded-full"></span>
-                  <span className="w-4 h-0.5 bg-[#2E7D32] rounded-full"></span>
-                  <span className="w-4 h-0.5 bg-[#2E7D32] rounded-full"></span>
-                </button>
-                <button onClick={() => onNavigate('auth')} className="bg-[#2E7D32] text-white px-3 py-1.5 rounded-lg text-[10px] font-bold shadow-sm">
-                  دخول
-                </button>
-              </div>
-            )}
+      <header className="fixed top-0 w-full z-50 bg-white/90 backdrop-blur-md border-b border-outline-variant/30">
+        {/* Row 1: Logo | Desktop Search | Actions — flex-row-reverse on mobile to match Home */}
+        <div className="max-w-7xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between gap-2 md:gap-8 flex-row-reverse md:flex-row">
+          
+          {/* LEFT: Logo + desktop nav links */}
+          <div className="flex items-center gap-2 md:gap-8 shrink-0">
+            <button onClick={() => onNavigate('home')} className="flex items-center group">
+              <img 
+                src={logoV2} 
+                alt="منصة kessabcom.ma" 
+                className="h-[22px] md:h-8 w-auto object-contain transition-transform group-hover:scale-105"
+              />
+            </button>
+            <div className="hidden md:flex items-center gap-6">
+              <button onClick={() => onNavigate('home')} className="text-on-surface-variant hover:text-[#2E7D32] transition-colors font-medium text-sm">الرئيسية</button>
+              <button onClick={() => onNavigate('search-results')} className="text-[#2E7D32] border-b-2 border-[#2E7D32] font-bold py-1 transition-colors text-sm">البحث</button>
+            </div>
           </div>
 
-          {/* Logo (Left in RTL) */}
-          <button onClick={() => onNavigate('home')} className="flex items-center">
-            <img src={logoV2} alt="منصة kessabcom.ma" className="h-[22px] w-auto object-contain" />
-          </button>
-        </div>
-
-        <div className="hidden md:flex items-center gap-6 shrink-0">
-          <button onClick={() => onNavigate('home')} className="flex items-center group">
-            <img 
-              src={logoV2} 
-              alt="منصة kessabcom.ma" 
-              className="h-[26px] md:h-8 w-auto object-contain transition-transform group-hover:scale-105"
-            />
-          </button>
-          <div className="flex items-center gap-4">
-            <button onClick={() => onNavigate('home')} className="text-on-surface-variant hover:text-[#2E7D32] transition-colors font-medium text-sm">الرئيسية</button>
-            <button onClick={() => onNavigate('search-results')} className="text-[#2E7D32] border-b-2 border-[#2E7D32] font-bold py-1 transition-colors text-sm">البحث</button>
-          </div>
-        </div>
-
-        {/* Modern Expert Search Bar - Copied from Dashboard for consistency */}
-        <div ref={searchBarRef} className="lg:max-w-xl flex flex-row items-center gap-1 sm:gap-2 bg-[#F9F9F6] border border-outline-variant/20 rounded-[10px] p-1 sm:p-1.5 shadow-sm hover:shadow-md transition-shadow relative z-[60] w-fit mx-auto">
-          {/* City Selector */}
-          {/* City Selector with text input */}
-          <div
-            className="w-32 sm:w-48 flex items-center px-2 sm:px-3 py-1.5 relative group bg-white rounded-[10px] border border-outline-variant/10 shadow-sm transition-all hover:border-[#2E7D32]/30 shrink-0"
-          >
-            <MapPin className="hidden sm:block w-4 h-4 text-[#2E7D32] shrink-0" />
-            <input
-              type="text"
-              value={citySearch}
-              onChange={(e) => { setCitySearch(e.target.value); setIsOpenCity(true); setIsOpenRadius(false); }}
-              onFocus={() => { setIsOpenCity(true); setIsOpenRadius(false); }}
-              placeholder="فين كتقلب؟"
-              className="bg-transparent border-none outline-none w-full text-xs sm:text-sm font-bold text-[#1A1A1A] text-right sm:mr-3 placeholder:text-[#ABABAB] placeholder:font-normal"
-            />
-            {citySearch && (
-              <button
-                onClick={(e) => { e.stopPropagation(); setCitySearch(''); setIsOpenCity(false); onNavigate('search-results', undefined, '', radiusSearch); }}
-                className="shrink-0 text-[#ABABAB] hover:text-[#1A1A1A] transition-colors"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-
-            {isOpenCity && (
-              <div className="absolute top-full mt-1.5 left-0 right-0 w-full bg-white rounded-[10px] shadow-2xl border border-outline-variant/10 z-[100] p-1 animate-in slide-in-from-top-2 duration-200" style={{minWidth: '180px'}}>
-                <div className="max-h-60 overflow-y-auto custom-scrollbar p-1">
-                  <div className="flex flex-col gap-0.5">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setCitySearch(''); setIsOpenCity(false); onNavigate('search-results', undefined, '', radiusSearch); }}
-                      className={`w-full text-right px-4 py-2 rounded-[10px] text-sm font-bold transition-colors ${!citySearch ? 'bg-[#2E7D32] text-white' : 'hover:bg-[#F9F9F6] text-[#4A4A4A]'}`}
-                    >
-                      الكل
-                    </button>
-                    {filteredCities.map(city => (
-                      <button
-                        key={city}
-                        onClick={(e) => { e.stopPropagation(); setCitySearch(city); setIsOpenCity(false); onNavigate('search-results', undefined, city, radiusSearch); }}
-                        className={`w-full text-right px-4 py-2 rounded-[10px] text-sm font-bold transition-colors ${citySearch === city ? 'bg-[#2E7D32] text-white' : 'hover:bg-[#F9F9F6] text-[#4A4A4A]'}`}
-                      >
-                        {city}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <button 
-            onClick={(e) => { e.stopPropagation(); handleLocateMe(); }}
-            disabled={isLocating}
-            title="في مدينتي"
-            className={`p-1.5 sm:p-2 rounded-[10px] hover:bg-[#E8F5E9] border border-outline-variant/10 bg-white shadow-sm transition-colors shrink-0 flex items-center justify-center ${isLocating ? 'animate-pulse text-[#2E7D32]' : 'text-[#2E7D32]'}`}
-          >
-            <LocateFixed className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${isLocating ? 'animate-pulse' : ''}`} />
-          </button>
-
-          {/* Distance Selector */}
-          {!settings.disableSearchRadius && (
-            <div 
-              onClick={() => { setIsOpenRadius(!isOpenRadius); setIsOpenCity(false); }}
-              className="w-[85px] sm:w-[120px] flex items-center px-1.5 sm:px-3 py-1.5 relative group bg-white rounded-[10px] border border-outline-variant/10 shadow-sm transition-all hover:border-[#2E7D32]/30 cursor-pointer shrink-0"
-            >
-              <Navigation className="hidden sm:block w-3.5 h-3.5 text-[#2E7D32] shrink-0" />
-              <div className="flex flex-col text-right sm:mr-3 flex-1">
-                <button 
-                  onClick={(e) => { e.stopPropagation(); setIsOpenRadius(!isOpenRadius); setIsOpenCity(false); }}
-                  className="bg-transparent border-none outline-none w-full text-xs sm:text-sm font-bold text-[#1A1A1A] text-right flex items-center justify-between"
-                >
-                  <span className="truncate">
-                    {radiusSearch === '10' ? '10 كلم' : 
-                    radiusSearch === '20' ? '20 كلم' : 
-                    radiusSearch === '50' ? '50 كلم' : 
-                    radiusSearch === 'all' ? 'الكل' : 'المسافة'}
-                  </span>
+          {/* CENTER: Desktop search bar */}
+          <div ref={searchBarRef} className="hidden lg:flex items-center gap-1 sm:gap-2 bg-[#F9F9F6] border border-outline-variant/20 rounded-[10px] p-1 shadow-sm hover:shadow-md transition-shadow relative z-[60] shrink-0">
+            <div className="w-32 sm:w-44 flex items-center px-2 sm:px-3 py-1 relative group bg-white rounded-[10px] border border-outline-variant/10 shadow-sm transition-all hover:border-[#2E7D32]/30 shrink-0">
+              <MapPin className="hidden sm:block w-3.5 h-3.5 text-[#2E7D32] shrink-0" />
+              <input
+                type="text"
+                value={citySearch}
+                onChange={(e) => { setCitySearch(e.target.value); setIsOpenCity(true); setIsOpenRadius(false); }}
+                onFocus={() => { setIsOpenCity(true); setIsOpenRadius(false); }}
+                placeholder="فين كتقلب؟"
+                className="bg-transparent border-none outline-none w-full text-xs sm:text-sm font-bold text-[#1A1A1A] text-right sm:mr-2 placeholder:text-[#ABABAB]"
+              />
+              {citySearch && (
+                <button onClick={(e) => { e.stopPropagation(); setCitySearch(''); setIsOpenCity(false); onNavigate('search-results', undefined, '', radiusSearch); }}>
+                  <X className="w-3 h-3 text-[#ABABAB]" />
                 </button>
-
-                {isOpenRadius && (
-                  <div className="absolute top-full mt-2 left-0 right-0 w-full bg-white rounded-[10px] shadow-2xl border border-outline-variant/10 z-[100] p-1 animate-in slide-in-from-top-2 duration-200">
+              )}
+              {isOpenCity && (
+                <div className="absolute top-full mt-1.5 left-0 right-0 w-full bg-white rounded-[10px] shadow-2xl border border-outline-variant/10 z-[100] p-1" style={{minWidth: '180px'}}>
+                  <div className="max-h-60 overflow-y-auto custom-scrollbar p-1">
                     <div className="flex flex-col gap-0.5">
-                      {[
-                        { val: '10', label: '10 كلم' },
-                        { val: '20', label: '20 كلم' },
-                        { val: '50', label: '50 كلم' },
-                        { val: 'all', label: 'الكل' }
-                      ].map(dist => (
-                        <button 
-                          key={dist.val}
-                          onClick={(e) => { e.stopPropagation(); setRadiusSearch(dist.val); setIsOpenRadius(false); }}
-                          className={`w-full text-right px-4 py-2 rounded-[10px] text-sm font-bold transition-colors ${radiusSearch === dist.val ? 'bg-[#2E7D32] text-white' : 'hover:bg-[#F9F9F6] text-[#4A4A4A]'}`}
-                        >
-                          {dist.label}
-                        </button>
+                      <button onClick={(e) => { e.stopPropagation(); setCitySearch(''); setIsOpenCity(false); onNavigate('search-results', undefined, '', radiusSearch); }} className={`w-full text-right px-4 py-2 rounded-[10px] text-sm font-bold transition-colors ${!citySearch ? 'bg-[#2E7D32] text-white' : 'hover:bg-[#F9F9F6] text-[#4A4A4A]'}`}>الكل</button>
+                      {filteredCities.map(city => (
+                        <button key={city} onClick={(e) => { e.stopPropagation(); setCitySearch(city); setIsOpenCity(false); onNavigate('search-results', undefined, city, radiusSearch); }} className={`w-full text-right px-4 py-2 rounded-[10px] text-sm font-bold transition-colors ${citySearch === city ? 'bg-[#2E7D32] text-white' : 'hover:bg-[#F9F9F6] text-[#4A4A4A]'}`}>{city}</button>
                       ))}
                     </div>
                   </div>
-                )}
-              </div>
-              <ChevronDown className={`hidden sm:block w-3 h-3 text-[#757575] ml-1 transition-transform ${isOpenRadius ? 'rotate-180' : ''}`} />
+                </div>
+              )}
             </div>
-          )}
-          
-          <button onClick={() => {
-            if (!citySearch && radiusSearch !== 'all') {
-              alert("عافاك اختار المدينة فين كتقلب أولاً");
-              return;
-            }
-            onNavigate('search-results', undefined, citySearch, radiusSearch);
-          }} className="bg-[#2E7D32] text-white py-1.5 px-4 sm:px-6 rounded-[10px] border border-transparent hover:bg-white hover:text-[#2E7D32] hover:border-[#2E7D32] transition-all shadow-sm flex items-center gap-2 justify-center shrink-0 group">
-            <span className="text-xs sm:text-sm font-bold">بحث</span>
-            <Search className="w-3.5 h-3.5 sm:w-4 sm:h-4 group-hover:scale-110 transition-transform" />
-          </button>
-        </div>
+            <button onClick={handleLocateMe} disabled={isLocating} className="p-1.5 rounded-[10px] hover:bg-[#E8F5E9] border border-outline-variant/10 bg-white shadow-sm transition-colors text-[#2E7D32]">
+              <LocateFixed className={`w-3.5 h-3.5 ${isLocating ? 'animate-pulse' : ''}`} />
+            </button>
+            {!settings.disableSearchRadius && (
+              <div onClick={() => setIsOpenRadius(!isOpenRadius)} className="w-[85px] sm:w-[100px] flex items-center px-1.5 sm:px-2 py-1 relative bg-white rounded-[10px] border border-outline-variant/10 shadow-sm cursor-pointer shrink-0">
+                <Navigation className="hidden sm:block w-3 h-3 text-[#2E7D32] shrink-0" />
+                <span className="text-xs font-bold text-[#1A1A1A] text-right flex-1 truncate mr-1">{radiusSearch === 'all' ? 'الكل' : `${radiusSearch} كلم`}</span>
+                {isOpenRadius && (
+                  <div className="absolute top-full mt-2 left-0 right-0 w-full bg-white rounded-[10px] shadow-2xl border border-outline-variant/10 z-[100] p-1">
+                    {['10', '20', '50', 'all'].map(v => (
+                      <button key={v} onClick={(e) => { e.stopPropagation(); setRadiusSearch(v); setIsOpenRadius(false); }} className={`w-full text-right px-4 py-2 rounded-[10px] text-sm font-bold transition-colors ${radiusSearch === v ? 'bg-[#2E7D32] text-white' : 'hover:bg-[#F9F9F6] text-[#4A4A4A]'}`}>{v === 'all' ? 'الكل' : `${v} كلم`}</button>
+                    ))}
+                  </div>
+                )}
+                <ChevronDown className="hidden sm:block w-3 h-3 text-[#757575] ml-1" />
+              </div>
+            )}
+            <button onClick={() => onNavigate('search-results', undefined, citySearch, radiusSearch)} className="bg-[#2E7D32] text-white py-1 px-3 sm:px-4 rounded-[10px] hover:bg-white hover:text-[#2E7D32] hover:border-[#2E7D32] border border-transparent transition-all shadow-sm flex items-center gap-2">
+              <span className="text-xs font-bold">بحث</span>
+              <Search className="w-3.5 h-3.5" />
+            </button>
+          </div>
 
-        {/* Actions - Desktop only */}
-        <div className="hidden md:flex items-center gap-4 shrink-0">
-          {user ? (
-            <>
-              {/* Notifications */}
-              <div className="relative">
-                <button 
-                  onClick={() => setIsNotificationSidebarOpen(true)}
-                  className={`p-2.5 rounded-xl transition-colors border ${isNotificationSidebarOpen ? 'bg-[#E8F5E9] text-[#2E7D32] border-[#2E7D32]' : 'bg-[#F9F9F6] text-[#757575] border-transparent hover:border-[#757575]'}`}
-                >
+          {/* RIGHT side (LTR) / LEFT side (mobile RTL): notification + profile + hamburger */}
+          <div className="flex items-center gap-2 md:gap-4 shrink-0">
+            {/* Hamburger — visible on mobile, before other icons in this flex group */}
+            <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="md:hidden w-9 h-9 flex flex-col items-center justify-center gap-1.5 bg-[#F9F9F6] rounded-xl border border-outline-variant/10 transition-colors">
+              <span className="w-4 h-0.5 bg-[#2E7D32] rounded-full"></span>
+              <span className="w-4 h-0.5 bg-[#2E7D32] rounded-full"></span>
+              <span className="w-4 h-0.5 bg-[#2E7D32] rounded-full"></span>
+            </button>
+            {user ? (
+              <>
+                <button onClick={() => setIsNotificationSidebarOpen(true)} className={`p-2 rounded-xl transition-colors relative ${isNotificationSidebarOpen ? 'bg-[#E8F5E9] text-[#2E7D32]' : 'bg-[#F9F9F6] text-[#757575] hover:bg-white hover:text-[#2E7D32] border border-transparent hover:border-[#2E7D32]'}`}>
                   <Bell className="w-5 h-5" />
                   {(Array.isArray(notifications) ? notifications : []).some(n => !n.read) && (
-                    <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
+                    <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
                   )}
                 </button>
-              </div>
-
-              {/* Profile */}
-              <div 
-                className="relative" 
-                ref={profileRef}
-                onMouseEnter={() => setShowProfileMenu(true)}
-                onMouseLeave={() => setShowProfileMenu(false)}
-              >
-                <button className="flex items-center justify-center w-10 h-10 rounded-full bg-[#F9F9F6] border border-outline-variant/10 hover:bg-[#F0F0F0] transition-all overflow-hidden shadow-sm">
-                  {profile?.photoURL ? (
-                    <img src={profile.photoURL} alt="Profile" className="w-full h-full object-cover rounded-full" referrerPolicy="no-referrer" />
-                  ) : (
-                    <div className="w-full h-full bg-[#2E7D32] text-white flex items-center justify-center font-bold">
-                      <User className="w-5 h-5" />
-                    </div>
-                  )}
-                </button>
-                {showProfileMenu && renderProfileMenu()}
-              </div>
-            </>
-          ) : (
-            <button onClick={() => onNavigate('auth')} className="bg-[#2E7D32] text-white px-6 py-2.5 rounded-xl text-sm font-bold transition-colors border border-transparent hover:bg-transparent hover:text-[#2E7D32] hover:border-[#2E7D32] shadow-sm">
-              <span>دخول</span>
-            </button>
-          )}
+                <div className="relative" ref={profileRef} onMouseEnter={() => setShowProfileMenu(true)} onMouseLeave={() => setShowProfileMenu(false)}>
+                  <button onClick={() => { const role = profile?.role || 'buyer'; onNavigate(role === 'admin' ? 'admin' : role === 'seller' ? 'seller' : 'buyer', undefined, undefined, undefined, role === 'admin' ? 'overview' : 'dashboard'); }} className="flex items-center justify-center w-9 h-9 rounded-full bg-[#F9F9F6] border border-outline-variant/10 hover:bg-white hover:border-[#2E7D32] transition-colors overflow-hidden shadow-sm">
+                    {profile?.photoURL ? <img src={profile.photoURL} alt="" className="w-full h-full object-cover rounded-full" referrerPolicy="no-referrer" /> : <div className="w-full h-full bg-[#2E7D32] text-white flex items-center justify-center font-bold"><User className="w-5 h-5" /></div>}
+                  </button>
+                  {showProfileMenu && renderProfileMenu()}
+                </div>
+              </>
+            ) : (
+              <button onClick={() => onNavigate('auth')} className="bg-[#2E7D32] text-white px-4 md:px-6 py-2 rounded-xl text-sm font-bold transition-colors border border-transparent hover:bg-white hover:text-[#2E7D32] hover:border-[#2E7D32] shadow-sm animate-shake">
+                دخول
+              </button>
+            )}
+          </div>
         </div>
-      </div>
-    </header>
+
+        {/* Row 2 — Mobile search bar */}
+        <div className="lg:hidden px-4 pb-3 border-t border-outline-variant/10 pt-2 bg-white/50">
+          <div className="flex flex-row items-center gap-1 bg-[#F9F9F6] border border-outline-variant/20 rounded-[10px] p-1 shadow-sm relative z-[60] w-full">
+            <div className="flex-1 flex items-center px-2 py-1.5 relative bg-white rounded-[10px] border border-outline-variant/10 shadow-sm min-w-0">
+              <MapPin className="w-3.5 h-3.5 text-[#2E7D32] shrink-0" />
+              <input
+                type="text"
+                value={citySearch}
+                onChange={(e) => { setCitySearch(e.target.value); setIsOpenCity(true); setIsOpenRadius(false); }}
+                onFocus={() => { setIsOpenCity(true); setIsOpenRadius(false); }}
+                placeholder="فين كتقلب؟"
+                className="bg-transparent border-none outline-none w-full text-xs font-bold text-[#1A1A1A] text-right mr-2 placeholder:text-[#ABABAB]"
+              />
+            </div>
+            
+            <button onClick={handleLocateMe} className="p-1.5 rounded-[10px] bg-white border border-outline-variant/10 text-[#2E7D32] shrink-0">
+              <LocateFixed className="w-3.5 h-3.5" />
+            </button>
+
+            {/* Mobile Radius Selector */}
+            <div 
+              onClick={() => { setIsOpenRadius(!isOpenRadius); setIsOpenCity(false); }}
+              className="w-[70px] flex items-center px-1 py-1.5 relative bg-white rounded-[10px] border border-outline-variant/10 shadow-sm cursor-pointer shrink-0"
+            >
+              <button 
+                onClick={(e) => { e.stopPropagation(); setIsOpenRadius(!isOpenRadius); setIsOpenCity(false); }}
+                className="bg-transparent border-none outline-none w-full text-[10px] font-bold text-[#1A1A1A] text-center"
+              >
+                {radiusSearch === '10' ? '10 كلم' : 
+                 radiusSearch === '20' ? '20 كلم' : 
+                 radiusSearch === '50' ? '50 كلم' : 
+                 radiusSearch === 'all' ? 'الكل' : 'المسافة'}
+              </button>
+              {isOpenRadius && (
+                <div className="absolute top-full mt-2 left-0 right-0 w-full bg-white rounded-[10px] shadow-2xl border border-outline-variant/10 z-[100] p-1">
+                  {['10', '20', '50', 'all'].map(v => (
+                    <button
+                      key={v}
+                      onClick={(e) => { e.stopPropagation(); setRadiusSearch(v); setIsOpenRadius(false); onNavigate('search-results', undefined, citySearch, v); }}
+                      className={`w-full text-center px-2 py-2 rounded-[8px] text-[10px] font-bold transition-colors ${radiusSearch === v ? 'bg-[#2E7D32] text-white' : 'hover:bg-[#F9F9F6] text-[#4A4A4A]'}`}
+                    >
+                      {v === 'all' ? 'الكل' : `${v} كلم`}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <button onClick={() => onNavigate('search-results', undefined, citySearch, radiusSearch)} className="bg-[#2E7D32] text-white p-1.5 rounded-[10px] shrink-0">
+              <Search className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {showTutorial && (
+          <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-md flex items-center justify-center p-4" onClick={() => setShowTutorial(false)}>
+            <div className="relative w-full max-w-4xl aspect-video bg-black rounded-[2rem] overflow-hidden shadow-2xl border border-white/10" onClick={e => e.stopPropagation()}>
+              <button onClick={() => setShowTutorial(false)} className="absolute top-6 right-6 z-10 bg-white/20 hover:bg-white/40 text-white p-2.5 rounded-full transition-colors backdrop-blur-md"><X className="w-6 h-6" /></button>
+              <iframe src={settings.tutorialUrl || "https://www.youtube.com/embed/dQw4w9WgXcQ"} className="w-full h-full" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
+            </div>
+          </div>
+        )}
+
+        <ValidationModal isOpen={showValidationModal} onClose={() => { setShowValidationModal(false); setIsOpenCity(true); }} message="عافاك اختار المدينة فين كتقلب أولاً" />
+      </header>
     </>
   );
 }

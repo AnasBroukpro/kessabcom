@@ -200,9 +200,9 @@ export default function SearchResults({ onNavigate, initialCity, initialRadius, 
     <div className="min-h-screen bg-[#FDFCF8] antialiased" dir="rtl">
       <SearchHeader onNavigate={onNavigate} initialCity={citySearch} initialRadius={radiusSearch} />
 
-      <main className="max-w-7xl mx-auto px-4 pt-0 pb-6 mt-0 md:mt-0">
+      <main className="max-w-7xl mx-auto px-4 pt-32 lg:pt-20 pb-6">
         {/* Results Header */}
-        <div className="flex flex-col mb-6 gap-6 pt-10">
+        <div className="flex flex-col mb-6 gap-6 pt-4">
           {/* Row 1: Title (Right) */}
           <div className="flex flex-col text-right">
             <h1 className="text-xl md:text-3xl font-black text-[#1A1A1A] font-headline mb-1 tracking-tight">
@@ -610,9 +610,11 @@ export default function SearchResults({ onNavigate, initialCity, initialRadius, 
                         >
                           <div className="w-24 h-24 rounded-xl overflow-hidden relative shrink-0">
                             <img alt={listing.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" src={listingImage} referrerPolicy="no-referrer" />
-                            <div className="absolute top-1.5 right-1.5 bg-white/90 backdrop-blur-sm text-[#2E7D32] px-1.5 py-0.5 rounded-lg text-[9px] font-black shadow-sm">
-                              {listing.minPrice || listing.price || '0'} د.م
-                            </div>
+                            {(listing.minPrice || listing.price) ? (
+                              <div className="absolute top-1.5 right-1.5 bg-white/90 backdrop-blur-sm text-[#2E7D32] px-1.5 py-0.5 rounded-lg text-[9px] font-black shadow-sm">
+                                {listing.minPrice || listing.price} د.م
+                              </div>
+                            ) : null}
                           </div>
                           <div className="flex-1 flex flex-col justify-between py-0.5 min-w-0">
                             <div>
@@ -714,7 +716,7 @@ export default function SearchResults({ onNavigate, initialCity, initialRadius, 
 
                     <div className="mt-auto pt-3 flex flex-col sm:flex-row sm:items-end justify-between gap-3">
                       <div className="text-[#2E7D32] font-black text-xs sm:text-lg truncate">
-                        كيبدا من {listing.minPrice || listing.price || '0'} درهم
+                        {(listing.minPrice || listing.price) ? `كيبدا من ${listing.minPrice || listing.price} درهم` : ''}
                       </div>
                       
                       <div className="flex items-center gap-2">
@@ -751,9 +753,11 @@ export default function SearchResults({ onNavigate, initialCity, initialRadius, 
               <div key={listing.id} className="bg-white rounded-2xl overflow-hidden shadow-sm border border-outline-variant/20 hover:shadow-xl transition-all duration-300 group cursor-pointer" onClick={() => onNavigate('listing-details', listing.id)}>
                 <div className="relative h-64 overflow-hidden">
                   <img alt={listing.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" src={listing.images?.[0] || listing.image || "https://images.unsplash.com/photo-1511117833895-4b473c0b85d6?auto=format&fit=crop&q=80&w=800"} referrerPolicy="no-referrer" />
-                  <div className="absolute top-4 right-4 bg-white/90 backdrop-blur text-[#1A1A1A] px-3 py-1 rounded-full text-xs font-bold shadow-sm">
-                    كيبدا من {listing.minPrice || listing.price || '0'} درهم
-                  </div>
+                  {(listing.minPrice || listing.price) ? (
+                    <div className="absolute top-4 right-4 bg-white/90 backdrop-blur text-[#1A1A1A] px-3 py-1 rounded-full text-xs font-bold shadow-sm">
+                      كيبدا من {listing.minPrice || listing.price} درهم
+                    </div>
+                  ) : null}
                   <div className="absolute bottom-4 right-4 bg-white/90 backdrop-blur text-[#1A1A1A] px-3 py-1.5 rounded-full text-[10px] font-bold shadow-sm flex items-center gap-1 cursor-pointer hover:bg-white transition-colors" onClick={(e) => {
                     e.stopPropagation();
                     const url = listing.coordinates 

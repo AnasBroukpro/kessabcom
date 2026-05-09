@@ -294,7 +294,7 @@ function AppContent() {
       <div className="flex-grow">
         {renderView()}
       </div>
-      {currentView !== 'auth' && !['buyer', 'seller', 'admin'].includes(currentView) && <Footer onNavigate={handleNavigate} />}
+      {currentView !== 'auth' && !['buyer', 'seller', 'admin', 'add-listing'].includes(currentView) && <Footer onNavigate={handleNavigate} />}
     </div>
   );
 }

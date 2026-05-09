@@ -56,7 +56,9 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
   const [dynamicAddress, setDynamicAddress] = useState<string>('');
   const [dynamicCity, setDynamicCity] = useState<string>('');
   const [retryTrigger, setRetryTrigger] = useState(0);
+  const [lastCreatedId, setLastCreatedId] = useState<string | null>(null);
   const [hasListings, setHasListings] = useState<boolean | null>(null);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
   const miniMapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -182,9 +184,9 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
         sellerName: profile?.fullName || 'كساب',
         phone: profile?.phoneNumber || '',
         whatsapp: profile?.whatsappNumber || '',
-        title: `${translatedRaces.join(', ')} - ${sheepCount} رأس`,
+        title: `${translatedRaces.join(', ')}${sheepCount ? ` - ${sheepCount} رأس` : ''}`,
         description,
-        price: parseInt(startingPrice) || 0,
+        price: startingPrice ? parseInt(startingPrice) : 0,
         category: translatedRaces[0] || 'أغنام',
         location: address || profile?.location || (coordinates ? 'موقع على الخريطة' : null),
         coordinates: coordinates || null,
@@ -195,8 +197,8 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
         farmLocation: farmLocation,
         youtubeLink,
         status: 'pending',
-        rating: 5,
-        ratingCount: 1
+        rating: 0,
+        ratingCount: 0
       };
 
       if (listingId) {
@@ -217,9 +219,16 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
     if (!user) return;
     
     // Validate Step 3 mandatory fields
-    if (!sheepCount || !startingPrice || selectedAges.length === 0 || selectedRaces.length === 0) {
+    if (selectedAges.length === 0 || selectedRaces.length === 0) {
       setShowErrors(true);
-      setError("المرجو ملء جميع الحقول الإجبارية (عدد الرؤوس، الثمن، السن، والسلالة).");
+      setError("المرجو ملء جميع الحقول الإجبارية (السن والسلالة).");
+      window.scrollTo(0, 0);
+      return;
+    }
+
+    if (startingPrice && parseInt(startingPrice) < 700) {
+      setShowErrors(true);
+      setError("أقل ثمن لا يمكن أن يكون أقل من 700 درهم.");
       window.scrollTo(0, 0);
       return;
     }
@@ -262,16 +271,16 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
         sellerPseudo: profile?.pseudo || null,
         phone: profile?.phoneNumber || '',
         whatsapp: profile?.whatsappNumber || '',
-        title: `${translatedRaces.join(', ')} - ${sheepCount} رأس`,
+        title: `${translatedRaces.join(', ')}${sheepCount ? ` - ${sheepCount} رأس` : ''}`,
         description,
-        price: parseInt(startingPrice) || 0,
+        price: startingPrice ? parseInt(startingPrice) : 0,
         category: translatedRaces[0] || 'أغنام',
         // Instead of defaulting to 'سطات', check if they provided coordinates. 
         // If they did but didn't provide address, store "موقع على الخريطة"
         location: address || profile?.location || (coordinates ? 'موقع على الخريطة' : null),
         coordinates: coordinates || null,
         images: photoUrls.length > 0 ? (photoUrls as string[]) : ["https://i.ytimg.com/vi/RrkkshRUttw/hq720.jpg?sqp=-oaymwEhCK4FEIIDSFryq4qpAxMIARUAAAAAGAElAADIQj0AgKJD&rs=AOn4CLD92lI4Kxe5liKSwWZaJuLAFopNeA"],
-        sheepCount: parseInt(sheepCount),
+        sheepCount: sheepCount ? parseInt(sheepCount) : 0,
         sizes: selectedSizes,
         races: selectedRaces,
         age: translatedAges.join(', '),
@@ -279,8 +288,8 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
         farmLocation: farmLocation,
         youtubeLink,
         status: settings.autoAcceptSellers ? 'active' : 'pending',
-        rating: 5,
-        ratingCount: 1
+        rating: 0,
+        ratingCount: 0
       };
 
       // Payload size check removed as we are using Storage URLs now
@@ -308,7 +317,8 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
       if (listingId) {
         await firestoreService.updateAnnouncement(listingId, finalData);
       } else {
-        await firestoreService.createAnnouncement(finalData);
+        const res = await firestoreService.createAnnouncement(finalData);
+        if (res?.id) setLastCreatedId(res.id);
       }
       setShowSuccess(true);
     } catch (error: any) {
@@ -429,11 +439,10 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
   };
     
   const renderLocationStep = () => (
-    <section className="min-h-0 bg-surface-container-lowest p-6 rounded-[10px] border border-outline-variant/30 shadow-sm space-y-6">
-      <h2 className="text-lg font-bold text-on-surface mb-2 flex items-center gap-2">
-        <span className="w-6 h-6 rounded-full bg-primary text-on-primary flex items-center justify-center text-xs">1</span>
-        تحديد موقع القطيع
-      </h2>
+    <section className="md:bg-surface-container-lowest md:p-6 md:rounded-3xl md:border md:border-outline-variant/30 md:shadow-sm space-y-8 animate-in fade-in duration-500">
+      <p className="text-sm font-bold text-on-surface-variant bg-surface-container-low p-4 rounded-xl border-r-4 border-primary">
+        تحديد موقع الضيعة كايساعد الكليان يلقاك بسهولة فخريطة المدينة ويجي عندك حتى للدار.
+      </p>
       <div className="space-y-6">
         
         {/* 1 & 2. GPS Button and City Selector in one row for mobile */}
@@ -506,7 +515,7 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
         
         {/* Farm location text */}
         <div className="space-y-2">
-          <label className="block text-sm font-bold text-on-surface-variant">موقع الضيعة بالتفصيل</label>
+          <label className="block text-sm font-bold text-on-surface-variant">النعت ديال الضيعة</label>
           <input 
             type="text"
             value={farmLocation}
@@ -693,16 +702,51 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
   );
 
   const renderMediaStep = () => (
-    <section className="bg-surface-container-lowest p-6 rounded-[10px] border border-outline-variant/30 shadow-sm space-y-6">
-      <h2 className="text-lg font-bold text-on-surface mb-2 flex items-center gap-2">
-        <span className="w-6 h-6 rounded-full bg-primary text-on-primary flex items-center justify-center text-xs">2</span>
-        صور القطيع (مهم بزاف)
-      </h2>
-      <p className="text-sm text-on-surface-variant">الكليان كايبغي يشوف الحولي مزيان قبل ما يجي. ضروري تحط على الأقل صورة رئيسية للقطيع ديالك.</p>
+    <section className="md:bg-surface-container-lowest md:p-6 md:rounded-3xl md:border md:border-outline-variant/30 md:shadow-sm space-y-6 animate-in fade-in duration-500">
+      <p className="text-sm font-bold text-on-surface-variant bg-surface-container-low p-4 rounded-xl border-r-4 border-primary">
+        الكليان كايبغي يشوف الحولي مزيان قبل ما يجي. ضروري تحط على الأقل صورة رئيسية للقطيع ديالك.
+      </p>
       
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+        {/* Secondary Photo Slots - Single Row on Mobile, 2x2 Grid on Desktop */}
+        <div className="order-2 md:order-1 grid grid-cols-4 md:grid-cols-2 gap-3">
+          {[1, 2, 3, 4].map((index) => (
+            <div key={index} className="relative bg-surface-container-low rounded-xl border-2 border-dashed border-outline-variant/30 flex flex-col items-center justify-center aspect-square cursor-pointer hover:bg-surface-variant/50 transition-colors overflow-hidden group">
+              {compressingIndex === index ? (
+                <Loader2 className="w-4 h-4 animate-spin text-primary" />
+              ) : photoFiles[index] ? (
+                <div className="absolute inset-0">
+                  <img 
+                    src={typeof photoFiles[index] === 'string' ? photoFiles[index] as string : URL.createObjectURL(photoFiles[index] as File)} 
+                    className="w-full h-full object-cover" 
+                    alt={`Photo ${index + 1}`} 
+                  />
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); handlePhotoChange(index, null); }}
+                    className="absolute top-1 right-1 bg-red-600 text-white p-1 rounded-full shadow-lg z-20 hover:scale-110 transition-transform"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    capture="environment"
+                    className="absolute inset-0 opacity-0 cursor-pointer z-10" 
+                    onChange={(e) => handlePhotoChange(index, e.target.files?.[0] || null)}
+                  />
+                  <Camera className="w-5 h-5 text-on-surface-variant/40 group-hover:text-primary transition-colors" />
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+
         {/* Main Photo (Required) */}
-        <div className="col-span-2 row-span-2 relative bg-surface-container-low rounded-[10px] border-2 border-dashed border-outline-variant/50 flex flex-col items-center justify-center aspect-square cursor-pointer hover:bg-surface-variant/50 transition-colors group overflow-hidden">
+        <div className="order-1 md:order-2 relative bg-surface-container-low rounded-[24px] border-2 border-dashed border-outline-variant/50 flex flex-col items-center justify-center aspect-square cursor-pointer hover:bg-surface-variant/50 transition-colors group overflow-hidden">
           {compressingIndex === 0 ? (
             <div className="flex flex-col items-center gap-2">
               <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -732,55 +776,17 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
                 className="absolute inset-0 opacity-0 cursor-pointer z-10" 
                 onChange={(e) => handlePhotoChange(0, e.target.files?.[0] || null)}
               />
-              <div className="w-12 h-12 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center mb-3 group-hover:scale-110 transition-transform shadow-md">
-                <Camera className="w-6 h-6" />
+              <div className="w-16 h-16 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center mb-3 group-hover:scale-110 transition-transform shadow-md">
+                <Camera className="w-8 h-8" />
               </div>
               <div className="flex flex-col items-center">
-                <span className="font-black text-on-surface text-sm text-center px-2">صورة رئيسية (إجبارية)</span>
-                <span className="text-[10px] text-error font-bold mt-1 bg-red-50 px-2 py-0.5 rounded">مطلوب</span>
+                <span className="font-black text-on-surface text-base text-center px-2">صورة رئيسية (إجبارية)</span>
+                <span className="text-xs text-error font-bold mt-1 bg-red-50 px-3 py-1 rounded-full">مطلوب وضع صورة</span>
               </div>
             </>
           )}
         </div>
-        
-        {/* Secondary Photo Slots */}
-        {[1, 2, 3, 4].map((index) => (
-          <div key={index} className="relative bg-surface-container-low rounded-[10px] border-2 border-dashed border-outline-variant/50 flex flex-col items-center justify-center aspect-square cursor-pointer hover:bg-surface-variant/50 transition-colors overflow-hidden group">
-            {compressingIndex === index ? (
-              <div className="flex flex-col items-center gap-1">
-                <Loader2 className="w-5 h-5 animate-spin text-primary" />
-                <span className="text-[10px] font-bold text-on-surface-variant">ضغط...</span>
-              </div>
-            ) : photoFiles[index] ? (
-              <div className="absolute inset-0">
-                <img 
-                  src={typeof photoFiles[index] === 'string' ? photoFiles[index] as string : URL.createObjectURL(photoFiles[index] as File)} 
-                  className="w-full h-full object-cover" 
-                  alt={`Photo ${index + 1}`} 
-                />
-                <div className="absolute bottom-1 left-1 bg-black/60 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full">WebP</div>
-                <button 
-                  onClick={(e) => { e.stopPropagation(); handlePhotoChange(index, null); }}
-                  className="absolute top-1 right-1 bg-red-600 text-white p-1 rounded-full shadow-lg z-20 hover:scale-110 transition-transform flex items-center justify-center"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ) : (
-              <>
-                <input 
-                  type="file" 
-                  accept="image/*" 
-                  capture="environment"
-                  className="absolute inset-0 opacity-0 cursor-pointer z-10" 
-                  onChange={(e) => handlePhotoChange(index, e.target.files?.[0] || null)}
-                />
-                <Camera className="w-6 h-6 text-on-surface-variant/50 mb-2 group-hover:text-primary transition-colors" />
-                <span className="text-xs font-medium text-on-surface-variant">صورة {index + 1}</span>
-              </>
-            )}
-          </div>
-        ))}
+      </div>
       </div>
 
       {/* Compression error banner */}
@@ -814,14 +820,10 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
   );
 
   const renderInfoStep = () => (
-    <section className="bg-surface-container-lowest p-5 rounded-2xl border border-outline-variant/30 shadow-xl space-y-8 animate-in fade-in duration-500">
-      <div className="flex items-center justify-between border-b border-outline-variant/10 pb-4">
-        <h2 className="text-xl font-black text-on-surface flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-primary text-on-primary flex items-center justify-center text-sm shadow-lg shadow-primary/20">3</div>
-          معلومات القطيع
-        </h2>
-        <span className="text-[10px] font-bold text-on-surface-variant bg-surface-container-high px-3 py-1 rounded-full">الخطوة الأخيرة</span>
-      </div>
+    <section className="md:bg-surface-container-lowest md:p-6 p-1 md:rounded-3xl md:border md:border-outline-variant/30 md:shadow-xl space-y-8 animate-in fade-in duration-500">
+      <p className="text-sm font-bold text-on-surface-variant bg-surface-container-low p-4 rounded-xl border-r-4 border-primary">
+        عمر المعلومات ديال القطيع ديالك بكل دقة باش يثيق فيك الشاري ويجي عندك بالمعقول.
+      </p>
       
       <div className="space-y-8">
         <div className="grid grid-cols-2 gap-4">
@@ -836,7 +838,6 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
                 className="w-full h-14 px-3 bg-surface-container-low border-2 border-transparent rounded-xl text-on-surface focus:bg-white focus:border-primary focus:ring-4 focus:ring-primary/5 transition-all text-right font-black text-xl shadow-sm" 
                 placeholder="0" 
                 type="number" 
-                required
                 value={sheepCount}
                 onChange={(e) => setSheepCount(e.target.value)}
               />
@@ -857,7 +858,7 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
                 className="w-full h-14 px-3 bg-surface-container-low border-2 border-transparent rounded-xl text-on-surface focus:bg-white focus:border-primary focus:ring-4 focus:ring-primary/5 transition-all text-right font-black text-xl shadow-sm" 
                 placeholder="0" 
                 type="number" 
-                required
+                min="700"
                 value={startingPrice}
                 onChange={(e) => setStartingPrice(e.target.value)}
               />
@@ -898,7 +899,7 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
         <div className="space-y-4">
           <label className="block text-sm font-black text-on-surface-variant flex items-center gap-2 mr-1">
             <Ruler className="w-4 h-4 text-primary" />
-            حجم الحولي
+            أحجام الأغنام المتوفرة عندك.
           </label>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
@@ -929,7 +930,7 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
         <div className="space-y-4">
           <label className="block text-sm font-black text-on-surface-variant flex items-center gap-2 mr-1">
             <Globe className="w-4 h-4 text-primary" />
-            سلالة الغنم
+            السلالات المتوفرة عندك
             {showErrors && selectedRaces.length === 0 && <span className="text-[10px] text-error animate-pulse bg-red-50 px-2 py-0.5 rounded">مطلوب</span>}
           </label>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -962,7 +963,7 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
         <div className="space-y-4 pt-4">
           <label className="block text-sm font-black text-on-surface-variant flex items-center gap-2 mr-1">
             <AudioLines className="w-4 h-4 text-primary" />
-            وصف مسموع وكتابي
+            وصف القطيع
           </label>
           
           <div className={`p-5 rounded-2xl flex items-center justify-between border-2 shadow-sm transition-all duration-300 ${isRecording ? 'bg-red-50 border-red-200 ring-4 ring-red-100' : 'bg-green-50/50 border-green-100'}`}>
@@ -1028,23 +1029,64 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
 
   return (
     <div className="min-h-screen bg-surface pb-20 md:pb-0" dir="rtl">
-      <header className="bg-surface/80 backdrop-blur-md border-b border-outline-variant/20 sticky top-0 z-50">
+      <header className="bg-surface/80 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-3xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            {hasListings !== false && (
-              <button 
-                onClick={() => onNavigate(profile?.role === 'admin' ? 'admin' : 'seller')} 
-                className="flex items-center gap-2 text-on-surface-variant hover:text-primary transition-colors group"
-              >
-                <ArrowRight className="w-6 h-6 transition-transform group-hover:translate-x-1" />
-                <span className="font-black text-sm">الرجوع للوحة التحكم</span>
-              </button>
-            )}
+            <button 
+              onClick={() => {
+                const hasData = sheepCount || startingPrice || description || photoFiles.some(f => f !== null);
+                if (hasData) {
+                  setShowExitConfirm(true);
+                } else {
+                  onNavigate(profile?.role === 'admin' ? 'admin' : 'seller');
+                }
+              }} 
+              className="flex items-center gap-2 text-red-600 hover:text-red-700 transition-colors group border border-red-100 px-3 py-1.5 rounded-xl bg-red-50/30"
+            >
+              <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
+              <span className="font-black text-xs">الرجوع للوحة التحكم</span>
+            </button>
           </div>
           
-          <h1 className="text-xl font-black text-on-surface font-headline">
-            {listingId ? 'تعديل القطيع' : 'إضافة قطيع جديد'}
+          <h1 className="text-lg font-black text-on-surface font-headline">
+            {currentStep === 1 ? 'تحديد الموقع' : currentStep === 2 ? 'صور القطيع' : 'معلومات القطيع'}
           </h1>
+        </div>
+        
+        {/* Stepper progress bar */}
+        <div className="max-w-3xl mx-auto px-6 py-4 bg-surface/50">
+          <div className="relative flex items-center justify-between">
+            {/* Background Line */}
+            <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-1 bg-surface-container-highest z-0 rounded-full" />
+            
+            {/* Active Progress Line */}
+            <motion.div 
+              className="absolute right-0 top-1/2 -translate-y-1/2 h-1 bg-primary z-0 origin-right rounded-full"
+              initial={{ width: 0 }}
+              animate={{ width: `${((currentStep - 1) / 2) * 100}%` }}
+              transition={{ type: 'spring', damping: 20, stiffness: 100 }}
+            />
+            
+            {/* Step Circles */}
+            {[1, 2, 3].map((step) => (
+              <div key={step} className="relative z-10 flex flex-col items-center">
+                <motion.div 
+                  initial={false}
+                  animate={{ 
+                    scale: currentStep === step ? 1.2 : 1,
+                    backgroundColor: currentStep >= step ? 'var(--color-primary)' : 'var(--color-surface-container-highest)',
+                    color: currentStep >= step ? 'var(--color-on-primary)' : 'var(--color-on-surface-variant)'
+                  }}
+                  className="w-7 h-7 rounded-full flex items-center justify-center font-black text-xs shadow-sm"
+                >
+                  {step}
+                </motion.div>
+                <span className={`text-[9px] mt-1 font-black transition-colors ${currentStep >= step ? 'text-primary' : 'text-on-surface-variant opacity-50'}`}>
+                  {step === 1 ? 'الموقع' : step === 2 ? 'الصور' : 'المعلومات'}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
       </header>
 
@@ -1058,21 +1100,21 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
 
         <div className="">
           {currentStep === 1 && (
-            <div className="min-h-0 flex flex-col">
+            <div className="min-h-[calc(100dvh-180px)] md:min-h-0 flex flex-col">
                {renderLocationStep()}
             </div>
           )}
           {currentStep === 2 && (
-            <div className="md:min-h-0 min-h-[calc(100dvh-150px)] flex flex-col">
+            <div className="min-h-[calc(100dvh-180px)] md:min-h-0 flex flex-col">
                {renderMediaStep()}
             </div>
           )}
           {currentStep === 3 && renderInfoStep()}
         </div>
 
-        <div className="flex gap-4 pt-6">
+        <div className="sticky bottom-0 left-0 right-0 p-4 bg-surface/80 backdrop-blur-md border-t border-outline-variant/20 flex gap-4 z-40">
           {currentStep > 1 && (
-            <button onClick={() => setCurrentStep(prev => prev - 1)} className="flex-1 py-4 bg-surface-container-high rounded-[10px] font-bold transition-colors border border-transparent hover:bg-transparent hover:text-on-surface hover:border-outline-variant">رجوع</button>
+            <button onClick={() => setCurrentStep(prev => prev - 1)} className="flex-1 py-4 bg-surface-container-high rounded-xl font-bold transition-colors border border-transparent hover:bg-transparent hover:text-on-surface hover:border-outline-variant">رجوع</button>
           )}
           {currentStep < 3 ? (
             <button 
@@ -1095,7 +1137,7 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
                 }
                 setCurrentStep(prev => prev + 1);
               }} 
-              className="flex-1 py-4 bg-primary text-on-primary rounded-[10px] font-bold transition-colors border border-transparent hover:bg-transparent hover:text-primary hover:border-primary"
+              className="flex-1 py-4 bg-primary text-on-primary rounded-xl font-bold transition-colors border border-transparent hover:bg-transparent hover:text-primary hover:border-primary"
             >
               التالي
             </button>
@@ -1103,7 +1145,7 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
             <button 
               onClick={handleSubmit} 
               disabled={isSubmitting}
-              className="flex-1 py-4 bg-primary text-on-primary rounded-[10px] font-bold transition-colors border border-transparent hover:bg-transparent hover:text-primary hover:border-primary flex items-center justify-center gap-2"
+              className="flex-1 py-4 bg-primary text-on-primary rounded-xl font-bold transition-colors border border-transparent hover:bg-transparent hover:text-primary hover:border-primary flex items-center justify-center gap-2"
             >
               {isSubmitting ? (
                 <>
@@ -1126,14 +1168,16 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
             </div>
             <h3 className="text-2xl font-black text-[#1a1a1a] mb-2 font-headline">{listingId ? 'تم التعديل!' : 'مبروك!'}</h3>
             <p className="text-[#4a4a4a] font-bold leading-relaxed mb-8">
-              {listingId ? 'تم تعديل معلومات القطيع بنجاح.' : 'صافي الغنم ديالك دخلات , دابا الناس غيلقاو الغنم ديالك'}
+              {listingId ? 'تم تعديل معلومات القطيع بنجاح.' : 'صافي الغنم ديالك دخلات، دابا الناس غيلقاو الغنم ديالك'}
             </p>
-            <button 
-              onClick={() => onNavigate('seller')}
-              className="w-full py-4 bg-[#2E7D32] text-white rounded-[10px] font-black shadow-lg shadow-green-900/20 transition-colors border border-transparent hover:bg-transparent hover:text-[#2E7D32] hover:border-[#2E7D32]"
-            >
-              تم
-            </button>
+            <div className="space-y-3">
+              <button 
+                onClick={() => onNavigate('listing-details', lastCreatedId || listingId)}
+                className="w-full py-4 bg-[#2E7D32] text-white rounded-xl font-black shadow-lg shadow-green-900/20 transition-colors border border-transparent hover:bg-transparent hover:text-[#2E7D32] hover:border-[#2E7D32] animate-shake"
+              >
+                شوف الإعلان ديالك دابا
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1174,6 +1218,34 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {showExitConfirm && (
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-sm rounded-3xl p-8 text-center animate-in zoom-in-95 duration-200 shadow-2xl border border-outline-variant/10">
+            <div className="w-20 h-20 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Info className="w-10 h-10" />
+            </div>
+            <h3 className="text-2xl font-black text-[#1a1a1a] mb-2 font-headline">واش متأكد؟</h3>
+            <p className="text-[#4a4a4a] font-bold leading-relaxed mb-8">
+              واش متأكد بغيتي تخرج؟ غادي تضيع كاع المعلومات اللي دخلتي دابا.
+            </p>
+            <div className="flex flex-col gap-3">
+              <button 
+                onClick={() => onNavigate(profile?.role === 'admin' ? 'admin' : 'seller')}
+                className="w-full py-4 bg-red-600 text-white rounded-xl font-black shadow-lg shadow-red-900/20 transition-all hover:bg-red-700 active:scale-95"
+              >
+                تأكيد الخروج
+              </button>
+              <button 
+                onClick={() => setShowExitConfirm(false)}
+                className="w-full py-4 bg-surface-container-high text-on-surface rounded-xl font-black transition-all hover:bg-surface-container-highest active:scale-95"
+              >
+                بقاء في الصفحة
+              </button>
+            </div>
           </div>
         </div>
       )}

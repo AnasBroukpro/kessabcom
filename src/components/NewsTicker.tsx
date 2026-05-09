@@ -49,7 +49,7 @@ export default function NewsTicker({ className = "", isMobile = false }: NewsTic
         <div key={`${keyPrefix}-n-${idx}`} className="flex items-center">
           <span className={`mx-2 flex items-center gap-1.5 text-on-surface ${small ? 'text-[10px]' : 'text-sm'}`}>
             <Info className={`text-primary ${small ? 'w-3 h-3' : 'w-4 h-4'}`} />
-            <span>{news}</span>
+            <span className="font-bold">{news}</span>
           </span>
           <span className="mx-2 text-outline-variant">•</span>
         </div>

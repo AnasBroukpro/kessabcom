@@ -117,3 +117,45 @@
     to { opacity: 1; transform: translateY(0); }
   }
 
+  @keyframes logo-shake {
+    0% { transform: translateX(0); }
+    5% { transform: translateX(-6px) rotate(-1deg); }
+    10% { transform: translateX(6px) rotate(1deg); }
+    15% { transform: translateX(-6px) rotate(-1deg); }
+    20% { transform: translateX(6px) rotate(1deg); }
+    25% { transform: translateX(0); }
+    100% { transform: translateX(0); }
+  }
+  .animate-shake {
+    animation: logo-shake 2.5s ease-in-out infinite;
+  }
+
+  @keyframes text-swap-1 {
+    0%, 45% { transform: translateY(0); opacity: 1; }
+    50%, 95% { transform: translateY(-10px); opacity: 0; }
+    100% { transform: translateY(0); opacity: 1; }
+  }
+
+  @keyframes text-swap-2 {
+    0%, 45% { transform: translateY(10px); opacity: 0; }
+    50%, 95% { transform: translateY(0); opacity: 1; }
+    100% { transform: translateY(10px); opacity: 0; }
+  }
+
+  .text-swap-container {
+    display: inline-grid;
+    place-items: center;
+    vertical-align: middle;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .text-swap-1 {
+    grid-area: 1/1;
+    animation: text-swap-1 5s infinite;
+  }
+
+  .text-swap-2 {
+    grid-area: 1/1;
+    animation: text-swap-2 5s infinite;
+  }

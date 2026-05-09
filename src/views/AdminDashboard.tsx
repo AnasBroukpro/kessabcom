@@ -3974,7 +3974,7 @@ const renderOverview = () => (
           onNavigate={onNavigate}
         />
 
-        <div className={`${prefCompactMode ? 'p-4 md:p-5' : 'p-6 md:p-8'} max-w-7xl mx-auto w-full transition-all duration-300`}>
+        <div className={`${prefCompactMode ? 'p-4 md:p-5' : 'p-6 md:p-8'} max-w-7xl mx-auto w-full transition-all duration-300 pt-20 lg:pt-24`}>
 
           {activeTab === 'overview' && renderOverview()}
           {activeTab === 'stats' && renderStats()}

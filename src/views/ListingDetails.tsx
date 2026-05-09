@@ -50,9 +50,11 @@ export default function ListingDetails({ onNavigate, listingId }: Props) {
     <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-outline-variant/20 hover:shadow-xl transition-all duration-300 group cursor-pointer" onClick={() => onNavigate('listing-details', relatedListing.id)}>
       <div className="relative h-64 overflow-hidden">
         <img alt={relatedListing.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" src={relatedListing.images?.[0] || relatedListing.image || "https://images.unsplash.com/photo-1511117833895-4b473c0b85d6?auto=format&fit=crop&q=80&w=800"} referrerPolicy="no-referrer" />
-        <div className="absolute top-4 right-4 bg-white/90 backdrop-blur text-[#1A1A1A] px-3 py-1 rounded-full text-xs font-bold shadow-sm">
-          كيبدا من {relatedListing.minPrice || relatedListing.price || '0'} درهم
-        </div>
+        {(relatedListing.minPrice || relatedListing.price) ? (
+          <div className="absolute top-4 right-4 bg-white/90 backdrop-blur text-[#1A1A1A] px-3 py-1 rounded-full text-xs font-bold shadow-sm">
+            كيبدا من {relatedListing.minPrice || relatedListing.price} درهم
+          </div>
+        ) : null}
         <div className="absolute bottom-4 right-4 bg-white/90 backdrop-blur text-[#1A1A1A] px-3 py-1.5 rounded-full text-[10px] font-bold shadow-sm flex items-center gap-1 cursor-pointer hover:bg-white transition-colors" onClick={(e) => {
           e.stopPropagation();
           const url = relatedListing.coordinates 
@@ -270,7 +272,7 @@ export default function ListingDetails({ onNavigate, listingId }: Props) {
     <div className="min-h-screen bg-[#FDFCF8] font-sans" dir="rtl">
       <SearchHeader onNavigate={onNavigate} />
 
-      <main className="max-w-7xl mx-auto px-4 py-6 md:py-8 pb-28 md:pb-8">
+      <main className="max-w-7xl mx-auto px-4 pt-32 lg:pt-24 pb-28 md:pb-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
           
           {/* LEFT COLUMN (Desktop) / BOTTOM (Mobile) — Seller Card + Location */}
@@ -301,37 +303,41 @@ export default function ListingDetails({ onNavigate, listingId }: Props) {
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-black text-lg text-[#1A1A1A] leading-tight truncate">
+                    <div className="flex items-center justify-between gap-2">
+                      <h3 className="font-black text-lg text-[#1A1A1A] leading-tight truncate">
+                        {(() => {
+                          const name = sellerProfile?.pseudo || sellerProfile?.fullName || sellerProfile?.displayName || listing?.sellerName;
+                          if (!name || name.toLowerCase() === 'user') return 'كساب';
+                          return name;
+                        })()}
+                      </h3>
                       {(() => {
-                        const name = sellerProfile?.pseudo || sellerProfile?.fullName || sellerProfile?.displayName || listing?.sellerName;
-                        if (!name || name.toLowerCase() === 'user') return 'كساب';
-                        return name;
+                        const totalReviews = (sellerProfile?.reviews?.length || 0) + (listing?.listingReviews?.length || 0);
+                        const avgRating = sellerProfile?.reviewsCount > 0 ? (sellerProfile?.rating || 5) : (totalReviews > 0 ? 4.5 : 5.0);
+                        return (
+                          <div className="flex items-center gap-1 bg-[#F9F9F6] px-2 py-0.5 rounded-lg border border-outline-variant/10 shadow-sm shrink-0" dir="ltr">
+                            <Star className="w-3 h-3 text-[#FF9800] fill-current" />
+                            <span className="text-[11px] font-black text-[#1A1A1A]">{Number(avgRating).toFixed(1)}</span>
+                          </div>
+                        );
                       })()}
-                    </h3>
+                    </div>
                     <span className={`inline-block text-[10px] font-black px-2 py-0.5 rounded-full mt-0.5 ${sellerProfile?.isCertified ? 'bg-[#E8F5E9] text-[#2E7D32]' : 'bg-[#F9F9F6] text-[#757575]'}`}>
-                      {sellerProfile?.isCertified ? '✓ كساب معتمد من طرف لونصا (ONSSA)' : 'كساب'}
+                      {sellerProfile?.isCertified ? '✓ كساب معتمد من طرف (ONSSA)' : 'كساب'}
                     </span>
                   </div>
                 </div>
 
-                {/* Stars rating — prominently below the role */}
+                {/* Rating details moved up next to name, but we keep the count here if needed, or remove this block */}
                 {(() => {
                   const totalReviews = (sellerProfile?.reviews?.length || 0) + (listing?.listingReviews?.length || 0);
-                  const avgRating = sellerProfile?.reviewsCount > 0 ? (sellerProfile?.rating || 5) : (totalReviews > 0 ? 4.5 : null);
-                  if (!avgRating) return null;
+                  const count = (sellerProfile?.reviewsCount || 0) + (totalReviews || 0);
+                  if (count === 0) return null;
                   return (
-                    <div className="flex items-center gap-3 bg-[#FFFDE7] border border-[#FFE082]/40 rounded-xl px-4 py-3 mb-5">
-                      <div className="text-2xl font-black text-[#FF9800]">{Number(avgRating).toFixed(1)}</div>
-                      <div>
-                        <div className="flex items-center gap-0.5 mb-0.5" dir="ltr">
-                          {[...Array(5)].map((_, i) => (
-                            <Star key={i} className={`w-4 h-4 ${i < Math.round(avgRating) ? 'text-[#FF9800] fill-current' : 'text-[#E0E0E0]'}`} />
-                          ))}
-                        </div>
-                        <p className="text-[10px] text-[#757575] font-bold">
-                          {sellerProfile?.reviewsCount || totalReviews} تقييم من المشترين
-                        </p>
-                      </div>
+                    <div className="flex items-center gap-2 mb-5 opacity-60">
+                      <p className="text-[10px] text-[#757575] font-bold">
+                        {count} تقييم من المشترين
+                      </p>
                     </div>
                   );
                 })()}
@@ -354,13 +360,29 @@ export default function ListingDetails({ onNavigate, listingId }: Props) {
                     <span>تواصل مع الكساب</span>
                   </button>
 
-                  <button
-                    onClick={() => setShowReportModal(true)}
-                    className="w-full flex items-center justify-center gap-2 text-red-500 py-2.5 rounded-xl font-bold transition-colors border border-transparent hover:border-red-200 hover:bg-red-50 text-sm"
-                  >
-                    <AlertTriangle className="w-4 h-4" />
-                    <span>تبليغ عن هذا الإعلان</span>
-                  </button>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      onClick={() => {
+                        const url = window.location.href;
+                        const buyerName = profile?.fullName || profile?.displayName || '';
+                        const greeting = buyerName ? `السلام عليكم، أنا ${buyerName}. ` : 'السلام عليكم. ';
+                        const text = `${greeting}شفت هاد الحولي ف منصة kessabcom.ma ومهتم نجي نشوف لكسيبة: ${url}`;
+                        window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+                      }}
+                      className="flex items-center justify-center gap-2 bg-[#94edb5] text-[#1a6b3a] border border-[#25D366] py-2.5 rounded-xl font-bold transition-all hover:bg-[#7de0a2] shadow-sm active:scale-95 text-sm"
+                    >
+                      <MessageCircle className="w-4 h-4" />
+                      <span>بارطاجي واتساب</span>
+                    </button>
+
+                    <button
+                      onClick={() => setShowReportModal(true)}
+                      className="flex items-center justify-center gap-2 text-red-600 py-2.5 rounded-xl font-bold transition-colors border border-red-300 bg-[#fef2f2] hover:bg-red-100 text-sm"
+                    >
+                      <AlertTriangle className="w-4 h-4" />
+                      <span>تبليغ عن الإعلان</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -481,21 +503,10 @@ export default function ListingDetails({ onNavigate, listingId }: Props) {
 
             {/* Title & Location */}
             <div className="bg-white rounded-3xl p-8 shadow-sm border border-outline-variant/10">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-2">
+              <div className="flex flex-row items-center gap-3 mb-2">
                 <h1 className="text-2xl md:text-3xl font-black text-[#1A1A1A] font-headline truncate" title={`ضيعة ${sellerProfile?.pseudo || sellerProfile?.fullName || sellerProfile?.displayName || listing?.sellerName || 'كساب'}`}>
                   ضيعة {sellerProfile?.pseudo || sellerProfile?.fullName || sellerProfile?.displayName || listing?.sellerName || 'كساب'}
                 </h1>
-                <div className="flex items-center gap-1 bg-[#F9F9F6] px-3 py-1.5 rounded-xl border border-outline-variant/10 shadow-sm w-fit shrink-0">
-                  <Star className="w-4 h-4 text-amber-400 fill-current" />
-                  <span className="text-sm font-black text-[#1A1A1A]">
-                    {listing?.ratingCount && listing.ratingCount > 0 ? (listing.rating / listing.ratingCount).toFixed(1) : '5.0'}
-                  </span>
-                  {listing?.ratingCount && listing.ratingCount > 0 && (
-                    <span className="text-[10px] font-bold text-[#757575] mr-1">
-                      ({listing.ratingCount} avis)
-                    </span>
-                  )}
-                </div>
               </div>
               <div className="flex items-center gap-2 text-[#4A4A4A] mb-6 overflow-hidden">
                 <MapPin className="w-5 h-5 text-[#2E7D32] shrink-0" />
@@ -526,11 +537,11 @@ export default function ListingDetails({ onNavigate, listingId }: Props) {
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
                     <div className="bg-[#F9F9F6] p-4 rounded-2xl border border-outline-variant/10">
                       <p className="text-[10px] text-[#757575] mb-1">عدد الرؤوس</p>
-                      <p className="font-bold text-[#1A1A1A]">{listing?.sheepCount || '---'} رأس</p>
+                      <p className="font-bold text-[#1A1A1A]">{listing?.sheepCount ? `${listing.sheepCount} رأس` : 'غير محدد'}</p>
                     </div>
                     <div className="bg-[#F9F9F6] p-4 rounded-2xl border border-outline-variant/10">
                       <p className="text-[10px] text-[#757575] mb-1">أقل ثمن</p>
-                      <p className="font-bold text-[#2E7D32]">{listing?.price || '---'} درهم</p>
+                      <p className="font-bold text-[#2E7D32]">{listing?.price ? `${listing.price} درهم` : 'غير محدد.'}</p>
                     </div>
                     <div className="bg-[#F9F9F6] p-4 rounded-2xl border border-outline-variant/10">
                       <p className="text-[10px] text-[#757575] mb-1">السن (الأعمار)</p>

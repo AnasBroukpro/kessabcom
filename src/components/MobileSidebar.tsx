@@ -28,6 +28,7 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   onNavigate: (view: ViewType, listingId?: string, city?: string, radius?: string, subView?: string) => void;
+  onShowTutorial?: () => void;
 }
 
 export default function MobileSidebar({ isOpen, onClose, onNavigate }: Props) {
@@ -157,7 +158,7 @@ export default function MobileSidebar({ isOpen, onClose, onNavigate }: Props) {
                   <p className="text-xs font-bold text-[#757575]">سجل الدخول باش تستافد من كاع الميزات</p>
                   <button 
                     onClick={() => handleLinkClick('auth')}
-                    className="mt-2 w-full py-3 bg-[#2E7D32] text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-[#2E7D32]/20 active:scale-95 transition-transform"
+                    className="mt-2 w-full py-3 bg-[#2E7D32] text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-[#2E7D32]/20 active:scale-95 transition-transform animate-shake"
                   >
                     <LogIn size={18} />
                     <span>تسجيل الدخول</span>

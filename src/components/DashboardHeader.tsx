@@ -262,7 +262,7 @@ export default function DashboardHeader({ title, subtitle, location, showSearch 
   };
 
   return (
-    <header className="bg-white/90 backdrop-blur-md border-b border-outline-variant/30 sticky top-0 z-[70]">
+    <header className="fixed top-0 w-full z-50 bg-white/90 backdrop-blur-md border-b border-outline-variant/30">
       <MobileSidebar 
         isOpen={isSidebarOpen} 
         onClose={() => setIsSidebarOpen(false)} 
@@ -275,68 +275,34 @@ export default function DashboardHeader({ title, subtitle, location, showSearch 
         onMarkNotificationAsRead={handleMarkNotificationAsRead}
       />
 
-      <div className="max-w-7xl mx-auto px-4 py-3 md:py-0 md:h-20 flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-6">
+      {/* Row 1: Logo | Desktop Search | Actions */}
+      <div className="max-w-7xl mx-auto px-4 md:px-6 h-16 w-full flex items-center justify-between gap-2 md:gap-8 flex-row-reverse md:flex-row">
         
-        {/* Top Mobile Row (Actions on Right + Logo on Left) */}
-        <div className="flex items-center justify-between md:hidden w-full h-14">
-          <div className="flex items-center gap-2">
-            <div className="flex flex-col items-center justify-center">
-               <button onClick={() => setIsSidebarOpen(true)} className="w-10 h-10 flex flex-col items-center justify-center gap-1.5 bg-[#F9F9F6] rounded-[10px] border border-outline-variant/10">
-                  <motion.span animate={isSidebarOpen ? { rotate: 45, y: 8 } : { rotate: 0, y: 0 }} className="w-5 h-0.5 bg-[#2E7D32] rounded-full" />
-                  <motion.span animate={isSidebarOpen ? { opacity: 0 } : { opacity: 1 }} className="w-5 h-0.5 bg-[#2E7D32] rounded-full" />
-                  <motion.span animate={isSidebarOpen ? { rotate: -45, y: -8 } : { rotate: 0, y: 0 }} className="w-5 h-0.5 bg-[#2E7D32] rounded-full" />
-               </button>
-            </div>
-            
-            <button 
-              onClick={() => setIsNotificationSidebarOpen(true)}
-              className={`p-2 rounded-[10px] border border-transparent transition-colors relative ${isNotificationSidebarOpen ? 'bg-white text-[#2E7D32] border-[#2E7D32]' : 'bg-[#F9F9F6] text-[#757575] hover:bg-white hover:text-[#2E7D32] hover:border-[#2E7D32]'}`}
-            >
-              <Bell className="w-5 h-5" />
-              {(Array.isArray(notifications) ? notifications : []).some(n => !n.read) && (
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
-              )}
-            </button>
-          </div>
-
-          <button onClick={() => onNavigate?.('home')} className="flex items-center">
+        {/* LEFT: Logo (desktop also shows nav links) */}
+        <div className="flex items-center gap-2 md:gap-8 shrink-0">
+          <button onClick={() => onNavigate?.('home')} className="flex items-center group">
             <img 
               src={logoV2} 
-              alt="كسابكوم" 
-              className="h-[26px] w-auto object-contain"
+              alt="منصة kessabcom.ma" 
+              className="h-[22px] md:h-8 w-auto object-contain transition-transform group-hover:scale-105"
             />
           </button>
-        </div>
-
-        {/* Desktop Title & Centered Welcome Message / Logo */}
-        <div className="hidden md:flex items-center justify-start flex-1 relative h-full">
-          <div className="flex items-center gap-6 animate-in fade-in slide-in-from-top-1 duration-700">
-            <button 
-              onClick={() => onNavigate?.('home')}
-              className="text-lg font-black text-primary hover:text-primary/80 transition-colors font-headline"
-            >
-              الرئيسية
-            </button>
-            <div className="w-px h-4 bg-outline-variant/30" />
-            <button 
-              onClick={() => onNavigate?.('search-results')}
-              className="text-lg font-black text-[#1A1A1A] hover:text-primary transition-colors font-headline"
-            >
-              البحث
-            </button>
+          <div className="hidden md:flex items-center gap-6">
+            <button onClick={() => onNavigate?.('home')} className="text-on-surface-variant hover:text-[#2E7D32] transition-colors font-medium text-sm">الرئيسية</button>
+            <button onClick={() => onNavigate?.('search-results')} className="text-on-surface-variant hover:text-[#2E7D32] transition-colors font-medium text-sm">البحث</button>
           </div>
         </div>
 
-        {/* Modern Expert Search Bar - Adapted for Dashboard */}
+        {/* Modern Expert Search Bar - Desktop Centered */}
         {showSearch && (
-          <div ref={searchBarRef} className="lg:max-w-xl flex flex-row items-center gap-1 sm:gap-2 bg-[#F9F9F6] border border-outline-variant/20 rounded-[10px] p-1 sm:p-1.5 shadow-sm hover:shadow-md transition-shadow relative z-[60] w-fit mx-auto">
+          <div ref={searchBarRef} className="hidden lg:flex items-center gap-1 sm:gap-2 bg-[#F9F9F6] border border-outline-variant/20 rounded-[10px] p-1 shadow-sm hover:shadow-md transition-shadow relative z-[60] shrink-0">
             {/* City Selector */}
             <div 
               onClick={() => { setIsOpenCity(!isOpenCity); setIsOpenRadius(false); }}
-              className="w-32 sm:w-48 flex items-center px-2 sm:px-3 py-1.5 relative group bg-white rounded-[10px] border border-outline-variant/10 shadow-sm transition-all hover:border-[#2E7D32]/30 cursor-pointer shrink-0"
+              className="w-32 sm:w-44 flex items-center px-2 sm:px-3 py-1 relative group bg-white rounded-[10px] border border-outline-variant/10 shadow-sm transition-all hover:border-[#2E7D32]/30 cursor-pointer shrink-0"
             >
-              <MapPin className="hidden sm:block w-4 h-4 text-[#2E7D32] shrink-0" />
-              <div className="flex flex-col text-right sm:mr-3 flex-1 min-w-0">
+              <MapPin className="hidden sm:block w-3.5 h-3.5 text-[#2E7D32] shrink-0" />
+              <div className="flex flex-col text-right sm:mr-2 flex-1 min-w-0">
                 <input 
                   type="text"
                   value={citySearch}
@@ -346,13 +312,13 @@ export default function DashboardHeader({ title, subtitle, location, showSearch 
                   }}
                   onFocus={() => setIsOpenCity(true)}
                   placeholder="فين كتقلب؟"
-                  className="bg-transparent border-none outline-none w-full text-xs sm:text-sm font-bold text-[#1A1A1A] text-right placeholder:text-[#757575]"
+                  className="bg-transparent border-none outline-none w-full text-xs sm:text-sm font-bold text-[#1A1A1A] text-right placeholder:text-[#ABABAB]"
                 />
               </div>
-              <ChevronDown className={`hidden sm:block w-3.5 h-3.5 text-[#757575] transition-transform ${isOpenCity ? 'rotate-180' : ''}`} />
+              <ChevronDown className={`hidden sm:block w-3 h-3 text-[#757575] transition-transform ${isOpenCity ? 'rotate-180' : ''}`} />
 
               {isOpenCity && (
-                <div className="absolute top-full mt-1.5 left-0 right-0 w-full bg-white rounded-[10px] shadow-2xl border border-outline-variant/10 z-[100] p-1 animate-in slide-in-from-top-2 duration-200">
+                <div className="absolute top-full mt-1.5 left-0 right-0 w-full bg-white rounded-[10px] shadow-2xl border border-outline-variant/10 z-[100] p-1">
                   <div className="max-h-60 overflow-y-auto custom-scrollbar p-1">
                     {filteredCities.length > 0 ? (
                       filteredCities.map(city => (
@@ -375,22 +341,21 @@ export default function DashboardHeader({ title, subtitle, location, showSearch 
             <button 
               onClick={(e) => { e.stopPropagation(); handleLocateMe(); }}
               disabled={isLocating}
-              title="في مدينتي"
-              className={`p-1.5 sm:p-2 rounded-[10px] hover:bg-[#E8F5E9] border border-outline-variant/10 bg-white shadow-sm transition-colors shrink-0 flex items-center justify-center ${isLocating ? 'animate-pulse text-[#2E7D32]' : 'text-[#2E7D32]'}`}
+              className={`p-1.5 rounded-[10px] hover:bg-[#E8F5E9] border border-outline-variant/10 bg-white shadow-sm transition-colors text-[#2E7D32]`}
             >
-              <LocateFixed className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${isLocating ? 'animate-pulse' : ''}`} />
+              <LocateFixed className={`w-3.5 h-3.5 ${isLocating ? 'animate-pulse' : ''}`} />
             </button>
 
             {/* Distance Selector */}
             <div 
               onClick={() => { setIsOpenRadius(!isOpenRadius); setIsOpenCity(false); }}
-              className="w-[85px] sm:w-[120px] flex items-center px-1.5 sm:px-3 py-1.5 relative group bg-white rounded-[10px] border border-outline-variant/10 shadow-sm transition-all hover:border-[#2E7D32]/30 cursor-pointer shrink-0"
+              className="w-[85px] sm:w-[100px] flex items-center px-1.5 sm:px-2 py-1 relative group bg-white rounded-[10px] border border-outline-variant/10 shadow-sm transition-all hover:border-[#2E7D32]/30 cursor-pointer shrink-0"
             >
-              <Navigation className="hidden sm:block w-3.5 h-3.5 text-[#2E7D32] shrink-0" />
-              <div className="flex flex-col text-right sm:mr-3 flex-1">
+              <Navigation className="hidden sm:block w-3 h-3 text-[#2E7D32] shrink-0" />
+              <div className="flex flex-col text-right sm:mr-2 flex-1">
                 <button 
                   onClick={(e) => { e.stopPropagation(); setIsOpenRadius(!isOpenRadius); setIsOpenCity(false); }}
-                  className="bg-transparent border-none outline-none w-full text-xs sm:text-sm font-bold text-[#1A1A1A] text-right flex items-center justify-between"
+                  className="bg-transparent border-none outline-none w-full text-xs font-bold text-[#1A1A1A] text-right flex items-center justify-between"
                 >
                   <span className="truncate">
                     {distance === '10' ? '10 كلم' : 
@@ -401,23 +366,12 @@ export default function DashboardHeader({ title, subtitle, location, showSearch 
                 </button>
 
                 {isOpenRadius && (
-                  <div className="absolute top-full mt-2 left-0 right-0 w-full bg-white rounded-[10px] shadow-2xl border border-outline-variant/10 z-[100] p-1 animate-in slide-in-from-top-2 duration-200">
-                    <div className="flex flex-col gap-0.5">
-                      {[
-                        { val: '10', label: '10 كلم' },
-                        { val: '20', label: '20 كلم' },
-                        { val: '50', label: '50 كلم' },
-                        { val: 'all', label: 'الكل' }
-                      ].map(dist => (
-                        <button 
-                          key={dist.val}
-                          onClick={(e) => { e.stopPropagation(); setDistance(dist.val); setIsOpenRadius(false); }}
-                          className={`w-full text-right px-4 py-2 rounded-[10px] text-sm font-bold transition-colors ${distance === dist.val ? 'bg-[#2E7D32] text-white' : 'hover:bg-[#F9F9F6] text-[#4A4A4A]'}`}
-                        >
-                          {dist.label}
-                        </button>
-                      ))}
-                    </div>
+                  <div className="absolute top-full mt-2 left-0 right-0 w-full bg-white rounded-[10px] shadow-2xl border border-outline-variant/10 z-[100] p-1">
+                    {['10', '20', '50', 'all'].map(v => (
+                      <button key={v} onClick={(e) => { e.stopPropagation(); setDistance(v); setIsOpenRadius(false); }} className={`w-full text-right px-4 py-2 rounded-[10px] text-sm font-bold transition-colors ${distance === v ? 'bg-[#2E7D32] text-white' : 'hover:bg-[#F9F9F6] text-[#4A4A4A]'}`}>
+                        {v === 'all' ? 'الكل' : `${v} كلم`}
+                      </button>
+                    ))}
                   </div>
                 )}
               </div>
@@ -426,28 +380,35 @@ export default function DashboardHeader({ title, subtitle, location, showSearch 
             
             <button 
               onClick={() => onSearch?.(getMappedCity(citySearch), distance)}
-              className="bg-[#2E7D32] text-white py-1.5 px-4 sm:px-6 rounded-[10px] border border-transparent hover:bg-white hover:text-[#2E7D32] hover:border-[#2E7D32] transition-all shadow-sm flex items-center gap-2 justify-center shrink-0 group"
+              className="bg-[#2E7D32] text-white py-1 px-3 sm:px-4 rounded-[10px] hover:bg-white hover:text-[#2E7D32] hover:border-[#2E7D32] border border-transparent transition-all shadow-sm flex items-center gap-2"
             >
-              <span className="text-xs sm:text-sm font-bold">بحث</span>
-              <Search className="w-3.5 h-3.5 sm:w-4 sm:h-4 group-hover:scale-110 transition-transform" />
+              <span className="text-xs font-bold">بحث</span>
+              <Search className="w-3.5 h-3.5" />
             </button>
           </div>
         )}
 
-        {/* Desktop Actions */}
-        <div className="hidden md:flex flex-1 items-center justify-end gap-3 lg:gap-4">
-          <div className="relative" ref={notificationsRef}>
-            <button 
-              onClick={() => setShowNotifications(!showNotifications)}
-              className={`p-2.5 rounded-[10px] border border-transparent transition-colors relative ${showNotifications ? 'bg-white text-[#2E7D32] border-[#2E7D32]' : 'bg-[#F9F9F6] text-[#757575] hover:bg-white hover:text-[#2E7D32] hover:border-[#2E7D32]'}`}
-            >
-              <Bell className="w-5 h-5" />
-              {(Array.isArray(notifications) ? notifications : []).some(n => !n.read) && (
-                <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
-              )}
-            </button>
-            {showNotifications && renderNotifications()}
-          </div>
+        {/* RIGHT: hamburger (first = rightmost on mobile RTL) + notification + profile */}
+        <div className="flex items-center gap-2 md:gap-4 shrink-0">
+          {/* Hamburger — first = rightmost on mobile RTL */}
+          <button 
+            onClick={() => setIsSidebarOpen(true)}
+            className="md:hidden w-9 h-9 flex flex-col items-center justify-center gap-1.5 bg-[#F9F9F6] rounded-xl border border-outline-variant/10 transition-colors"
+          >
+            <span className="w-4 h-0.5 bg-[#2E7D32] rounded-full"></span>
+            <span className="w-4 h-0.5 bg-[#2E7D32] rounded-full"></span>
+            <span className="w-4 h-0.5 bg-[#2E7D32] rounded-full"></span>
+          </button>
+
+          <button 
+            onClick={() => setIsNotificationSidebarOpen(true)}
+            className={`p-2 rounded-xl transition-colors relative ${isNotificationSidebarOpen ? 'bg-[#E8F5E9] text-[#2E7D32]' : 'bg-[#F9F9F6] text-[#757575] hover:bg-white hover:text-[#2E7D32] border border-transparent hover:border-[#2E7D32]'}`}
+          >
+            <Bell className="w-5 h-5" />
+            {(Array.isArray(notifications) ? notifications : []).some(n => !n.read) && (
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
+            )}
+          </button>
 
           <div 
             className="relative" 
@@ -455,7 +416,7 @@ export default function DashboardHeader({ title, subtitle, location, showSearch 
             onMouseEnter={() => setShowProfileMenu(true)}
             onMouseLeave={() => setShowProfileMenu(false)}
           >
-            <button className="flex items-center justify-center w-10 h-10 rounded-full bg-[#F9F9F6] border border-outline-variant/10 hover:bg-white hover:border-[#2E7D32] transition-colors overflow-hidden shadow-sm shrink-0">
+            <button className="flex items-center justify-center w-9 h-9 rounded-full bg-[#F9F9F6] border border-outline-variant/10 hover:bg-white hover:border-[#2E7D32] transition-colors overflow-hidden shadow-sm">
               {profile?.photoURL ? (
                 <img src={profile.photoURL} alt="Profile" className="w-full h-full object-cover rounded-full" referrerPolicy="no-referrer" />
               ) : (
@@ -468,6 +429,60 @@ export default function DashboardHeader({ title, subtitle, location, showSearch 
           </div>
         </div>
       </div>
-    </header>
+
+      {/* Row 2 — Mobile search bar */}
+      {showSearch && (
+        <div className="lg:hidden px-4 pb-3 border-t border-outline-variant/10 pt-2 bg-white/50">
+          <div className="flex flex-row items-center gap-1 bg-[#F9F9F6] border border-outline-variant/20 rounded-[10px] p-1 shadow-sm relative z-[60] w-full">
+            <div className="flex-1 flex items-center px-2 py-1.5 relative bg-white rounded-[10px] border border-outline-variant/10 shadow-sm min-w-0">
+              <MapPin className="w-3.5 h-3.5 text-[#2E7D32] shrink-0" />
+              <input
+                type="text"
+                value={citySearch}
+                onChange={(e) => { setCitySearch(e.target.value); setIsOpenCity(true); setIsOpenRadius(false); }}
+                onFocus={() => { setIsOpenCity(true); setIsOpenRadius(false); }}
+                placeholder="فين كتقلب؟"
+                className="bg-transparent border-none outline-none w-full text-xs font-bold text-[#1A1A1A] text-right mr-2 placeholder:text-[#ABABAB]"
+              />
+            </div>
+            {/* Mobile Radius Selector */}
+            <div 
+              onClick={() => { setIsOpenRadius(!isOpenRadius); setIsOpenCity(false); }}
+              className="w-[80px] flex items-center px-1.5 py-1.5 relative bg-white rounded-[10px] border border-outline-variant/10 shadow-sm cursor-pointer shrink-0"
+            >
+              <button 
+                onClick={(e) => { e.stopPropagation(); setIsOpenRadius(!isOpenRadius); setIsOpenCity(false); }}
+                className="bg-transparent border-none outline-none w-full text-[11px] font-bold text-[#1A1A1A] text-center"
+              >
+                {distance === '10' ? '10 كلم' : 
+                 distance === '20' ? '20 كلم' : 
+                 distance === '50' ? '50 كلم' : 
+                 distance === 'all' ? 'الكل' : 'المسافة'}
+              </button>
+              {isOpenRadius && (
+                <div className="absolute top-full mt-2 left-0 right-0 w-full bg-white rounded-[10px] shadow-2xl border border-outline-variant/10 z-[100] p-1">
+                  {['10', '20', '50', 'all'].map(v => (
+                    <button
+                      key={v}
+                      onClick={(e) => { e.stopPropagation(); setDistance(v); setIsOpenRadius(false); onSearch?.(citySearch, v); }}
+                      className={`w-full text-center px-2 py-2 rounded-[8px] text-[11px] font-bold transition-colors ${distance === v ? 'bg-[#2E7D32] text-white' : 'hover:bg-[#F9F9F6] text-[#4A4A4A]'}`}
+                    >
+                      {v === 'all' ? 'الكل' : `${v} كلم`}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <button 
+              onClick={() => onSearch?.(getMappedCity(citySearch), distance)}
+              className="bg-[#2E7D32] text-white p-1.5 rounded-[10px] shrink-0"
+            >
+              <Search className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+      </header>
   );
 }
+

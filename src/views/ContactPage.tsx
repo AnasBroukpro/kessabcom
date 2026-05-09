@@ -81,7 +81,7 @@ export default function ContactPage({ onNavigate }: Props) {
                   </div>
                   <div>
                     <p className="text-sm text-[#4A4A4A] font-medium mb-1">الهاتف</p>
-                    <p className="text-lg font-bold text-[#1A1A1A] dir-ltr inline-block">06 61 48 12 86</p>
+                    <p className="text-lg font-bold text-[#1A1A1A] inline-block" dir="ltr">07 00 11 07 11</p>
                   </div>
                 </div>
 
@@ -112,10 +112,10 @@ export default function ContactPage({ onNavigate }: Props) {
               <h3 className="text-xl font-bold mb-4 relative z-10">الدعم عبر الواتساب</h3>
               <p className="opacity-90 mb-6 relative z-10">تواصل معانا مباشرة عبر الواتساب للحصول على رد سريع.</p>
               <a 
-                href="https://wa.me/212661481286"
+                href="https://wa.me/212700110711"
                 target="_blank"
                 rel="noreferrer"
-                className="bg-white text-[#2E7D32] px-8 py-4 rounded-2xl font-black flex items-center gap-2 transition-colors border border-transparent hover:bg-transparent hover:text-white hover:border-white relative z-10 inline-flex"
+                className="bg-white text-[#2E7D32] px-8 py-4 rounded-2xl font-black flex items-center gap-2 transition-colors border border-transparent hover:bg-transparent hover:text-white hover:border-white relative z-10 inline-flex animate-shake"
               >
                 <MessageSquare className="w-5 h-5" />
                 مراسلة الآن

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ViewType } from '../App';
-import { MapPin, Loader2, Eye, EyeOff, CheckCircle2, ArrowRight, Search, ChevronDown, Star, BarChart2, Navigation, Bell, Package, ShieldCheck, Users, Image, FileText, PhoneCall } from 'lucide-react';
+import { MapPin, Loader2, Eye, EyeOff, CheckCircle2, ArrowRight, Search, ChevronDown, Star, BarChart2, Navigation, Bell, Package, ShieldCheck, Users, Image, FileText, PhoneCall, BookOpen, X } from 'lucide-react';
 import { auth, db } from '../lib/firebase';
 import {
   signInWithEmailAndPassword,
@@ -219,6 +219,7 @@ export default function Auth({ onNavigate, intendedView }: Props) {
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [pendingNavigation, setPendingNavigation] = useState<{ view: ViewType } | null>(null);
+  const [showTutorial, setShowTutorial] = useState(false);
   const allCities = Object.keys(cityCoords).sort();
   
   // 10-digit phone input logic
@@ -568,10 +569,17 @@ export default function Auth({ onNavigate, intendedView }: Props) {
                 className="w-full h-auto"
               />
             </div>
-            <h1 className="text-2xl font-black text-on-surface mb-3 font-headline">تسجيل الدخول</h1>
-            <p className="text-on-surface-variant font-medium leading-relaxed">
+            <h1 className="text-2xl font-black text-on-surface mb-1 font-headline">تسجيل الدخول</h1>
+            <p className="text-on-surface-variant font-medium leading-relaxed mb-4">
               على سلامتك، توحشناك في السوق
             </p>
+            <button 
+              onClick={() => setShowTutorial(true)}
+              className="inline-flex items-center gap-2 text-xs font-black text-[#2E7D32] bg-[#E8F5E9] px-4 py-2 rounded-full border border-[#2E7D32]/10 hover:bg-[#C8E6C9] transition-colors"
+            >
+              <BookOpen className="w-4 h-4" />
+              <span>كيفاش نصوب حساب؟</span>
+            </button>
           </div>
 
           {error && (
@@ -723,11 +731,21 @@ export default function Auth({ onNavigate, intendedView }: Props) {
                   <span>جاري المعالجة...</span>
                 </>
               ) : !phoneChecked ? (
-                <span>دخول</span>
+                <span className="animate-shake">
+                  <span className="text-swap-container">
+                    <span className="text-swap-1">دخول</span>
+                    <span className="text-swap-2">اضغط هنا</span>
+                  </span>
+                </span>
               ) : isNewUser ? (
                 <span>إنشاء الحساب</span>
               ) : (
-                <span>دخول</span>
+                <span className="animate-shake">
+                  <span className="text-swap-container">
+                    <span className="text-swap-1">دخول</span>
+                    <span className="text-swap-2">اضغط هنا</span>
+                  </span>
+                </span>
               )}
             </button>
 
@@ -794,6 +812,24 @@ export default function Auth({ onNavigate, intendedView }: Props) {
         .animate-marquee-up { animation: marquee-up 60s linear infinite; }
         .animate-marquee-down { animation: marquee-down 60s linear infinite; }
       `}} />
+      {showTutorial && (
+        <div className="fixed inset-0 z-[1000] bg-black/80 backdrop-blur-md flex items-center justify-center p-4" onClick={() => setShowTutorial(false)}>
+          <div className="relative w-full max-w-4xl aspect-video bg-black rounded-[2rem] overflow-hidden shadow-2xl border border-white/10" onClick={e => e.stopPropagation()}>
+            <button 
+              onClick={() => setShowTutorial(false)}
+              className="absolute top-6 right-6 z-10 bg-white/20 hover:bg-white/40 text-white p-2.5 rounded-full transition-colors backdrop-blur-md"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            <iframe 
+              src="https://www.youtube.com/embed/dQw4w9WgXcQ" 
+              className="w-full h-full"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

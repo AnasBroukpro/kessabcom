@@ -162,7 +162,7 @@ export default function SellerDashboard({ onNavigate, activeSubView }: Props) {
           onNavigate={onNavigate}
         />
 
-        <div className="p-4 md:p-8 max-w-7xl mx-auto w-full space-y-6 md:space-y-8 text-right">
+        <div className="p-4 md:p-8 max-w-7xl mx-auto w-full space-y-6 md:space-y-8 text-right pt-20 lg:pt-24">
           {activeTab === 'dashboard' && (
             <SellerHomeView 
               profile={profile}

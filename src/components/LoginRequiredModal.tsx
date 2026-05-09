@@ -22,11 +22,12 @@ export default function LoginRequiredModal({
   return (
     <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
       <div className="bg-white w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300 p-8 text-center" dir="rtl">
-        <div className="flex justify-end -mt-4 -mr-4 mb-2">
-          <button onClick={onClose} className="p-2 transition-colors border border-transparent hover:border-gray-300 rounded-full">
-            <X className="w-5 h-5 text-[#757575]" />
-          </button>
-        </div>
+        <button 
+          onClick={onClose} 
+          className="absolute top-4 left-4 w-8 h-8 flex items-center justify-center transition-all bg-[#fef2f2] border border-red-200 text-red-600 rounded-full hover:bg-red-500 hover:text-white z-10"
+        >
+          <X className="w-4 h-4" />
+        </button>
         
         <div className="w-20 h-20 bg-orange-100 text-orange-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
           <Lock className="w-10 h-10" />

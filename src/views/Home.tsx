@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ViewType } from '../App';
-import { Search, MapPin, Navigation, ArrowLeft, BadgeCheck, Scale, BookOpen, User, Star, ShieldCheck, Heart, Camera, CheckCircle, Clock, HeartHandshake, TrendingUp, Bell, LogOut, LayoutDashboard, ShoppingBag, PlusCircle, Settings, Users, List, ChevronDown, Loader2, Target, Route } from 'lucide-react';
+import { Search, MapPin, Navigation, ArrowLeft, BadgeCheck, Scale, User, Star, ShieldCheck, Heart, Camera, CheckCircle, Clock, HeartHandshake, TrendingUp, Bell, LogOut, LayoutDashboard, ShoppingBag, PlusCircle, Settings, Users, List, ChevronDown, Loader2, Target, Route } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useAuth } from '../contexts/AuthContext';
 import { firestoreService } from '../services/firestoreService';
@@ -18,6 +18,7 @@ import logoV2 from '../assets/marketing/branding/logo v2.png';
 import MobileSidebar from '../components/MobileSidebar';
 import NotificationSidebar from '../components/NotificationSidebar';
 import GoogleMapComponent from '../components/GoogleMap';
+import ValidationModal from '../components/ValidationModal';
 
 interface Props {
   onNavigate: (view: ViewType, listingId?: string, city?: string, radius?: string, subView?: string, breed?: string) => void;
@@ -108,7 +109,7 @@ export default function Home({ onNavigate }: Props) {
   const [isNotificationSidebarOpen, setIsNotificationSidebarOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [selectedBreeds, setSelectedBreeds] = useState<string[]>([]);
-  const [showCityModal, setShowCityModal] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
   const [isOpenCity, setIsOpenCity] = useState(false);
   const [isOpenRadius, setIsOpenRadius] = useState(false);
   const [openUpwards, setOpenUpwards] = useState(false);
@@ -160,6 +161,7 @@ export default function Home({ onNavigate }: Props) {
   const [selectedSellerPhone, setSelectedSellerPhone] = useState<string | undefined>();
   const [selectedSellerWhatsapp, setSelectedSellerWhatsapp] = useState<string | undefined>();
   const [selectedListingId, setSelectedListingId] = useState<string | undefined>();
+  const [showValidationModal, setShowValidationModal] = useState(false);
 
   const suggestionsRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
@@ -295,7 +297,7 @@ export default function Home({ onNavigate }: Props) {
 
   const handleSearchNearMe = async () => {
     if (!citySearch) {
-      setShowCityModal(true);
+      setShowValidationModal(true);
       return;
     }
     // Save city to sessionStorage for other views to use
@@ -405,6 +407,7 @@ export default function Home({ onNavigate }: Props) {
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
         onNavigate={onNavigate}
+        onShowTutorial={() => setShowTutorial(true)}
       />
       <NotificationSidebar
         isOpen={isNotificationSidebarOpen}
@@ -479,8 +482,11 @@ export default function Home({ onNavigate }: Props) {
                 </div>
               </>
             ) : (
-              <button onClick={() => onNavigate('auth')} className="bg-[#2E7D32] text-white px-6 py-2.5 rounded-xl text-sm font-bold border border-transparent hover:bg-white hover:text-[#2E7D32] hover:border-[#2E7D32] transition-colors shadow-md">
-                دخول
+              <button onClick={() => onNavigate('auth')} className="bg-[#2E7D32] text-white px-6 py-2.5 rounded-xl font-black border border-transparent hover:bg-white hover:text-[#2E7D32] hover:border-[#2E7D32] transition-colors shadow-md animate-shake">
+                <span className="text-swap-container">
+                  <span className="text-swap-1">دخول</span>
+                  <span className="text-swap-2">اضغط هنا</span>
+                </span>
               </button>
             )}
           </div>
@@ -648,10 +654,13 @@ export default function Home({ onNavigate }: Props) {
                   <div className="md:pr-1">
                     <button
                       onClick={handleSearchNearMe}
-                      className="w-full md:w-auto bg-[#2E7D32] text-white py-3 md:py-5 px-14 rounded-xl font-black text-lg md:text-xl flex items-center justify-center gap-3 md:gap-4 shadow-[0_10px_25px_rgba(46,125,50,0.4)] hover:shadow-[0_15px_35px_rgba(46,125,50,0.5)] transform hover:-translate-y-1 active:scale-95 transition-all duration-300 group"
+                      className="w-full md:w-auto bg-[#2E7D32] text-white py-3 md:py-5 px-14 rounded-xl font-black text-lg md:text-xl flex items-center justify-center gap-3 md:gap-4 shadow-[0_10px_25px_rgba(46,125,50,0.4)] hover:shadow-[0_15px_35px_rgba(46,125,50,0.5)] transform hover:-translate-y-1 active:scale-95 transition-all duration-300 group animate-shake"
                     >
                       <Search className="w-5 h-5 md:w-7 md:h-7 group-hover:scale-110 transition-transform" />
-                      <span>قلب دابا</span>
+                      <span className="text-swap-container">
+                        <span className="text-swap-1">قلب دابا</span>
+                        <span className="text-swap-2">توكل على الله.</span>
+                      </span>
                     </button>
                   </div>
                 </div>
@@ -753,15 +762,11 @@ export default function Home({ onNavigate }: Props) {
 
         {/* Featured Listings Section */}
         <section className="max-w-7xl mx-auto px-6 py-20">
-          <div className="flex justify-between items-end mb-12">
+          <div className="mb-12">
             <div className="text-right">
               <span className="text-[#2E7D32] font-bold text-sm tracking-widest uppercase mb-2 block">الضيعات لي قريبة ليك</span>
               <h2 className="text-3xl font-black text-[#1A1A1A] font-headline">الضيعات اللي كيزوروهم الناس بزاف</h2>
             </div>
-            <button onClick={() => onNavigate('search-results')} className="text-[#2E7D32] font-bold flex items-center gap-2 hover:gap-3 transition-all">
-              <span>شوف كلشي</span>
-              <ArrowLeft className="w-5 h-5" />
-            </button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -812,9 +817,11 @@ export default function Home({ onNavigate }: Props) {
               <div key={listing.id} className="bg-white rounded-2xl overflow-hidden shadow-sm border border-outline-variant/20 hover:shadow-xl transition-all duration-300 group cursor-pointer" onClick={() => onNavigate('listing-details', listing.id)}>
                 <div className="relative h-64 overflow-hidden">
                   <img alt={listing.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" src={listing.images?.[0] || 'https://i.ytimg.com/vi/RrkkshRUttw/hq720.jpg?sqp=-oaymwEhCK4FEIIDSFryq4qpAxMIARUAAAAAGAElAADIQj0AgKJD&rs=AOn4CLD92lI4Kxe5liKSwWZaJuLAFopNeA'} referrerPolicy="no-referrer" />
-                  <div className="absolute top-4 right-4 bg-white/90 backdrop-blur text-[#1A1A1A] px-3 py-1 rounded-full text-xs font-bold shadow-sm">
-                    كيبدا من {listing.minPrice || listing.price || '0'} درهم
-                  </div>
+                  {(listing.minPrice || listing.price) ? (
+                    <div className="absolute top-4 right-4 bg-white/90 backdrop-blur text-[#1A1A1A] px-3 py-1 rounded-full text-xs font-bold shadow-sm">
+                      كيبدا من {listing.minPrice || listing.price} درهم
+                    </div>
+                  ) : null}
                   <div className="absolute bottom-4 right-4 bg-white/90 backdrop-blur text-[#1A1A1A] px-3 py-1.5 rounded-full text-[10px] font-bold shadow-sm flex items-center gap-1 cursor-pointer hover:bg-white transition-colors" onClick={(e) => {
                     e.stopPropagation();
                     const url = listing.coordinates
@@ -936,6 +943,16 @@ export default function Home({ onNavigate }: Props) {
               </div>
             ))})()}
           </div>
+
+          <div className="mt-12 flex justify-center">
+            <button 
+              onClick={() => onNavigate('search-results')} 
+              className="bg-[#2E7D32] text-white px-8 py-3 rounded-xl font-black border border-transparent hover:bg-white hover:text-[#2E7D32] hover:border-[#2E7D32] transition-all shadow-md animate-shake flex items-center gap-3 group"
+            >
+              <span>شوف كلشي</span>
+              <ArrowLeft className="w-5 h-5 group-hover:-translate-x-2 transition-transform" />
+            </button>
+          </div>
         </section>
 
         {/* Banner 2 */}
@@ -1032,7 +1049,7 @@ export default function Home({ onNavigate }: Props) {
             </div>
 
             <div className="mt-16 text-center">
-              <button onClick={() => onNavigate('auth')} className="bg-[#2E7D32] text-white px-10 py-4 rounded-xl font-bold border border-transparent hover:bg-white hover:text-[#2E7D32] hover:border-[#2E7D32] transition-colors shadow-lg">
+              <button onClick={() => onNavigate('auth')} className="bg-[#2E7D32] text-white px-10 py-4 rounded-xl font-bold border border-transparent hover:bg-white hover:text-[#2E7D32] hover:border-[#2E7D32] transition-colors shadow-lg animate-shake">
                 حط إعلانك دابا
               </button>
             </div>
@@ -1086,7 +1103,7 @@ export default function Home({ onNavigate }: Props) {
               </p>
               <button
                 onClick={() => onNavigate('auth')}
-                className="w-full md:w-auto bg-white text-[#2E7D32] px-10 py-5 rounded-2xl font-black text-lg flex items-center justify-center gap-3 border-2 border-transparent hover:bg-transparent hover:text-white hover:border-white transition-all duration-300 shadow-2xl hover:scale-105 active:scale-95"
+                className="w-full md:w-auto bg-white text-[#2E7D32] px-10 py-5 rounded-2xl font-black text-lg flex items-center justify-center gap-3 border-2 border-transparent hover:bg-transparent hover:text-white hover:border-white transition-all duration-300 shadow-2xl hover:scale-105 active:scale-95 animate-shake"
               >
                 <PlusCircle className="w-6 h-6" />
                 <span>زيد الضيعة ديالك دابا</span>
@@ -1116,6 +1133,15 @@ export default function Home({ onNavigate }: Props) {
         {/* Removed */}
       </main>
 
+      <ValidationModal 
+        isOpen={showValidationModal}
+        onClose={() => {
+          setShowValidationModal(false);
+          setIsOpenCity(true);
+        }}
+        message="عافاك اختار المدينة فين كتقلب أولاً"
+      />
+
       <ContactSellerModal
         isOpen={contactModalOpen}
         onClose={() => setContactModalOpen(false)}
@@ -1130,6 +1156,25 @@ export default function Home({ onNavigate }: Props) {
         onClose={() => setLoginModalOpen(false)}
         onNavigate={onNavigate}
       />
+
+      {showTutorial && (
+        <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-md flex items-center justify-center p-4" onClick={() => setShowTutorial(false)}>
+          <div className="relative w-full max-w-4xl aspect-video bg-black rounded-[2rem] overflow-hidden shadow-2xl border border-white/10" onClick={e => e.stopPropagation()}>
+            <button 
+              onClick={() => setShowTutorial(false)}
+              className="absolute top-6 right-6 z-10 bg-white/20 hover:bg-white/40 text-white p-2.5 rounded-full transition-colors backdrop-blur-md"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            <iframe 
+              src={settings.tutorialUrl || "https://www.youtube.com/embed/dQw4w9WgXcQ"} 
+              className="w-full h-full"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
