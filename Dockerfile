@@ -24,6 +24,9 @@ COPY --from=builder /app/dist ./dist
 # Copier les fichiers nécessaires pour le backend
 COPY server.ts ./
 COPY tsconfig.json ./
+# Services métiers (monétisation, paiement, notifications)
+COPY cashplusService.ts ./
+COPY whatsappService.ts ./
 # Copier firebase-applet-config.json s'il existe (optionnel)
 COPY firebase-applet-config.json* ./
 
@@ -31,3 +34,4 @@ COPY firebase-applet-config.json* ./
 EXPOSE 3000
 
 CMD ["tsx", "server.ts"]
+
