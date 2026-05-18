@@ -29,10 +29,10 @@ export default function FlockView({
     <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h2 className="text-3xl font-black text-[#1A1A1A] font-headline tracking-tight">القطيع ديالي</h2>
-          <div className="w-16 h-1 bg-[#115E2C] rounded-full mt-2"></div>
+          <h2 className="text-2xl font-black text-on-surface font-headline tracking-tight">القطيع ديالي</h2>
+          <p className="text-on-surface-variant text-sm mt-1">إدارة وتعديل الإعلانات ديالك اللي كاينين فالمنصة.</p>
         </div>
-        <button onClick={() => onNavigate('add-listing')} className="bg-[#115E2C] text-white px-8 py-4 rounded-[10px] font-black flex items-center gap-3 shadow-xl shadow-[#115E2C]/20 hover:scale-105 active:scale-95 transition-all">
+        <button onClick={() => onNavigate('add-listing')} className="hidden md:flex bg-[#115E2C] text-white px-8 py-4 rounded-[10px] font-black items-center gap-3 shadow-xl shadow-[#115E2C]/20 hover:scale-105 active:scale-95 transition-all">
           <PlusCircle className="w-6 h-6" />
           <span>إضافة قطيع جديد</span>
         </button>
@@ -169,12 +169,12 @@ export default function FlockView({
             <ChevronRight className="w-5 h-5" />
           </button>
           
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar max-w-[60vw] sm:max-w-none px-2">
             {[...Array(totalPages)].map((_, i) => (
               <button
                 key={i}
-                onClick={() => setCurrentPage(i + 1)}
-                className={`w-10 h-10 rounded-xl font-black text-sm transition-all ${
+                onClick={() => { setCurrentPage(i + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                className={`w-10 h-10 rounded-xl font-black text-sm transition-all shrink-0 ${
                   currentPage === i + 1 
                     ? 'bg-[#115E2C] text-white shadow-lg' 
                     : 'bg-white text-[#757575] border border-outline-variant/10 hover:border-[#115E2C]/30'

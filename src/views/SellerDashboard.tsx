@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../hooks/useSettings';
 import { useSellerDashboardData } from '../hooks/useSellerDashboardData';
@@ -43,6 +43,13 @@ export default function SellerDashboard({ onNavigate, activeSubView }: Props) {
   const { user, profile, signOut } = useAuth();
   const { settings } = useSettings();
   const [activeTab, setActiveTab] = useState<SellerTab>('dashboard');
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTo(0, 0);
+    }
+  }, [activeTab]);
 
 
   useEffect(() => {
@@ -152,7 +159,7 @@ export default function SellerDashboard({ onNavigate, activeSubView }: Props) {
         signOut={signOut}
       />
 
-      <main className="flex-1 flex flex-col overflow-y-auto no-scrollbar pb-20 md:pb-0">
+      <main ref={scrollRef} className="flex-1 flex flex-col overflow-y-auto no-scrollbar pb-20 md:pb-0">
         <DashboardHeader 
           title={getTitle()} 
           subtitle={activeTab === 'dashboard' ? getDisplayCity({ location: profile?.location }) : undefined}
@@ -162,7 +169,7 @@ export default function SellerDashboard({ onNavigate, activeSubView }: Props) {
           onNavigate={onNavigate}
         />
 
-        <div className="p-4 md:p-8 max-w-7xl mx-auto w-full space-y-6 md:space-y-8 text-right pt-20 lg:pt-24">
+        <div className="p-4 md:p-8 max-w-7xl mx-auto w-full space-y-6 md:space-y-8 text-right pt-32 lg:pt-24">
           {activeTab === 'dashboard' && (
             <SellerHomeView 
               profile={profile}
@@ -223,15 +230,10 @@ export default function SellerDashboard({ onNavigate, activeSubView }: Props) {
         setActiveTab={setActiveTab}
         requestsCount={(requests || []).length}
         settings={settings}
+        onNavigate={onNavigate}
       />
 
-      {/* Sticky "+" Button - Hidden on Desktop/Tablet */}
-      <button 
-        onClick={() => onNavigate('add-listing')}
-        className="fixed bottom-24 right-6 w-14 h-14 bg-[#115E2C] text-white rounded-[10px] shadow-2xl shadow-[#115E2C]/30 flex items-center justify-center hover:scale-110 active:scale-95 transition-all z-40 group border border-white/20 md:hidden"
-      >
-        <Plus className="w-8 h-8 transition-transform group-hover:rotate-90" />
-      </button>
+
 
       <DeleteConfirmationModal 
         show={showDeleteConfirm}

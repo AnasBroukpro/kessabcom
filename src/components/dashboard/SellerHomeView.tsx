@@ -39,7 +39,7 @@ export default function SellerHomeView({
       {/* ── Welcome Header ── */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10">
         <div className="flex items-center gap-4">
-          <div className="w-16 h-16 bg-[#115E2C] rounded-[10px] flex items-center justify-center text-white shadow-xl shadow-[#115E2C]/10">
+          <div className="hidden md:flex w-16 h-16 bg-[#115E2C] rounded-[10px] items-center justify-center text-white shadow-xl shadow-[#115E2C]/10">
             <User className="w-8 h-8" />
           </div>
           <div>

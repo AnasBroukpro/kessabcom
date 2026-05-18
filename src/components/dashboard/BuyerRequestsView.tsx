@@ -913,9 +913,9 @@ export function BuyerRequestsView({
       ) : (
         <>
           <div>
-            <h2 className="text-4xl font-black text-[#1A1A1A] font-headline tracking-tight">طلبات المشترين</h2>
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mt-2">
-              <p className="text-[#757575] text-sm font-medium">تواصل مع المشترين لي كايقلبو على حوالا فحال لي عندك</p>
+            <h2 className="text-2xl font-black text-on-surface font-headline tracking-tight">طلبات المشترين</h2>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mt-1">
+              <p className="text-on-surface-variant text-sm font-medium">تواصل مع المشترين لي كايقلبو على حوالا فحال لي عندك</p>
               
               <div className="flex items-center gap-3">
                 <div className="bg-white px-4 py-2 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-3">

@@ -27,7 +27,7 @@ COPY tsconfig.json ./
 # Copier firebase-applet-config.json s'il existe (optionnel)
 COPY firebase-applet-config.json* ./
 
-# Le port 3001 est utilisé par server.ts par défaut
-EXPOSE 3001
+# Le port 3000 est utilisé par server.ts par défaut (via .env ou fallback)
+EXPOSE 3000
 
 CMD ["tsx", "server.ts"]

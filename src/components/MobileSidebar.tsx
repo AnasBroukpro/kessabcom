@@ -39,46 +39,8 @@ export default function MobileSidebar({ isOpen, onClose, onNavigate }: Props) {
     : (profile?.fullName || profile?.displayName || (role === 'admin' ? 'المشرف' : role === 'seller' ? 'الكساب' : 'المشتري'));
 
   const menuItems = [
-    {
-      role: 'guest',
-      items: [
-        { icon: <Home size={20} />, label: 'الرئيسية', view: 'home' as ViewType },
-        { icon: <Search size={20} />, label: 'البحث', view: 'search-results' as ViewType },
-      ]
-    },
-    { 
-      role: 'buyer', 
-      items: [
-        { icon: <Home size={20} />, label: 'الرئيسية', view: 'home' as ViewType },
-        { icon: <Search size={20} />, label: 'البحث', view: 'search-results' as ViewType },
-        { icon: <LayoutDashboard size={20} />, label: 'لوحة التحكم', view: 'buyer' as ViewType, subView: 'dashboard' },
-        { icon: <ShoppingBag size={20} />, label: 'طلباتي', view: 'buyer' as ViewType, subView: 'kessaba-offers' },
-        { icon: <Heart size={20} />, label: 'المفضلة', view: 'buyer' as ViewType, subView: 'favorites' },
-      ],
-    },
-    { 
-      role: 'seller', 
-      items: [
-        { icon: <Home size={20} />, label: 'الرئيسية', view: 'home' as ViewType },
-        { icon: <Search size={20} />, label: 'البحث', view: 'search-results' as ViewType },
-        { icon: <LayoutDashboard size={20} />, label: 'لوحة التحكم', view: 'seller' as ViewType, subView: 'dashboard' },
-        { icon: <List size={20} />, label: 'القطيع', view: 'seller' as ViewType, subView: 'flock' },
-        { icon: <PlusCircle size={20} />, label: 'إضافة إعلان', view: 'add-listing' as ViewType },
-        { icon: <ShoppingBag size={20} />, label: 'طلبات', view: 'seller' as ViewType, subView: 'buyer-requests' },
-        { icon: <BarChart3 size={20} />, label: 'الإحصائيات', view: 'seller' as ViewType, subView: 'stats' },
-        { icon: <Settings size={20} />, label: 'الإعدادات', view: 'seller' as ViewType, subView: 'settings' },
-      ]
-    },
-    { 
-      role: 'admin', 
-      items: [
-        { icon: <Home size={20} />, label: 'الرئيسية', view: 'home' as ViewType },
-        { icon: <Search size={20} />, label: 'البحث', view: 'search-results' as ViewType },
-        { icon: <LayoutDashboard size={20} />, label: 'لوحة التحكم', view: 'admin' as ViewType, subView: 'overview' },
-        { icon: <Users size={20} />, label: 'المستخدمين', view: 'admin' as ViewType, subView: 'users' },
-        { icon: <Settings size={20} />, label: 'الإعدادات', view: 'admin' as ViewType, subView: 'settings' },
-      ]
-    }
+    { icon: <Home size={20} />, label: 'الرئيسية', view: 'home' as ViewType },
+    { icon: <Search size={20} />, label: 'البحث', view: 'search-results' as ViewType },
   ];
 
   const usefulLinks = [
@@ -88,7 +50,7 @@ export default function MobileSidebar({ isOpen, onClose, onNavigate }: Props) {
     { icon: <FileText size={20} />, label: 'سياسة الخصوصية', view: 'privacy' as ViewType },
   ];
 
-  const currentRoleMenu = user ? (menuItems.find(m => m.role === role)?.items || []) : menuItems[0].items;
+  const currentRoleMenu = menuItems;
 
   const handleLinkClick = (view: ViewType, subView?: string) => {
     onNavigate(view, undefined, undefined, undefined, subView);

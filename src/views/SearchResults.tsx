@@ -200,7 +200,7 @@ export default function SearchResults({ onNavigate, initialCity, initialRadius, 
     <div className="min-h-screen bg-[#FDFCF8] antialiased" dir="rtl">
       <SearchHeader onNavigate={onNavigate} initialCity={citySearch} initialRadius={radiusSearch} />
 
-      <main className="max-w-7xl mx-auto px-4 pt-32 lg:pt-20 pb-6">
+      <main className="max-w-7xl mx-auto px-4 pt-40 lg:pt-20 pb-6">
         {/* Results Header */}
         <div className="flex flex-col mb-6 gap-6 pt-4">
           {/* Row 1: Title (Right) */}
@@ -945,12 +945,12 @@ export default function SearchResults({ onNavigate, initialCity, initialRadius, 
               </button>
 
               {/* Page numbers */}
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1 overflow-x-auto no-scrollbar max-w-[60vw] sm:max-w-none px-2">
                 {[...Array(Math.ceil(filteredListings.length / pageSize))].map((_, i) => (
                   <button
                     key={i}
                     onClick={() => { setCurrentPage(i + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-                    className={`w-10 h-10 rounded-xl font-black text-sm transition-all ${
+                    className={`w-10 h-10 rounded-xl font-black text-sm transition-all shrink-0 ${
                       currentPage === i + 1
                         ? 'bg-[#2E7D32] text-white shadow-lg'
                         : 'bg-white text-[#757575] border border-outline-variant/10 hover:border-[#2E7D32]/30'

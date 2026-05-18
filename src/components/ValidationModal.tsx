@@ -12,7 +12,7 @@ export default function ValidationModal({ isOpen, onClose, message }: Props) {
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 h-[100dvh]">
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 h-[100dvh] w-full">
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

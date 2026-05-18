@@ -141,8 +141,8 @@ function OnboardingModal({ role, name, onDone }: { role: 'seller' | 'buyer'; nam
   ];
 
   return (
-    <div className="fixed inset-0 z-[1000] flex flex-col items-center justify-center p-4 sm:p-8 bg-[#FDFCF8] overflow-y-auto" dir="rtl">
-      <div className="w-full max-w-xl bg-white rounded-[32px] overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.08)] border border-outline-variant/10 animate-in fade-in slide-in-from-bottom-8 duration-700 my-auto">
+    <div className="fixed inset-0 z-[1000] flex flex-col bg-white overflow-y-auto" dir="rtl">
+      <div className="w-full min-h-full flex flex-col bg-white animate-in fade-in slide-in-from-bottom-8 duration-700">
         {/* Header */}
         <div className="bg-gradient-to-br from-[#1B5E20] to-[#2E7D32] p-8 sm:p-10 text-center relative overflow-hidden">
           <div className="absolute -top-12 -left-12 w-48 h-48 bg-white/5 rounded-full" />

@@ -354,7 +354,7 @@ export default function ListingDetails({ onNavigate, listingId }: Props) {
                       setSelectedListingId(listing?.id);
                       setContactModalOpen(true);
                     }}
-                    className="w-full flex items-center justify-center gap-2 bg-[#2E7D32] text-white py-4 rounded-xl font-black transition-all border border-transparent hover:bg-[#1B5E20] shadow-lg shadow-[#2E7D32]/20 active:scale-95"
+                    className="hidden md:flex w-full items-center justify-center gap-2 bg-[#2E7D32] text-white py-4 rounded-xl font-black transition-all border border-transparent hover:bg-[#1B5E20] shadow-lg shadow-[#2E7D32]/20 active:scale-95"
                   >
                     <Phone className="w-5 h-5" />
                     <span>تواصل مع الكساب</span>
@@ -369,7 +369,7 @@ export default function ListingDetails({ onNavigate, listingId }: Props) {
                         const text = `${greeting}شفت هاد الحولي ف منصة kessabcom.ma ومهتم نجي نشوف لكسيبة: ${url}`;
                         window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
                       }}
-                      className="flex items-center justify-center gap-2 bg-[#94edb5] text-[#1a6b3a] border border-[#25D366] py-2.5 rounded-xl font-bold transition-all hover:bg-[#7de0a2] shadow-sm active:scale-95 text-sm"
+                      className="flex items-center justify-center gap-2 bg-[#edfff4] text-[#1a6b3a] border border-[#25D366] py-2.5 rounded-xl font-bold transition-all hover:bg-[#25D366]/10 shadow-sm active:scale-95 text-sm"
                     >
                       <MessageCircle className="w-4 h-4" />
                       <span>بارطاجي واتساب</span>
@@ -422,7 +422,7 @@ export default function ListingDetails({ onNavigate, listingId }: Props) {
                     target="_blank" 
                     rel="noopener noreferrer" 
                     onClick={() => firestoreService.incrementContactClick(listing.id, 'location')}
-                    className="w-full flex items-center justify-center gap-2 bg-[#1A1A1A] text-white py-4 rounded-xl font-bold transition-colors border border-transparent hover:bg-transparent hover:text-[#1A1A1A] hover:border-[#1A1A1A]"
+                    className="hidden md:flex w-full items-center justify-center gap-2 bg-[#1A1A1A] text-white py-4 rounded-xl font-bold transition-colors border border-transparent hover:bg-transparent hover:text-[#1A1A1A] hover:border-[#1A1A1A]"
                   >
                     <Navigation className="w-5 h-5" />
                     <span>طريق الضيعة (GPS)</span>
@@ -433,7 +433,7 @@ export default function ListingDetails({ onNavigate, listingId }: Props) {
                     target="_blank" 
                     rel="noopener noreferrer" 
                     onClick={() => firestoreService.incrementContactClick(listing.id, 'location')}
-                    className="w-full flex items-center justify-center gap-2 bg-[#1A1A1A] text-white py-4 rounded-xl font-bold transition-colors border border-transparent hover:bg-transparent hover:text-[#1A1A1A] hover:border-[#1A1A1A]"
+                    className="hidden md:flex w-full items-center justify-center gap-2 bg-[#1A1A1A] text-white py-4 rounded-xl font-bold transition-colors border border-transparent hover:bg-transparent hover:text-[#1A1A1A] hover:border-[#1A1A1A]"
                   >
                     <Navigation className="w-5 h-5" />
                     <span>طريق الضيعة (GPS)</span>

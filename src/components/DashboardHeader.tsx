@@ -118,7 +118,7 @@ export default function DashboardHeader({ title, subtitle, location, showSearch 
     const displayName = profile?.fullName || profile?.displayName || (role === 'admin' ? 'المشرف' : role === 'seller' ? 'الكساب' : 'المشتري');
     
     return (
-      <div className="absolute top-full left-0 pt-2 w-64 z-[60]">
+      <div className="hidden md:block absolute top-full left-0 pt-2 w-64 z-[60]">
         <div className="bg-white rounded-[10px] shadow-2xl border border-outline-variant/20 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
           <div className="p-4 border-b border-outline-variant/10 bg-[#F9F9F6]">
             <div className="flex items-center gap-3 mb-2">
@@ -416,7 +416,7 @@ export default function DashboardHeader({ title, subtitle, location, showSearch 
             onMouseEnter={() => setShowProfileMenu(true)}
             onMouseLeave={() => setShowProfileMenu(false)}
           >
-            <button className="flex items-center justify-center w-9 h-9 rounded-full bg-[#F9F9F6] border border-outline-variant/10 hover:bg-white hover:border-[#2E7D32] transition-colors overflow-hidden shadow-sm">
+            <button className="flex items-center justify-center w-9 h-9 rounded-full bg-[#F9F9F6] border border-outline-variant/10 md:hover:bg-white md:hover:border-[#2E7D32] transition-colors overflow-hidden shadow-sm">
               {profile?.photoURL ? (
                 <img src={profile.photoURL} alt="Profile" className="w-full h-full object-cover rounded-full" referrerPolicy="no-referrer" />
               ) : (

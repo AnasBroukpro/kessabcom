@@ -52,6 +52,13 @@ export default function BuyerDashboard({ onNavigate, activeSubView }: Props) {
   const { settings } = useSettings();
   const [activeTab, setActiveTab] = useState<'map' | 'list'>('map');
   const [activeView, setActiveView] = useState<DashboardView>('dashboard');
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTo(0, 0);
+    }
+  }, [activeView]);
 
   useEffect(() => {
     if (activeSubView) {
@@ -340,7 +347,7 @@ export default function BuyerDashboard({ onNavigate, activeSubView }: Props) {
         />
 
         {/* Dynamic Content Area */}
-        <div className="flex-1 overflow-y-auto no-scrollbar pt-16">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto no-scrollbar pt-32 lg:pt-16">
           <div className="p-4 md:p-8 max-w-7xl mx-auto w-full space-y-6 md:space-y-8 text-right">
           {activeView === 'dashboard' && (
             <BuyerHomeView 
@@ -424,6 +431,18 @@ export default function BuyerDashboard({ onNavigate, activeSubView }: Props) {
             <span className="text-[10px] font-bold">المزاد</span>
           </button>
         )}
+        
+        {/* Plus Button in Middle */}
+        <button 
+          onClick={() => onNavigate('add-listing')}
+          className="flex-1 flex flex-col items-center justify-center gap-1 p-2"
+        >
+          <div className="bg-[#115E2C] text-white p-2.5 rounded-full shadow-lg -mt-10 mb-1 border-4 border-white">
+            <PlusCircle className="w-6 h-6" />
+          </div>
+          <span className="text-[10px] font-bold text-[#115E2C]">إضافة</span>
+        </button>
+
         <button 
           onClick={() => setActiveView('favorites')}
           className={`flex-1 flex flex-col items-center justify-center gap-1 p-2 rounded-xl transition-colors relative border border-transparent ${activeView === 'favorites' ? 'text-primary bg-primary/5 border-primary' : 'text-on-surface-variant hover:text-primary hover:border-primary'}`}

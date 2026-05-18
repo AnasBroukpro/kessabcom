@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Tag, ShoppingBag, Settings } from 'lucide-react';
+import { LayoutDashboard, Tag, ShoppingBag, Settings, Plus } from 'lucide-react';
 import { SellerTab } from '../../views/SellerDashboard';
 
 interface SellerMobileNavProps {
@@ -7,6 +7,7 @@ interface SellerMobileNavProps {
   setActiveTab: (tab: SellerTab) => void;
   requestsCount: number;
   settings: any;
+  onNavigate: (view: any) => void;
 }
 
 const SheepIcon = ({ className }: { className?: string }) => (
@@ -24,11 +25,13 @@ export default function SellerMobileNav({
   activeTab,
   setActiveTab,
   requestsCount,
-  settings
+  settings,
+  onNavigate
 }: SellerMobileNavProps) {
   const items = [
     { id: 'dashboard', icon: LayoutDashboard, label: 'الرئيسية' },
     { id: 'flock', icon: Tag, label: 'إعلاناتي' },
+    { id: 'add', icon: Plus, label: 'إضافة', isAction: true },
     { id: 'buyer-requests', icon: SheepIcon, label: 'طلبات', badge: requestsCount, visible: settings.auctionSystemEnabled },
     { id: 'settings', icon: Settings, label: 'الإعدادات' },
   ].filter(item => item.visible !== false);
@@ -38,11 +41,24 @@ export default function SellerMobileNav({
       {items.map(item => (
         <button 
           key={item.id}
-          onClick={() => setActiveTab(item.id as SellerTab)}
+          onClick={() => { 
+            if (item.isAction) {
+              onNavigate('add-listing');
+            } else {
+              setActiveTab(item.id as SellerTab); 
+              window.scrollTo(0, 0); 
+            }
+          }}
           className={`flex-1 flex flex-col items-center justify-center gap-1.5 p-2 rounded-[10px] transition-all duration-300 ${activeTab === item.id ? 'text-[#115E2C] scale-110' : 'text-[#757575] hover:text-[#115E2C]'}`}
         >
           <div className="relative">
-            <item.icon className={`w-5 h-5 ${activeTab === item.id ? 'stroke-[2.5px]' : 'stroke-2'}`} />
+            {item.id === 'add' ? (
+              <div className="bg-[#115E2C] text-white p-2 rounded-full shadow-lg -mt-8 mb-1 border-4 border-white">
+                <item.icon className="w-6 h-6" />
+              </div>
+            ) : (
+              <item.icon className={`w-5 h-5 ${activeTab === item.id ? 'stroke-[2.5px]' : 'stroke-2'}`} />
+            )}
             {item.badge !== undefined && item.badge > 0 && (
               <span className="absolute -top-2 -right-2 bg-red-600 text-white text-[8px] w-4 h-4 flex items-center justify-center rounded-full font-black border-2 border-white shadow-sm animate-bounce">
                 {item.badge}

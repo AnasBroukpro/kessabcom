@@ -290,15 +290,10 @@ const AccountView = ({ user, profile, settings, cities }: AccountViewProps) => {
   return (
     <div className="space-y-8 w-full animate-in fade-in slide-in-from-bottom-4 duration-500" dir="rtl">
       <div className="w-full">
-        <div className="flex justify-between items-center mb-8">
           <div>
             <h2 className="text-2xl font-black text-on-surface font-headline">حسابي الشخصي</h2>
             <p className="text-on-surface-variant text-sm mt-1">إدارة معلوماتك الشخصية وتفضيلاتك في المنصة.</p>
           </div>
-          <div className="bg-primary/10 text-primary p-3 rounded-[10px]">
-            <User className="w-6 h-6" />
-          </div>
-        </div>
 
         {(success || error) && (
           <div className={`mb-6 p-4 rounded-[10px] flex items-center gap-3 animate-in zoom-in-95 duration-200 ${success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
