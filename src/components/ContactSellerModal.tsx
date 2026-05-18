@@ -1,8 +1,8 @@
 import React from 'react';
-import { Phone, AlertTriangle, X } from 'lucide-react';
+import { Phone, AlertTriangle, X, Lock } from 'lucide-react';
 import { useSettings } from '../hooks/useSettings';
 import { useAuth } from '../contexts/AuthContext';
-import { firestoreService } from '../services/firestoreService';
+import { monetizationService } from '../services/monetizationService';
 import { ViewType } from '../App';
 import LoginRequiredModal from './LoginRequiredModal';
 
@@ -19,6 +19,7 @@ interface ContactSellerModalProps {
   phones?: string[];
   whatsapps?: string[];
   listingId?: string;
+  listingStatus?: string; // 'active' | 'paused_for_payment' | ...
   onNavigate: (view: ViewType, listingId?: string, city?: string, radius?: string, subView?: string) => void;
 }
 
@@ -31,7 +32,7 @@ const formatMoroccanPhone = (phone: string) => {
 };
 
 export default function ContactSellerModal({ 
-  isOpen, onClose, sellerPhone, sellerWhatsapp, phones = [], whatsapps = [], listingId, onNavigate 
+  isOpen, onClose, sellerPhone, sellerWhatsapp, phones = [], whatsapps = [], listingId, listingStatus, onNavigate 
 }: ContactSellerModalProps) {
   const { settings } = useSettings();
   const { profile } = useAuth();
@@ -39,17 +40,40 @@ export default function ContactSellerModal({
 
   if (!isOpen) return null;
 
-  const handlePhoneClick = () => {
+  const handlePhoneClick = async () => {
     if (listingId) {
-      firestoreService.incrementContactClick(listingId, 'phone');
+      try { await monetizationService.recordContact(listingId, 'phone'); }
+      catch (e) { console.warn('Contact point deduction failed (non-blocking):', e); }
     }
   };
 
-  const handleWhatsappClick = () => {
+  const handleWhatsappClick = async () => {
     if (listingId) {
-      firestoreService.incrementContactClick(listingId, 'whatsapp');
+      try { await monetizationService.recordContact(listingId, 'whatsapp'); }
+      catch (e) { console.warn('Contact point deduction failed (non-blocking):', e); }
     }
   };
+
+  // Si l'annonce est bloquée pour paiement, bloquer tout contact
+  if (isOpen && listingStatus === 'paused_for_payment') {
+    return (
+      <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300" dir="rtl">
+        <div className="w-full max-w-[360px] bg-white rounded-[28px] p-6 shadow-2xl text-center">
+          <button onClick={onClose} className="absolute top-4 left-4 w-8 h-8 flex items-center justify-center bg-red-100 text-red-600 rounded-full">
+            <X className="w-4 h-4" />
+          </button>
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Lock className="w-8 h-8 text-red-500" />
+          </div>
+          <h3 className="text-xl font-black text-[#1A1A1A] mb-2">هذا الإعلان موقوف</h3>
+          <p className="text-sm text-[#757575] leading-relaxed">
+            كساب هذا الإعلان وصل للحد المجاني ديال التواصل.
+            الإعلان سيرجع نشيط بعد الدفع.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   // If guest buyer mode is disabled and user is not logged in
   if (!settings.guestBuyerMode && !profile) {

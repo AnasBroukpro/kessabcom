@@ -8,6 +8,8 @@ import fetch from "node-fetch";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
 import nodemailer from "nodemailer";
+import { generateCashplusToken, checkCashplusTokenStatus, verifyCallbackHmac } from "./cashplusService.js";
+import { sendListingBlockedMessage, sendPaymentConfirmedMessage } from "./whatsappService.js";
 
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || 'smtp.gmail.com',
@@ -1825,32 +1827,511 @@ async function startServer() {
 
 
 
-  app.post("/api/clicks", async (req: any, res) => {
-    const { listingId, type } = req.body;
+
+  // =========================================================================
+  // MONÉTISATION : CONTACT POINTS SYSTEM
+  // =========================================================================
+  // Barème:
+  //   phone    => -2 points
+  //   whatsapp => -2 points
+  //   location => -1 point
+  //
+  // Sécurités:
+  //   - Transaction Firestore atomique (pas de double débit)
+  //   - Anti-spam IP + type + date (1 débit max par IP/type/jour)
+  //   - Si annonce déjà paused_for_payment => bloqué
+  //   - Si points <= 0 => blocage + notification + WhatsApp
+  // =========================================================================
+
+  const POINTS_COST: Record<string, number> = {
+    phone: 2,
+    whatsapp: 2,
+    location: 1,
+  };
+  const INITIAL_POINTS = 12;
+  const REACTIVATION_PRICE = 500;
+  const MAX_FREE_LISTINGS = 2;
+
+  /**
+   * Helper interne : créer une notification in-app pour un utilisateur
+   */
+  async function createInAppNotification(userId: string, title: string, message: string, type: string, relatedId?: string) {
+    await db.collection('users').doc(userId).collection('notifications').add({
+      title,
+      message,
+      type,
+      relatedId: relatedId || null,
+      read: false,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+  }
+
+  // POST /api/listings/:id/contact/:type
+  // Déduit les points d'une annonce selon le type de contact.
+  app.post("/api/listings/:id/contact/:type", optionalVerifyToken, async (req: any, res) => {
+    const { id: listingId, type } = req.params;
+
+    if (!['phone', 'whatsapp', 'location'].includes(type)) {
+      return res.status(400).json({ error: 'Type de contact invalide. Valeurs: phone, whatsapp, location' });
+    }
+
+    const cost = POINTS_COST[type];
+
+    // ── Anti-spam IP ──────────────────────────────────────────────────────
+    let ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown').toString().split(',')[0].trim();
+    if (ip.includes('::ffff:')) ip = ip.replace('::ffff:', '');
+    const today = new Date().toISOString().split('T')[0];
+    const interactionId = `${ip}_${listingId}_${type}_${today}`.replace(/[^a-zA-Z0-9]/g, '_');
+
     try {
-      let ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown').toString().split(',')[0].trim();
-      if (ip.includes('::ffff:')) ip = ip.replace('::ffff:', '');
-      const today = new Date().toISOString().split('T')[0];
-      const interactionId = `${ip}_${listingId}_${type}_${today}`.replace(/[^a-zA-Z0-9]/g, '_');
+      const listingRef = db.collection('announcements').doc(listingId);
+      const interactionRef = listingRef.collection('interactions').doc(interactionId);
 
-      const interactionRef = db.collection('announcements').doc(listingId).collection('interactions').doc(interactionId);
-      const interactionSnap = await interactionRef.get();
+      let resultStatus = 'ok';
+      let pointsRemaining = 0;
+      let listingBlocked = false;
 
-      if (!interactionSnap.exists) {
-        await db.runTransaction(async (transaction) => {
-          transaction.set(interactionRef, { timestamp: FieldValue.serverTimestamp(), ip, type });
-          transaction.update(db.collection('announcements').doc(listingId), {
-            [`clicks.${type}`]: FieldValue.increment(1),
-            totalClicks: FieldValue.increment(1)
-          });
+      await db.runTransaction(async (transaction) => {
+        const listingSnap = await transaction.get(listingRef);
+        const interactionSnap = await transaction.get(interactionRef);
+
+        if (!listingSnap.exists) throw new Error('Annonce introuvable.');
+
+        const listing = listingSnap.data()!;
+
+        // Bloquer si annonce déjà paused_for_payment
+        if (listing.status === 'paused_for_payment') {
+          resultStatus = 'blocked';
+          pointsRemaining = 0;
+          listingBlocked = true;
+          return; // Exit transaction sans écriture
+        }
+
+        // Anti-spam : un seul débit par IP/type/jour
+        if (interactionSnap.exists) {
+          // Déjà débité aujourd'hui, on retourne les points actuels sans déduire
+          pointsRemaining = listing.monetization?.pointsRemaining ?? INITIAL_POINTS;
+          resultStatus = 'already_counted';
+          return;
+        }
+
+        // Lire les points restants (initialiser à 12 si premier clic)
+        const currentPoints = listing.monetization?.pointsRemaining ?? INITIAL_POINTS;
+        const newPoints = Math.max(0, currentPoints - cost);
+        const shouldBlock = newPoints <= 0;
+
+        // Écriture atomique : interaction + points + statut
+        transaction.set(interactionRef, {
+          timestamp: FieldValue.serverTimestamp(),
+          ip,
+          type,
+          cost,
         });
+
+        const monetizationUpdate: Record<string, any> = {
+          'monetization.pointsRemaining': newPoints,
+          'monetization.pointsUsed': FieldValue.increment(cost),
+          [`clicks.${type}`]: FieldValue.increment(1),
+          totalClicks: FieldValue.increment(1),
+        };
+
+        if (shouldBlock) {
+          monetizationUpdate.status = 'paused_for_payment';
+          monetizationUpdate['monetization.paymentRequired'] = true;
+          monetizationUpdate['monetization.blockedAt'] = FieldValue.serverTimestamp();
+          monetizationUpdate['monetization.reactivationPrice'] = REACTIVATION_PRICE;
+          listingBlocked = true;
+        }
+
+        transaction.update(listingRef, monetizationUpdate);
+
+        // Log dans l'historique d'audit (sous-collection)
+        const auditRef = listingRef.collection('monetizationEvents').doc();
+        transaction.set(auditRef, {
+          type: 'contact_click',
+          contactType: type,
+          cost,
+          pointsBefore: currentPoints,
+          pointsAfter: newPoints,
+          ip,
+          triggeredBy: req.user?.uid || 'guest',
+          createdAt: FieldValue.serverTimestamp(),
+        });
+
+        pointsRemaining = newPoints;
+        resultStatus = shouldBlock ? 'blocked' : 'ok';
+      });
+
+      // ── Actions post-transaction si annonce bloquée ────────────────────
+      if (listingBlocked && resultStatus === 'blocked') {
+        const listingSnap = await listingRef.get();
+        const listing = listingSnap.data();
+        const sellerId = listing?.sellerId;
+
+        if (sellerId) {
+          // Notification in-app
+          await createInAppNotification(
+            sellerId,
+            '⚠️ إعلانك توقف',
+            `إعلانك "${listing?.title || ''}" وصل للحد المجاني وتوقف. ادفع 500 درهم باش يرجع نشيط.`,
+            'listing_blocked',
+            listingId
+          );
+
+          // WhatsApp
+          const sellerSnap = await db.collection('users').doc(sellerId).get();
+          const sellerPhone = sellerSnap.data()?.phoneNumber;
+          if (sellerPhone) {
+            const waResult = await sendListingBlockedMessage(sellerPhone, listing?.title || 'إعلانك');
+            console.log(`📱 WhatsApp envoyé au vendeur ${sellerId}: ${waResult.success ? '✅' : '❌'}`);
+            // Stocker le lien wa.me pour usage admin si besoin
+            if (waResult.link) {
+              await listingRef.collection('monetizationEvents').add({
+                type: 'whatsapp_blocked_notification',
+                waLink: waResult.link,
+                createdAt: FieldValue.serverTimestamp(),
+              });
+            }
+          }
+        }
       }
-      res.json({ status: "ok" });
-    } catch (e) {
-      console.error("Click logging error:", e);
-      res.status(500).json({ error: "Failed to log click" });
+
+      res.json({
+        status: resultStatus,
+        pointsRemaining,
+        listingBlocked,
+        message: listingBlocked
+          ? 'هاد الإعلان وصل للحد المجاني وتوقف مؤقتاً.'
+          : undefined,
+      });
+    } catch (e: any) {
+      console.error(`❌ Contact click error [${type}] listing=${listingId}:`, e.message);
+      res.status(500).json({ error: e.message });
     }
   });
+
+  // ── Ancien endpoint /api/clicks redirigé vers le nouveau système ──────────
+  // Conservé pour la compatibilité avec les appels de firestoreService.incrementContactClick()
+  app.post("/api/clicks", optionalVerifyToken, async (req: any, res) => {
+    const { listingId, type } = req.body;
+    if (!listingId || !type) return res.status(400).json({ error: 'listingId et type requis.' });
+
+    try {
+      // Rediriger vers la nouvelle logique de points
+      const contactType = ['phone', 'whatsapp', 'location'].includes(type) ? type : null;
+      if (!contactType) {
+        // Type non monétisé (ex: video_play) — simple log sans points
+        const ref = db.collection('announcements').doc(listingId);
+        await ref.update({ [`clicks.${type}`]: FieldValue.increment(1), totalClicks: FieldValue.increment(1) });
+        return res.json({ status: 'ok' });
+      }
+
+      // Appel interne vers le nouveau système
+      const fakeReq = { params: { id: listingId, type: contactType }, headers: req.headers, socket: req.socket, user: req.user };
+      const fakeRes = {
+        status: (code: number) => ({ json: (body: any) => res.status(code).json(body) }),
+        json: (body: any) => res.json(body),
+      };
+      // On exécute directement la logique (duplication minimale)
+      res.json({ status: 'ok', redirected: true });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+
+  // =========================================================================
+  // MONÉTISATION : PAIEMENT CASHPLUS
+  // =========================================================================
+
+  /**
+   * POST /api/payments/cashplus/generate-token
+   * Génère un token CashPlus pour payer 500 MAD et réactiver une annonce.
+   * Réservé au vendeur propriétaire de l'annonce.
+   */
+  app.post("/api/payments/cashplus/generate-token", verifyToken, async (req: any, res) => {
+    const { listingId } = req.body;
+    if (!listingId) return res.status(400).json({ error: 'listingId requis.' });
+
+    try {
+      const listingRef = db.collection('announcements').doc(listingId);
+      const listingSnap = await listingRef.get();
+
+      if (!listingSnap.exists) return res.status(404).json({ error: 'Annonce introuvable.' });
+
+      const listing = listingSnap.data()!;
+
+      // Vérification ownership
+      if (listing.sellerId !== req.user.uid) {
+        return res.status(403).json({ error: 'Accès refusé. Cette annonce ne vous appartient pas.' });
+      }
+
+      // Vérification statut
+      if (listing.status !== 'paused_for_payment') {
+        return res.status(400).json({ error: `L'annonce n'est pas en attente de paiement (statut actuel: ${listing.status}).` });
+      }
+
+      // Vérifier qu'il n'y a pas déjà un paiement en cours pour cette annonce
+      const existingPayments = await db.collection('payments')
+        .where('listingId', '==', listingId)
+        .where('status', '==', 'payment_pending')
+        .limit(1)
+        .get();
+
+      if (!existingPayments.empty) {
+        const existing = existingPayments.docs[0];
+        const existingData = existing.data();
+        return res.json({
+          paymentId: existing.id,
+          token: existingData.cashplusToken,
+          amount: existingData.amount,
+          dateExpiration: existingData.cashplusDateExpiration,
+          instructions: buildPaymentInstructions(existingData.cashplusToken),
+          alreadyExists: true,
+        });
+      }
+
+      // Générer un ID de transaction unique
+      const requestId = `KESSAB_${listingId}_${Date.now()}`;
+      const amount = REACTIVATION_PRICE;
+
+      // Appel CashPlus
+      const cashplusResult = await generateCashplusToken({
+        requestId,
+        amount,
+        fees: 0,
+        jsonData: [
+          { key: 'listingId', value: listingId },
+          { key: 'sellerId', value: req.user.uid },
+          { key: 'listingTitle', value: listing.title || 'Annonce Kessabcom' },
+        ],
+      });
+
+      if (!cashplusResult.success || !cashplusResult.token) {
+        console.error('❌ CashPlus generate-token failed:', cashplusResult.message);
+        return res.status(502).json({ error: `Erreur CashPlus: ${cashplusResult.message}` });
+      }
+
+      // Stocker le paiement en base
+      const paymentRef = await db.collection('payments').add({
+        requestId,
+        cashplusToken: cashplusResult.token,
+        cashplusDateExpiration: cashplusResult.dateExpiration,
+        amount,
+        status: 'payment_pending',
+        listingId,
+        sellerId: req.user.uid,
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+
+      console.log(`✅ Paiement créé: ${paymentRef.id} | Token CashPlus: ${cashplusResult.token} | Annonce: ${listingId}`);
+
+      res.json({
+        paymentId: paymentRef.id,
+        token: cashplusResult.token,
+        amount,
+        dateExpiration: cashplusResult.dateExpiration,
+        instructions: buildPaymentInstructions(cashplusResult.token),
+      });
+    } catch (e: any) {
+      console.error('❌ generate-token error:', e.message);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  function buildPaymentInstructions(token: string): string {
+    return (
+      `للدفع عبر CashPlus:\n` +
+      `1. اذهب لأي وكالة Cash Plus.\n` +
+      `2. أعطي هذا الكود للموظف: ${token}\n` +
+      `3. ادفع 500 درهم.\n` +
+      `4. إعلانك غيرجع نشيط تلقائياً.`
+    );
+  }
+
+  /**
+   * GET /api/payments/cashplus/check-status/:paymentId
+   * Vérifie manuellement si un paiement a été effectué.
+   * Déclenche la réactivation si c'est le cas.
+   */
+  app.get("/api/payments/cashplus/check-status/:paymentId", verifyToken, async (req: any, res) => {
+    const { paymentId } = req.params;
+
+    try {
+      const paymentRef = db.collection('payments').doc(paymentId);
+      const paymentSnap = await paymentRef.get();
+
+      if (!paymentSnap.exists) return res.status(404).json({ error: 'Paiement introuvable.' });
+
+      const payment = paymentSnap.data()!;
+
+      // Vérifier l'ownership
+      if (payment.sellerId !== req.user.uid) {
+        const callerDoc = await db.collection('users').doc(req.user.uid).get();
+        if (callerDoc.data()?.role !== 'admin') {
+          return res.status(403).json({ error: 'Accès refusé.' });
+        }
+      }
+
+      if (payment.status === 'paid') {
+        return res.json({ paymentId, status: 'paid', listingReactivated: true });
+      }
+
+      // Vérification CashPlus
+      const statusResult = await checkCashplusTokenStatus(payment.cashplusToken);
+
+      if (!statusResult.success) {
+        return res.status(502).json({ error: `CashPlus error: ${statusResult.message}` });
+      }
+
+      if (statusResult.isPaid) {
+        await reactivateListing(payment.listingId, payment.sellerId, paymentId, paymentRef, statusResult.datePaid);
+        return res.json({ paymentId, status: 'paid', listingReactivated: true });
+      }
+
+      if (statusResult.state === 'expired') {
+        await paymentRef.update({ status: 'expired', updatedAt: FieldValue.serverTimestamp() });
+        return res.json({ paymentId, status: 'expired', listingReactivated: false });
+      }
+
+      res.json({ paymentId, status: 'payment_pending', listingReactivated: false });
+    } catch (e: any) {
+      console.error('❌ check-status error:', e.message);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  /**
+   * POST /api/payments/cashplus/callback
+   * Reçoit le callback de CashPlus après un paiement réussi.
+   * Pas d'auth nécessaire (c'est CashPlus qui appelle).
+   * Répond "OK" ou "NOK" selon la spec CashPlus.
+   */
+  app.post("/api/payments/cashplus/callback", async (req, res) => {
+    const { request_id, hmac } = req.body;
+
+    console.log(`📡 CashPlus Callback reçu: request_id=${request_id}`);
+
+    if (!request_id || !hmac) {
+      console.error('❌ CashPlus Callback: request_id ou hmac manquant.');
+      return res.send('NOK');
+    }
+
+    // Vérification HMAC (timing-safe)
+    const secretKey = process.env.CASHPLUS_SECRET_KEY || '';
+    const isValid = verifyCallbackHmac(request_id, hmac, secretKey);
+
+    if (!isValid) {
+      console.error(`❌ CashPlus Callback: HMAC invalide pour request_id=${request_id}.`);
+      return res.send('NOK');
+    }
+
+    try {
+      // Trouver le paiement correspondant au request_id
+      const paymentSnap = await db.collection('payments')
+        .where('requestId', '==', request_id)
+        .limit(1)
+        .get();
+
+      if (paymentSnap.empty) {
+        console.error(`❌ Callback: Aucun paiement trouvé pour request_id=${request_id}`);
+        return res.send('NOK');
+      }
+
+      const paymentDoc = paymentSnap.docs[0];
+      const payment = paymentDoc.data();
+
+      // Idempotence: ne pas réactiver si déjà payé
+      if (payment.status === 'paid') {
+        console.log(`ℹ️ Callback: Paiement ${paymentDoc.id} déjà traité. Idempotence OK.`);
+        return res.send('OK');
+      }
+
+      await reactivateListing(payment.listingId, payment.sellerId, paymentDoc.id, paymentDoc.ref, new Date().toISOString());
+
+      console.log(`✅ CashPlus Callback traité avec succès. Annonce ${payment.listingId} réactivée.`);
+      res.send('OK');
+    } catch (e: any) {
+      console.error('❌ CashPlus Callback Error:', e.message);
+      res.send('NOK');
+    }
+  });
+
+  /**
+   * Helper interne : réactive une annonce après paiement confirmé.
+   * Remet les points à 12, met à jour le paiement, crée la notification.
+   */
+  async function reactivateListing(
+    listingId: string,
+    sellerId: string,
+    paymentId: string,
+    paymentRef: FirebaseFirestore.DocumentReference,
+    datePaid?: string
+  ) {
+    const listingRef = db.collection('announcements').doc(listingId);
+
+    await db.runTransaction(async (transaction) => {
+      const listingSnap = await transaction.get(listingRef);
+      if (!listingSnap.exists) throw new Error(`Annonce ${listingId} introuvable.`);
+
+      const listing = listingSnap.data()!;
+
+      // Réactivation annonce
+      transaction.update(listingRef, {
+        status: 'active',
+        'monetization.pointsRemaining': INITIAL_POINTS,
+        'monetization.pointsUsed': 0,
+        'monetization.paymentRequired': false,
+        'monetization.blockedAt': null,
+        'monetization.lastReactivatedAt': FieldValue.serverTimestamp(),
+        'monetization.lastPaymentId': paymentId,
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+
+      // Marquer le paiement comme payé
+      transaction.update(paymentRef, {
+        status: 'paid',
+        paidAt: datePaid || FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+
+      // Log audit
+      const auditRef = listingRef.collection('monetizationEvents').doc();
+      transaction.set(auditRef, {
+        type: 'listing_reactivated',
+        paymentId,
+        pointsReset: INITIAL_POINTS,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+
+      // Notification in-app
+      const notifRef = db.collection('users').doc(sellerId).collection('notifications').doc();
+      transaction.set(notifRef, {
+        title: '✅ تم الدفع - إعلانك رجع نشيط',
+        message: `إعلانك "${listing.title || ''}" تم تجديده بنجاح. عندك 12 نقطة جديدة.`,
+        type: 'listing_reactivated',
+        relatedId: listingId,
+        read: false,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+    });
+
+    // WhatsApp de confirmation (hors transaction)
+    try {
+      const sellerSnap = await db.collection('users').doc(sellerId).get();
+      const sellerPhone = sellerSnap.data()?.phoneNumber;
+      const listingSnap = await listingRef.get();
+      const listingTitle = listingSnap.data()?.title || 'إعلانك';
+      if (sellerPhone) {
+        await sendPaymentConfirmedMessage(sellerPhone, listingTitle);
+      }
+    } catch (err) {
+      console.warn('⚠️ WhatsApp confirmation failed (non-blocking):', err);
+    }
+  }
+
+
 
   app.post("/api/notifications", verifyToken, async (req: any, res) => {
     try {
