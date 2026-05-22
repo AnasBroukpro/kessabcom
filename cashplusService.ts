@@ -98,14 +98,11 @@ export const SIMULATION_MODE = process.env.CASHPLUS_SIMULATION_MODE === 'true' |
 
 /**
  * Construit l'URL complète pour un endpoint CashPlus.
- * Format: base/cpws/cpmarchand/index.cfm/{endpoint}
+ * Format: base/cpws/cpmarchand/index.cfm?endpoint=/xxx
  */
 function buildCashplusUrl(endpoint: string): URL {
-  // Enlève le ?endpoint=xxx s'il existe et utilise le path à la place
-  const base = CASHPLUS_BASE_URL.split('?')[0];
-  const normalized = base.endsWith('/') ? base.slice(0, -1) : base;
   const ep = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-  return new URL(`${normalized}${ep}`);
+  return new URL(`${CASHPLUS_BASE_URL}?endpoint=${ep}`);
 }
 
 function generateSimulatedToken(params: GenerateTokenParams): GenerateTokenResult {
