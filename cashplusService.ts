@@ -14,7 +14,7 @@
  */
 
 import crypto from 'crypto';
-import fetch from 'node-fetch';
+import https from 'https';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -92,6 +92,27 @@ export function verifyCallbackHmac(
 const CASHPLUS_BASE_URL = process.env.CASHPLUS_BASE_URL || 'https://cpay.ma/cpws/cpmarchand/index.cfm';
 const MARCHAND_CODE = process.env.CASHPLUS_MARCHAND_CODE || '';
 const SECRET_KEY = process.env.CASHPLUS_SECRET_KEY || '';
+const CASHPLUS_CALLBACK_URL = process.env.CASHPLUS_CALLBACK_URL || '';
+export const SIMULATION_MODE = process.env.CASHPLUS_SIMULATION_MODE === 'true' ||
+  (process.env.CASHPLUS_SIMULATION_MODE !== 'false' && process.env.NODE_ENV !== 'production');
+
+function generateSimulatedToken(params: GenerateTokenParams): GenerateTokenResult {
+  const token = `SIM_${params.requestId.slice(-8)}_${Date.now().toString(36).toUpperCase()}`;
+  const defaultExpiration = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const dateExpiration = (
+    `${defaultExpiration.getFullYear()}-${pad(defaultExpiration.getMonth() + 1)}-${pad(defaultExpiration.getDate())} ` +
+    `${pad(defaultExpiration.getHours())}:${pad(defaultExpiration.getMinutes())}:${pad(defaultExpiration.getSeconds())}`
+  );
+  console.log(`🧪 CashPlus SIMULATION: Token généré pour ${params.requestId} => ${token}`);
+  return { success: true, token, dateExpiration };
+}
+
+function simulateCheckStatus(token: string): CheckStatusResult {
+  const isSim = token.startsWith('SIM_');
+  if (!isSim) return { success: false, isPaid: false, state: 'new', message: 'Token non simulé' };
+  return { success: true, isPaid: false, state: 'new' };
+}
 
 /**
  * Génère un token de paiement CashPlus.
@@ -99,6 +120,10 @@ const SECRET_KEY = process.env.CASHPLUS_SECRET_KEY || '';
  * @returns Token CashPlus + date d'expiration
  */
 export async function generateCashplusToken(params: GenerateTokenParams): Promise<GenerateTokenResult> {
+  if (SIMULATION_MODE) {
+    return generateSimulatedToken(params);
+  }
+
   if (!MARCHAND_CODE || !SECRET_KEY) {
     console.error('❌ CashPlus: CASHPLUS_MARCHAND_CODE ou CASHPLUS_SECRET_KEY manquant dans .env');
     return { success: false, message: 'Configuration CashPlus manquante sur le serveur.' };
@@ -129,14 +154,30 @@ export async function generateCashplusToken(params: GenerateTokenParams): Promis
 
   try {
     console.log(`📡 CashPlus: Génération token pour request_id=${params.requestId}, montant=${params.amount} MAD`);
-    const res = await fetch(`${CASHPLUS_BASE_URL}?endpoint=/generate_token`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+    console.log('📡 CashPlus Body envoyé:', JSON.stringify(body));
+    const data: any = await new Promise((resolve, reject) => {
+      const fullBody = JSON.stringify(body);
+      const url = new URL(`${CASHPLUS_BASE_URL}?endpoint=/generate_token`);
+      const opts: https.RequestOptions = {
+        hostname: url.hostname,
+        port: url.port || 443,
+        path: url.pathname + url.search,
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(fullBody, 'utf8') },
+        rejectUnauthorized: process.env.NODE_ENV === 'production',
+      };
+      const req = https.request(opts, (res) => {
+        let data = '';
+        res.on('data', (chunk) => data += chunk);
+        res.on('end', () => {
+          console.log(`📡 CashPlus Response (generate_token): HTTP ${res.statusCode} | Body:`, data);
+          try { resolve(JSON.parse(data)); } catch (e) { reject(new Error('Invalid JSON: ' + data)); }
+        });
+      });
+      req.on('error', reject);
+      req.write(fullBody);
+      req.end();
     });
-
-    const data: any = await res.json();
-    console.log('📡 CashPlus Response (generate_token):', JSON.stringify(data));
 
     if (data.SUCCESS === 1) {
       return {
@@ -148,8 +189,12 @@ export async function generateCashplusToken(params: GenerateTokenParams): Promis
       return { success: false, message: data.MESSAGE || 'Erreur CashPlus inconnue.' };
     }
   } catch (err: any) {
-    console.error('❌ CashPlus: Erreur réseau generate_token:', err.message);
-    return { success: false, message: `Erreur réseau CashPlus: ${err.message}` };
+    if (process.env.NODE_ENV === 'production') {
+      console.error(`❌ CashPlus: API inaccessible (${err.message}).`);
+      return { success: false, message: `API CashPlus inaccessible: ${err.message}` };
+    }
+    console.warn(`⚠️ CashPlus: API inaccessible (${err.message}). Bascule automatique en mode simulation (non-production).`);
+    return generateSimulatedToken(params);
   }
 }
 
@@ -159,6 +204,14 @@ export async function generateCashplusToken(params: GenerateTokenParams): Promis
  * @returns Statut du paiement
  */
 export async function checkCashplusTokenStatus(token: string): Promise<CheckStatusResult> {
+  if (SIMULATION_MODE) {
+    return simulateCheckStatus(token);
+  }
+  if (token.startsWith('SIM_')) {
+    console.warn(`⚠️ CashPlus: Token SIM_ détecté alors que le mode simulation est désactivé.`);
+    return { success: false, isPaid: false, state: 'new', message: 'Token de simulation invalide pour l\'API réelle.' };
+  }
+
   if (!MARCHAND_CODE || !SECRET_KEY) {
     return { success: false, isPaid: false, state: 'new', message: 'Configuration manquante.' };
   }
@@ -167,14 +220,29 @@ export async function checkCashplusTokenStatus(token: string): Promise<CheckStat
 
   try {
     console.log(`📡 CashPlus: Vérification statut token=${token}`);
-    const res = await fetch(`${CASHPLUS_BASE_URL}?endpoint=/status_token`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, marchand_code: MARCHAND_CODE, hmac }),
+    const data: any = await new Promise((resolve, reject) => {
+      const fullBody = JSON.stringify({ token, marchand_code: MARCHAND_CODE, hmac });
+      const url = new URL(`${CASHPLUS_BASE_URL}?endpoint=/status_token`);
+      const opts: https.RequestOptions = {
+        hostname: url.hostname,
+        port: url.port || 443,
+        path: url.pathname + url.search,
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(fullBody, 'utf8') },
+        rejectUnauthorized: process.env.NODE_ENV === 'production',
+      };
+      const req = https.request(opts, (res) => {
+        let data = '';
+        res.on('data', (chunk) => data += chunk);
+        res.on('end', () => {
+          console.log(`📡 CashPlus Response (status_token): HTTP ${res.statusCode} | Body:`, data);
+          try { resolve(JSON.parse(data)); } catch (e) { reject(new Error('Invalid JSON: ' + data)); }
+        });
+      });
+      req.on('error', reject);
+      req.write(fullBody);
+      req.end();
     });
-
-    const data: any = await res.json();
-    console.log('📡 CashPlus Response (status_token):', JSON.stringify(data));
 
     if (data.SUCCESS !== 1) {
       return { success: false, isPaid: false, state: 'new', message: data.MESSAGE };
@@ -187,7 +255,11 @@ export async function checkCashplusTokenStatus(token: string): Promise<CheckStat
       datePaid: data.DATE_PAID,
     };
   } catch (err: any) {
-    console.error('❌ CashPlus: Erreur réseau status_token:', err.message);
-    return { success: false, isPaid: false, state: 'new', message: err.message };
+    if (!SIMULATION_MODE) {
+      console.error(`❌ CashPlus: API inaccessible (${err.message}).`);
+      return { success: false, isPaid: false, state: 'new', message: `API CashPlus inaccessible: ${err.message}` };
+    }
+    console.warn(`⚠️ CashPlus: API inaccessible (${err.message}). Simulation mode.`);
+    return simulateCheckStatus(token);
   }
 }

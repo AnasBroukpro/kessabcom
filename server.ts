@@ -8,7 +8,7 @@ import fetch from "node-fetch";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
 import nodemailer from "nodemailer";
-import { generateCashplusToken, checkCashplusTokenStatus, verifyCallbackHmac } from "./cashplusService.js";
+import { generateCashplusToken, checkCashplusTokenStatus, verifyCallbackHmac, SIMULATION_MODE } from "./cashplusService.js";
 import { sendListingBlockedMessage, sendPaymentConfirmedMessage } from "./whatsappService.js";
 
 const transporter = nodemailer.createTransport({
@@ -231,6 +231,8 @@ async function startServer() {
     "http://127.0.0.1:3000",
     "http://localhost:3001",
     "http://127.0.0.1:3001",
+    "http://localhost:3002",
+    "http://127.0.0.1:3002",
   ];
 
   app.use(cors({
@@ -240,7 +242,13 @@ async function startServer() {
       if (!origin) {
         return callback(null, true);
       }
-      if (allowedOrigins.includes(origin)) return callback(null, true);
+      if (
+        allowedOrigins.includes(origin) || 
+        origin.endsWith('.ngrok-free.dev') || 
+        origin.endsWith('.ngrok-free.app')
+      ) {
+        return callback(null, true);
+      }
       return callback(new Error(`Origin not allowed by CORS: ${origin}`));
     },
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
@@ -263,6 +271,21 @@ async function startServer() {
 
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
+  });
+
+  app.get("/api/debug/cashplus-test", async (req, res) => {
+    const result = await generateCashplusToken({
+      requestId: "DEBUG_" + Date.now(),
+      amount: 500,
+      fees: 0,
+      jsonData: [
+        { key: 'listingId', value: 'debug_test_' + Date.now() },
+        { key: 'sellerId', value: 'debug_user' },
+        { key: 'listingTitle', value: 'Test' },
+        { key: 'callbackUrl', value: 'https://baggie-unguided-annex.ngrok-free.dev/api/payments/cashplus/callback' },
+      ],
+    });
+    res.json(result);
   });
 
   // --- SETTINGS ENDPOINTS ---
@@ -367,6 +390,7 @@ async function startServer() {
         phoneNumber: phone ? String(phone).trim().slice(0, 20) : '',
         role: safeRole,
         status: 'active',
+        accountActivated: false,
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp()
       }, { merge: true });
@@ -395,7 +419,7 @@ async function startServer() {
 
   app.get("/api/auth/check-phone/:phone", checkPhoneLimiter, async (req, res) => {
     try {
-      const rawPhone = req.params.phone;
+      const rawPhone = String(req.params.phone);
       if (!rawPhone) return res.status(400).json({ error: "Numéro invalide" });
 
       // 1. Generate formats to search in Firestore
@@ -516,25 +540,34 @@ async function startServer() {
       const limitVal = Math.min(parseInt(req.query.limit as string) || 20, 100);
       const startAfterId = req.query.startAfter as string;
 
-      let queryRef: any = db.collection('announcements').where('status', '==', 'active').orderBy('createdAt', 'desc');
+      let queryRef: any = db.collection('announcements').where('status', '==', 'active');
       
       if (category) queryRef = queryRef.where('category', '==', category);
-      if (sellerId) queryRef = queryRef.where('sellerId', '==', sellerId);
-      
-      if (startAfterId) {
-        const cursorDoc = await db.collection('announcements').doc(startAfterId).get();
-        if (cursorDoc.exists) {
-          queryRef = queryRef.startAfter(cursorDoc);
-        }
+      if (sellerId) {
+        queryRef = queryRef.where('sellerId', '==', sellerId);
+      } else {
+        queryRef = queryRef.where('sellerAccountActivated', '==', true);
       }
 
-      const snap = await queryRef.limit(limitVal).get();
-      const data = snap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
-      const lastDoc = snap.docs[snap.docs.length - 1];
+      const snap = await queryRef.get();
+      let data = snap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
+
+      data.sort((a, b) => {
+        const dateA = a.createdAt?.toDate?.() || new Date(0);
+        const dateB = b.createdAt?.toDate?.() || new Date(0);
+        return dateB.getTime() - dateA.getTime();
+      });
+
+      if (startAfterId) {
+        const startIdx = data.findIndex(d => d.id === startAfterId);
+        if (startIdx !== -1) data = data.slice(startIdx + 1);
+      }
+
+      const paginated = data.slice(0, limitVal);
 
       res.json({
-        data,
-        nextCursor: snap.docs.length === limitVal ? lastDoc?.id : null
+        data: paginated,
+        nextCursor: data.length > limitVal ? paginated[paginated.length - 1]?.id : null
       });
     } catch (e: any) {
       console.error('API Listings Error:', e.message);
@@ -571,6 +604,10 @@ async function startServer() {
       if (!doc.exists) return res.status(404).json({ error: "Not found" });
       const data: any = { id: doc.id, ...doc.data() };
       
+      if (!data.sellerAccountActivated || data.status !== 'active') {
+        return res.status(404).json({ error: "Not found" });
+      }
+
       // Fetch approved reviews for this listing
       try {
         const reviewsSnap = await db.collection('announcements').doc(req.params.id).collection('reviews')
@@ -636,26 +673,44 @@ async function startServer() {
         return res.status(400).json({ error: 'Maximum 10 images autorisées.' });
       }
 
-      // Check listing limits if payment system is disabled
+      // Check listing limits based on settings and user plan
       const settingsDoc = await db.collection('settings').doc('global').get();
-      const settings = settingsDoc.data();
-      if (settings && !settings.paymentSystemEnabled) {
-        const maxListings = settings.maxListingsPerFreeUser || 5;
+      const settings = { paymentSystemEnabled: true, ...(settingsDoc.data() || {}) };
+      const sellerDoc = await db.collection('users').doc(req.user.uid).get();
+      const sellerData = sellerDoc.data();
+      const userPlan = sellerData?.plan || 'مجاني';
+
+      if (settings) {
+        let maxListings = 5;
+
+        if (settings.paymentSystemEnabled) {
+          if (userPlan === 'احترافي') {
+            maxListings = 20;
+          } else if (userPlan === 'باقة الانطلاق') {
+            maxListings = 2;
+          } else if (userPlan === 'شركات') {
+            maxListings = 50;
+          } else {
+            maxListings = 2;
+          }
+        } else {
+          maxListings = settings.maxListingsPerFreeUser || 5;
+        }
+
         const userListingsCount = (await db.collection('announcements')
           .where('sellerId', '==', req.user.uid)
-          .where('status', '==', 'active')
           .count().get()).data().count;
         
         if (userListingsCount >= maxListings) {
+          const planNameAr = userPlan === 'باقة الانطلاق' ? 'باقة الانطلاق' : userPlan === 'احترافي' ? 'باقة المحترف' : userPlan === 'شركات' ? 'باقة الضيعة الكبيرة' : 'الباقة المجانية';
           return res.status(403).json({ 
-            error: `لقد وصلت إلى الحد الأقصى للإعلانات المجانية (${maxListings}). يرجى تفعيل نظام الدفع أو حذف بعض الإعلانات.` 
+            error: `لقد وصلت إلى الحد الأقصى للإعلانات المسموح بها في ${planNameAr} (${maxListings} إعلانات). المرجو ترقية اشتراكك أو حذف بعض الإعلانات.` 
           });
         }
       }
 
       // Fetch seller info for denormalization
-      const sellerDoc = await db.collection('users').doc(req.user.uid).get();
-      const sellerData = sellerDoc.data();
+      const sellerAccountActivated = sellerData?.accountActivated === true;
 
       const data = {
         title: String(title).trim().slice(0, 200),
@@ -682,6 +737,7 @@ async function startServer() {
         sellerName: sellerData?.fullName || sellerData?.displayName || 'كساب',
         sellerPseudo: sellerData?.pseudo || null,
         status: 'active',
+        sellerAccountActivated,
         clicks: { phone: 0, whatsapp: 0 },
         totalClicks: 0,
         createdAt: FieldValue.serverTimestamp()
@@ -1527,7 +1583,7 @@ async function startServer() {
       );
 
       // ── User subscription plan breakdown ─────────────────────────────────
-      const plans = ['احترافي', 'شركات'];
+      const plans = ['باقة الانطلاق', 'احترافي', 'شركات'];
       const planBreakdown = await Promise.all(
         plans.map(async (plan) => ({
           name: plan,
@@ -1625,6 +1681,37 @@ async function startServer() {
   app.put("/api/admin/users/:id/ban", verifyToken, isAdmin, async (req, res) => {
     await db.collection('users').doc(req.params.id).update({ status: 'blocked' });
     res.json({ status: "ok" });
+  });
+
+  app.put("/api/admin/users/:id/deactivate", verifyToken, isAdmin, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userRef = db.collection('users').doc(id);
+      const userSnap = await userRef.get();
+      if (!userSnap.exists) return res.status(404).json({ error: "User not found" });
+
+      await db.runTransaction(async (transaction) => {
+        transaction.update(userRef, {
+          accountActivated: false,
+          accountActivationType: FieldValue.delete(),
+          plan: FieldValue.delete(),
+          status: 'deactivated',
+          deactivatedAt: FieldValue.serverTimestamp(),
+          deactivatedBy: req.user.uid,
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+
+        const listingsSnap = await db.collection('announcements')
+          .where('sellerId', '==', id).get();
+        for (const doc of listingsSnap.docs) {
+          transaction.update(doc.ref, { sellerAccountActivated: false });
+        }
+      });
+
+      res.json({ status: "ok", message: "Account deactivated" });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
   });
 
   app.get("/api/admin/listings", verifyToken, isAdmin, async (req, res) => {
@@ -1899,14 +1986,6 @@ async function startServer() {
 
         const listing = listingSnap.data()!;
 
-        // Bloquer si annonce déjà paused_for_payment
-        if (listing.status === 'paused_for_payment') {
-          resultStatus = 'blocked';
-          pointsRemaining = 0;
-          listingBlocked = true;
-          return; // Exit transaction sans écriture
-        }
-
         // Anti-spam : un seul débit par IP/type/jour
         if (interactionSnap.exists) {
           // Déjà débité aujourd'hui, on retourne les points actuels sans déduire
@@ -1918,7 +1997,7 @@ async function startServer() {
         // Lire les points restants (initialiser à 12 si premier clic)
         const currentPoints = listing.monetization?.pointsRemaining ?? INITIAL_POINTS;
         const newPoints = Math.max(0, currentPoints - cost);
-        const shouldBlock = newPoints <= 0;
+        const shouldBlock = false; // Freeze points blocking: never block listings due to points exhaustion
 
         // Écriture atomique : interaction + points + statut
         transaction.set(interactionRef, {
@@ -2046,64 +2125,82 @@ async function startServer() {
 
   /**
    * POST /api/payments/cashplus/generate-token
-   * Génère un token CashPlus pour payer 500 MAD et réactiver une annonce.
-   * Réservé au vendeur propriétaire de l'annonce.
+   * Génère un token CashPlus pour activer le compte vendeur (500 MAD).
+   * Le listingId est utilisé comme référence mais le paiement active le compte.
    */
   app.post("/api/payments/cashplus/generate-token", verifyToken, async (req: any, res) => {
-    const { listingId } = req.body;
-    if (!listingId) return res.status(400).json({ error: 'listingId requis.' });
+    const { listingId, paymentMode } = req.body;
+    const isAccountActivation = paymentMode === 'account_activation';
+
+    if (!isAccountActivation && !listingId) {
+      return res.status(400).json({ error: 'listingId requis.' });
+    }
+    if (isAccountActivation && listingId) {
+      return res.status(400).json({ error: 'Ne pas envoyer listingId avec paymentMode=account_activation.' });
+    }
 
     try {
-      const listingRef = db.collection('announcements').doc(listingId);
-      const listingSnap = await listingRef.get();
+      const sellerDoc = await db.collection('users').doc(req.user.uid).get();
+      const sellerData = sellerDoc.data();
+      if (!sellerData) return res.status(404).json({ error: 'Vendeur introuvable.' });
 
-      if (!listingSnap.exists) return res.status(404).json({ error: 'Annonce introuvable.' });
-
-      const listing = listingSnap.data()!;
-
-      // Vérification ownership
-      if (listing.sellerId !== req.user.uid) {
-        return res.status(403).json({ error: 'Accès refusé. Cette annonce ne vous appartient pas.' });
+      if (sellerData?.accountActivated === true) {
+        return res.json({
+          accountActivated: true,
+          message: 'حسابك مفعل بالفعل',
+        });
       }
 
-      // Vérification statut
-      if (listing.status !== 'paused_for_payment') {
-        return res.status(400).json({ error: `L'annonce n'est pas en attente de paiement (statut actuel: ${listing.status}).` });
+      let sellerName = sellerData.pseudo || sellerData.fullName || sellerData.displayName || 'Kessab';
+
+      // Vérifier l'annonce si listingId fourni (backward compat)
+      if (!isAccountActivation && listingId) {
+        const listingSnap = await db.collection('announcements').doc(listingId).get();
+        if (!listingSnap.exists) return res.status(404).json({ error: 'Annonce introuvable.' });
+        const listing = listingSnap.data()!;
+        if (listing.sellerId !== req.user.uid) {
+          return res.status(403).json({ error: 'Accès refusé.' });
+        }
+        sellerName = listing.sellerName || sellerName;
       }
 
-      // Vérifier qu'il n'y a pas déjà un paiement en cours pour cette annonce
+      // Vérifier si un paiement d'activation existe déjà pour ce vendeur
       const existingPayments = await db.collection('payments')
-        .where('listingId', '==', listingId)
-        .where('status', '==', 'payment_pending')
+        .where('sellerId', '==', req.user.uid)
+        .where('paymentType', '==', 'account_activation')
         .limit(1)
         .get();
 
       if (!existingPayments.empty) {
         const existing = existingPayments.docs[0];
         const existingData = existing.data();
-        return res.json({
-          paymentId: existing.id,
-          token: existingData.cashplusToken,
-          amount: existingData.amount,
-          dateExpiration: existingData.cashplusDateExpiration,
-          instructions: buildPaymentInstructions(existingData.cashplusToken),
-          alreadyExists: true,
-        });
+        if (existingData.status === 'payment_pending' && existingData.cashplusToken && !existingData.cashplusToken.startsWith('SIM_')) {
+          return res.json({
+            paymentId: existing.id,
+            token: existingData.cashplusToken,
+            amount: existingData.amount,
+            dateExpiration: existingData.cashplusDateExpiration,
+            instructions: buildPaymentInstructions(existingData.cashplusToken),
+            alreadyExists: true,
+            status: 'payment_pending',
+          });
+        }
+        if (existingData.status === 'expired' || (!SIMULATION_MODE && existingData.cashplusToken?.startsWith('SIM_'))) {
+          await existing.ref.update({ status: 'expired', updatedAt: FieldValue.serverTimestamp() });
+        }
       }
 
-      // Générer un ID de transaction unique
-      const requestId = `KESSAB_${listingId}_${Date.now()}`;
+      const requestId = `KESSAB_ACT_${req.user.uid.slice(-8)}_${Date.now()}`;
       const amount = REACTIVATION_PRICE;
 
-      // Appel CashPlus
       const cashplusResult = await generateCashplusToken({
         requestId,
         amount,
         fees: 0,
         jsonData: [
-          { key: 'listingId', value: listingId },
           { key: 'sellerId', value: req.user.uid },
-          { key: 'listingTitle', value: listing.title || 'Annonce Kessabcom' },
+          { key: 'sellerName', value: sellerName },
+          { key: 'callbackUrl', value: process.env.CASHPLUS_CALLBACK_URL || '' },
         ],
       });
 
@@ -2112,20 +2209,20 @@ async function startServer() {
         return res.status(502).json({ error: `Erreur CashPlus: ${cashplusResult.message}` });
       }
 
-      // Stocker le paiement en base
       const paymentRef = await db.collection('payments').add({
         requestId,
         cashplusToken: cashplusResult.token,
         cashplusDateExpiration: cashplusResult.dateExpiration,
         amount,
         status: 'payment_pending',
-        listingId,
+        paymentType: 'account_activation',
+        listingId: listingId || null,
         sellerId: req.user.uid,
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
       });
 
-      console.log(`✅ Paiement créé: ${paymentRef.id} | Token CashPlus: ${cashplusResult.token} | Annonce: ${listingId}`);
+      console.log(`✅ Paiement activation créé: ${paymentRef.id} | Token: ${cashplusResult.token} | Vendeur: ${req.user.uid}`);
 
       res.json({
         paymentId: paymentRef.id,
@@ -2133,6 +2230,7 @@ async function startServer() {
         amount,
         dateExpiration: cashplusResult.dateExpiration,
         instructions: buildPaymentInstructions(cashplusResult.token),
+        paymentType: 'account_activation',
       });
     } catch (e: any) {
       console.error('❌ generate-token error:', e.message);
@@ -2146,7 +2244,7 @@ async function startServer() {
       `1. اذهب لأي وكالة Cash Plus.\n` +
       `2. أعطي هذا الكود للموظف: ${token}\n` +
       `3. ادفع 500 درهم.\n` +
-      `4. إعلانك غيرجع نشيط تلقائياً.`
+      `4. حسابك غيرفعّل تلقائياً و إعلاناتك تبان للناس.`
     );
   }
 
@@ -2175,6 +2273,9 @@ async function startServer() {
       }
 
       if (payment.status === 'paid') {
+        if (payment.paymentType === 'account_activation') {
+          return res.json({ paymentId, status: 'paid', accountActivated: true });
+        }
         return res.json({ paymentId, status: 'paid', listingReactivated: true });
       }
 
@@ -2182,10 +2283,19 @@ async function startServer() {
       const statusResult = await checkCashplusTokenStatus(payment.cashplusToken);
 
       if (!statusResult.success) {
+        // Si le token est SIM_ et le mode simulation désactivé, on marque comme expiré
+        if (payment.cashplusToken?.startsWith('SIM_') && !SIMULATION_MODE) {
+          await paymentRef.update({ status: 'expired', updatedAt: FieldValue.serverTimestamp() });
+          return res.json({ paymentId, status: 'expired', listingReactivated: false, message: 'Paiement de simulation expiré. Veuillez réessayer.' });
+        }
         return res.status(502).json({ error: `CashPlus error: ${statusResult.message}` });
       }
 
       if (statusResult.isPaid) {
+        if (payment.paymentType === 'account_activation') {
+          await activateAccount(payment.sellerId, paymentId, paymentRef, statusResult.datePaid);
+          return res.json({ paymentId, status: 'paid', accountActivated: true });
+        }
         await reactivateListing(payment.listingId, payment.sellerId, paymentId, paymentRef, statusResult.datePaid);
         return res.json({ paymentId, status: 'paid', listingReactivated: true });
       }
@@ -2248,13 +2358,126 @@ async function startServer() {
         return res.send('OK');
       }
 
-      await reactivateListing(payment.listingId, payment.sellerId, paymentDoc.id, paymentDoc.ref, new Date().toISOString());
-
-      console.log(`✅ CashPlus Callback traité avec succès. Annonce ${payment.listingId} réactivée.`);
+      if (payment.paymentType === 'account_activation') {
+        await activateAccount(payment.sellerId, paymentDoc.id, paymentDoc.ref, new Date().toISOString());
+        console.log(`✅ CashPlus Callback: Compte ${payment.sellerId} activé.`);
+      } else {
+        await reactivateListing(payment.listingId, payment.sellerId, paymentDoc.id, paymentDoc.ref, new Date().toISOString());
+        console.log(`✅ CashPlus Callback: Annonce ${payment.listingId} réactivée.`);
+      }
       res.send('OK');
     } catch (e: any) {
       console.error('❌ CashPlus Callback Error:', e.message);
       res.send('NOK');
+    }
+  });
+
+  /**
+   * POST /api/payments/cashplus/simulate-payment/:paymentId
+   * Simule un paiement CashPlus réussi (mode développement uniquement).
+   * Déclenche la même réactivation que le callback réel.
+   */
+  app.post("/api/payments/cashplus/simulate-payment/:paymentId", verifyToken, async (req: any, res) => {
+    const { paymentId } = req.params;
+
+    try {
+      const paymentRef = db.collection('payments').doc(paymentId);
+      const paymentSnap = await paymentRef.get();
+
+      if (!paymentSnap.exists) return res.status(404).json({ error: 'Paiement introuvable.' });
+
+      const payment = paymentSnap.data()!;
+
+      if (payment.sellerId !== req.user.uid) {
+        const callerDoc = await db.collection('users').doc(req.user.uid).get();
+        if (callerDoc.data()?.role !== 'admin') {
+          return res.status(403).json({ error: 'Accès refusé.' });
+        }
+      }
+
+      if (payment.status === 'paid') {
+        return res.json({ status: 'already_paid' });
+      }
+
+      const token = payment.cashplusToken || '';
+      if (!token.startsWith('SIM_')) {
+        return res.status(400).json({ error: 'Seuls les tokens de simulation peuvent être simulés.' });
+      }
+
+      if (payment.paymentType === 'account_activation') {
+        await activateAccount(payment.sellerId, paymentId, paymentRef, new Date().toISOString());
+        console.log(`🧪 CashPlus SIMULATION: Compte ${payment.sellerId} activé (simulé).`);
+        return res.json({ status: 'paid', accountActivated: true });
+      }
+      await reactivateListing(payment.listingId, payment.sellerId, paymentId, paymentRef, new Date().toISOString());
+      console.log(`🧪 CashPlus SIMULATION: Paiement simulé pour paymentId=${paymentId}`);
+      res.json({ status: 'paid', listingReactivated: true });
+    } catch (e: any) {
+      console.error('❌ simulate-payment error:', e.message);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  /**
+   * POST /api/payments/refund-request
+   * Permet à un vendeur de demander le remboursement de 500 MAD pour une annonce.
+   * Désactive l'annonce correspondante et marque le paiement comme remboursé/demandé.
+   */
+  app.post("/api/payments/refund-request", verifyToken, async (req: any, res) => {
+    const { listingId } = req.body;
+    if (!listingId) return res.status(400).json({ error: 'listingId requis.' });
+
+    try {
+      // 1. Lire les settings globaux pour récupérer la date limite
+      const settingsDoc = await db.collection('settings').doc('global').get();
+      const settings = settingsDoc.data();
+      const deadlineStr = settings?.refund_deadline_date || "2026-05-24T23:59:59Z";
+      const deadline = new Date(deadlineStr);
+
+      if (new Date() > deadline) {
+        return res.status(400).json({ error: 'أجل طلب استرجاع المبلغ سالى.' });
+      }
+
+      // 2. Trouver le paiement CashPlus "paid" lié à cette annonce et à cet utilisateur
+      const paymentSnap = await db.collection('payments')
+        .where('listingId', '==', listingId)
+        .where('sellerId', '==', req.user.uid)
+        .where('status', '==', 'paid')
+        .limit(1)
+        .get();
+
+      if (paymentSnap.empty) {
+        return res.status(404).json({ error: 'لم يتم العثور على أي دفعة مؤكدة لهذا الإعلان.' });
+      }
+
+      const paymentDoc = paymentSnap.docs[0];
+      const paymentData = paymentDoc.data();
+
+      if (paymentData.refundRequested) {
+        return res.status(400).json({ error: 'لقد قمت بالفعل بطلب استرجاع المبلغ لهذا الإعلان.' });
+      }
+
+      // 3. Mettre à jour le paiement et suspendre l'annonce
+      const batch = db.batch();
+      batch.update(paymentDoc.ref, {
+        refundRequested: true,
+        refundRequestedAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp()
+      });
+
+      const listingRef = db.collection('announcements').doc(listingId);
+      batch.update(listingRef, {
+        status: 'inactive',
+        updatedAt: FieldValue.serverTimestamp()
+      });
+
+      await batch.commit();
+
+      console.log(`💰 Demande de remboursement enregistrée pour le paiement ${paymentDoc.id} | Annonce ${listingId} suspendue.`);
+      res.json({ success: true, message: 'تم تسجيل طلب استرجاع المبلغ بنجاح وتوقيف الإعلان.' });
+    } catch (e: any) {
+      console.error('❌ Error refund-request:', e.message);
+      res.status(500).json({ error: e.message });
     }
   });
 
@@ -2280,6 +2503,7 @@ async function startServer() {
       // Réactivation annonce
       transaction.update(listingRef, {
         status: 'active',
+        activationType: 'paid',
         'monetization.pointsRemaining': INITIAL_POINTS,
         'monetization.pointsUsed': 0,
         'monetization.paymentRequired': false,
@@ -2331,6 +2555,66 @@ async function startServer() {
     }
   }
 
+  /**
+   * Helper interne : active un compte vendeur après paiement confirmé.
+   * Met à jour toutes les annonces du vendeur pour les rendre visibles.
+   */
+  async function activateAccount(
+    sellerId: string,
+    paymentId: string,
+    paymentRef: FirebaseFirestore.DocumentReference,
+    datePaid?: string
+  ) {
+    const userRef = db.collection('users').doc(sellerId);
+    const listingsSnap = await db.collection('announcements').where('sellerId', '==', sellerId).get();
+
+    await db.runTransaction(async (transaction) => {
+      const userSnap = await transaction.get(userRef);
+      if (!userSnap.exists) throw new Error(`Utilisateur ${sellerId} introuvable.`);
+
+      // Activer le compte
+      transaction.update(userRef, {
+        accountActivated: true,
+        accountActivationType: 'paid',
+        plan: 'باقة الانطلاق',
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+
+      // Rendre toutes les annonces visibles
+      for (const listingDoc of listingsSnap.docs) {
+        transaction.update(listingDoc.ref, { sellerAccountActivated: true });
+      }
+
+      // Marquer le paiement comme payé
+      transaction.update(paymentRef, {
+        status: 'paid',
+        paidAt: datePaid || FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+
+      // Notification in-app
+      const notifRef = db.collection('users').doc(sellerId).collection('notifications').doc();
+      transaction.set(notifRef, {
+        title: '✅ حسابك مفعل',
+        message: `تم تفعيل حسابك بنجاح. كل إعلاناتك تبان للمشترين الآن.`,
+        type: 'account_activated',
+        relatedId: paymentId,
+        read: false,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+    });
+
+    // WhatsApp de confirmation
+    try {
+      const sellerSnap = await db.collection('users').doc(sellerId).get();
+      const sellerPhone = sellerSnap.data()?.phoneNumber;
+      if (sellerPhone) {
+        await sendPaymentConfirmedMessage(sellerPhone, 'حساب كسابكوم');
+      }
+    } catch (err) {
+      console.warn('⚠️ WhatsApp activation confirmation failed (non-blocking):', err);
+    }
+  }
 
 
   app.post("/api/notifications", verifyToken, async (req: any, res) => {

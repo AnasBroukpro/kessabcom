@@ -1,19 +1,12 @@
-/**
- * PaymentModal.tsx
- * ================
- * Modal de paiement CashPlus pour réactiver une annonce bloquée.
- * Wording simple et accessible pour un public rural marocain.
- */
 import React, { useState } from 'react';
-import { X, CreditCard, RefreshCw, CheckCircle, Clock, Copy, Check } from 'lucide-react';
+import { X, CreditCard, RefreshCw, CheckCircle, Clock, Copy, Check, FlaskConical } from 'lucide-react';
 import { monetizationService } from '../../services/monetizationService';
 
 interface PaymentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  listingId: string;
-  listingTitle: string;
-  onReactivated: () => void; // Callback pour rafraîchir les annonces
+  sellerName: string;
+  onActivated: () => void;
 }
 
 type ModalStep = 'intro' | 'generating' | 'waiting' | 'checking' | 'success' | 'error';
@@ -21,9 +14,8 @@ type ModalStep = 'intro' | 'generating' | 'waiting' | 'checking' | 'success' | '
 export default function PaymentModal({
   isOpen,
   onClose,
-  listingId,
-  listingTitle,
-  onReactivated,
+  sellerName,
+  onActivated,
 }: PaymentModalProps) {
   const [step, setStep] = useState<ModalStep>('intro');
   const [paymentData, setPaymentData] = useState<{
@@ -42,7 +34,7 @@ export default function PaymentModal({
     setStep('generating');
     setErrorMsg('');
     try {
-      const result = await monetizationService.initiatePayment(listingId);
+      const result = await monetizationService.initiateAccountActivation();
       setPaymentData(result);
       setStep('waiting');
     } catch (e: any) {
@@ -56,17 +48,17 @@ export default function PaymentModal({
     setStep('checking');
     try {
       const result = await monetizationService.checkPaymentStatus(paymentData.paymentId);
-      if (result.listingReactivated) {
+      if (result.listingReactivated || (result as any).accountActivated) {
         setStep('success');
         setTimeout(() => {
-          onReactivated();
+          onActivated();
           onClose();
         }, 2500);
       } else if (result.status === 'expired') {
         setErrorMsg('الكود انتهت مدته. اضغط "ابدأ من جديد" باش تولد كود جديد.');
         setStep('error');
       } else {
-        setStep('waiting'); // Retour à l'écran d'attente
+        setStep('waiting');
       }
     } catch (e: any) {
       setErrorMsg(e.message || 'حدث خطأ. حاول مرة أخرى.');
@@ -87,7 +79,7 @@ export default function PaymentModal({
       <div className="w-full max-w-[420px] bg-white rounded-[28px] shadow-2xl border border-outline-variant/10 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
 
         {/* Header */}
-        <div className="bg-gradient-to-l from-orange-500 to-red-600 p-6 relative">
+        <div className="bg-gradient-to-l from-amber-500 to-amber-700 p-6 relative">
           <button onClick={onClose} className="absolute top-4 left-4 w-8 h-8 flex items-center justify-center bg-white/20 hover:bg-white/30 rounded-full text-white transition-all">
             <X className="w-4 h-4" />
           </button>
@@ -96,8 +88,8 @@ export default function PaymentModal({
               <CreditCard className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h2 className="text-xl font-black text-white">إعلانك وقف</h2>
-              <p className="text-white/80 text-sm font-medium">خلص 500 درهم باش يرجع</p>
+              <h2 className="text-xl font-black text-white">تفعيل الحساب</h2>
+              <p className="text-white/80 text-sm font-medium">خلص 500 درهم مرة وحدة باش الحساب ينشط</p>
             </div>
           </div>
         </div>
@@ -108,11 +100,10 @@ export default function PaymentModal({
           {/* ── STEP: INTRO ──────────────────────────────────── */}
           {step === 'intro' && (
             <div className="space-y-5">
-              <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 text-right">
-                <p className="font-black text-orange-900 text-sm mb-1">"{listingTitle}"</p>
-                <p className="text-orange-700 text-sm leading-relaxed">
-                  إعلانك مشى فيه <strong>12 نقطة</strong> ديال التواصل المجاني. 
-                  دابا خاصك تجدد باش يبقى ظاهر للمشترين.
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-right">
+                <p className="font-black text-amber-900 text-sm mb-1">مرحبا {sellerName}</p>
+                <p className="text-amber-700 text-sm leading-relaxed">
+                  خلص <strong>500 درهم</strong> مرة وحدة باش حسابك يتفعل وتقدر تنشر إعلاناتك ويبانو للمشترين.
                 </p>
               </div>
 
@@ -121,7 +112,7 @@ export default function PaymentModal({
                 {[
                   { n: '1', text: 'دوزنا نولدو ليك كود CashPlus' },
                   { n: '2', text: 'مشي لأي وكالة Cash Plus وأعطي الكود للموظف' },
-                  { n: '3', text: 'خلص 500 درهم وإعلانك غيرجع نشيط بلا ما دير والو' },
+                  { n: '3', text: 'خلص 500 درهم وحسابك غيتفعل تلقائياً' },
                 ].map(item => (
                   <div key={item.n} className="flex items-center gap-3 bg-[#F9F9F6] rounded-xl p-3">
                     <div className="w-8 h-8 bg-[#2E7D32] text-white rounded-full flex items-center justify-center font-black text-sm shrink-0">
@@ -186,8 +177,36 @@ export default function PaymentModal({
                 >
                   دفضت؟ تحقق من الدفع
                 </button>
+                {paymentData.token.startsWith('SIM_') && (
+                  <button
+                    onClick={async () => {
+                      try {
+                        setStep('checking');
+                        const headers: any = { 'Content-Type': 'application/json' };
+                        const user = (await import('../../lib/firebase')).auth.currentUser;
+                        if (user) headers['Authorization'] = `Bearer ${await user.getIdToken()}`;
+                        const res = await fetch(`/api/payments/cashplus/simulate-payment/${paymentData.paymentId}`, { method: 'POST', headers });
+                        const data = await res.json();
+                        if (data.listingReactivated || data.accountActivated) {
+                          setStep('success');
+                          setTimeout(() => { onActivated(); onClose(); }, 2500);
+                        } else {
+                          setErrorMsg(data.error || 'خطأ في المحاكاة');
+                          setStep('error');
+                        }
+                      } catch (e: any) {
+                        setErrorMsg(e.message);
+                        setStep('error');
+                      }
+                    }}
+                    className="w-full py-3 rounded-2xl font-black text-sm border-2 border-dashed border-amber-400 text-amber-700 bg-amber-50 hover:bg-amber-100 active:scale-95 transition-all flex items-center justify-center gap-2"
+                  >
+                    <FlaskConical className="w-4 h-4" />
+                    محاكاة الدفع (تطوير)
+                  </button>
+                )}
                 <p className="text-xs text-center text-[#757575]">
-                  الإعلان غيتفعل تلقائياً بعد الدفع
+                  الحساب غيتفعل تلقائياً بعد الدفع
                 </p>
               </div>
             </div>
@@ -211,9 +230,9 @@ export default function PaymentModal({
                 <CheckCircle className="w-10 h-10 text-[#2E7D32]" />
               </div>
               <div>
-                <p className="font-black text-[#1A1A1A] text-xl mb-2">تم الدفع!</p>
+                <p className="font-black text-[#1A1A1A] text-xl mb-2">تم التفعيل!</p>
                 <p className="text-[#4A4A4A] text-sm leading-relaxed">
-                  إعلانك رجع نشيط. عندك 12 نقطة جديدة.
+                  حسابك دابا نشيط وتقدر تنشر إعلاناتك ويبانو للمشترين.
                 </p>
               </div>
             </div>

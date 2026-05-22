@@ -89,6 +89,19 @@ export const monetizationService = {
   },
 
   /**
+   * Initie un paiement CashPlus pour l'activation du compte vendeur.
+   * @returns Le token CashPlus + l'ID interne du paiement
+   */
+  async initiateAccountActivation(): Promise<PaymentInitResult> {
+    const headers = await getAuthHeaders();
+    return apiFetch(`${API_BASE}/payments/cashplus/generate-token`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ paymentMode: 'account_activation' }),
+    });
+  },
+
+  /**
    * Vérifie manuellement le statut d'un paiement CashPlus.
    * À appeler après que l'utilisateur affirme avoir payé.
    */
@@ -99,4 +112,19 @@ export const monetizationService = {
       headers,
     });
   },
+
+  /**
+   * Soumet une demande de remboursement de 500 MAD pour une annonce payée.
+   * Désactive l'annonce et marque le paiement comme "refundRequested".
+   * Retourne une erreur si la date limite de remboursement est dépassée.
+   */
+  async requestRefund(listingId: string): Promise<{ success: boolean; message: string }> {
+    const headers = await getAuthHeaders();
+    return apiFetch(`${API_BASE}/payments/refund-request`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ listingId }),
+    });
+  },
 };
+

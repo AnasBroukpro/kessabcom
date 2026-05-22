@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev:api": "cross-env PORT=3001 npx tsx --watch server.ts",
-    "dev:client": "npx vite --port 3000",
+    "dev:client": "npx vite",
     "dev": "concurrently \"npm run dev:api\" \"npm run dev:client\"",
     "build": "npx vite build",
     "preview": "npx vite preview",

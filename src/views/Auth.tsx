@@ -132,7 +132,7 @@ function OnboardingModal({ role, name, onDone }: { role: 'seller' | 'buyer'; nam
     { icon: MapPin, label: 'حدد موقع الضيعة ديالك بدقة على الخريطة' },
     { icon: Image, label: 'دخل تصاور القطيع ديالك' },
     { icon: FileText, label: 'دخل المعلومات ديال القطيع' },
-    { icon: PhoneCall, label: 'صافي! راك واجد باش تستقبل طلبات المشترين' },
+    { icon: PhoneCall, label: '  أكتيفي  إعلان القطيع ديالك.  ' },
   ] : [
     { icon: Search, label: 'قلب على الحولي لي قراب منك بالمدينة والصنف' },
     { icon: Navigation, label: 'شوف موقع الضيعة على الخريطة قبل ما تتنقل' },

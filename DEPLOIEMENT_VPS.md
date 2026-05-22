@@ -80,7 +80,11 @@ Le script va :
 
 📧 **Envoyez un email ou appelez CashPlus** pour déclarer votre URL de callback :
 
+```text
+{CASHPLUS_CALLBACK_URL}
 ```
+
+> ℹ️ La variable d'environnement `CASHPLUS_CALLBACK_URL` est définie dans `.env` (ou via Docker/PM2). En production : `https://kessabcom.ma/api/payments/cashplus/callback`
 https://kessabcom.ma/api/payments/cashplus/callback
 ```
 
@@ -129,12 +133,12 @@ docker compose ps
 
 # Tester le callback CashPlus manuellement
 # (remplacer REQUEST_ID et HMAC par des vraies valeurs)
-curl -X POST https://kessabcom.ma/api/payments/cashplus/callback \
+curl -X POST {VOTRE_DOMAIN}/api/payments/cashplus/callback \
   -H "Content-Type: application/json" \
   -d '{"request_id": "TEST_123", "hmac": "XXXXXX"}'
 
 # Vérifier la santé de l'API
-curl https://kessabcom.ma/api/health
+curl {VOTRE_DOMAIN}/api/health
 ```
 
 ---
@@ -143,7 +147,7 @@ curl https://kessabcom.ma/api/health
 
 - [ ] `.env` sur le VPS avec les vraies clés CashPlus
 - [ ] `firebase-service-account.json` présent sur le VPS (ou `FIREBASE_SERVICE_ACCOUNT_JSON` dans `.env`)
-- [ ] URL de callback déclarée à CashPlus : `https://kessabcom.ma/api/payments/cashplus/callback`
+- [ ] URL de callback déclarée à CashPlus : `{CASHPLUS_CALLBACK_URL}`
 - [ ] SSL/HTTPS activé sur le domaine `kessabcom.ma`
 - [ ] Nginx configuré avec `X-Forwarded-For`
 - [ ] `docker compose up -d` et `/api/health` répond `{"status":"ok"}`

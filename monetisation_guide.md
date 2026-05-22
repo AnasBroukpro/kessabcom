@@ -15,7 +15,7 @@ SMTP_USER=kessabcom.maroc@gmail.com
 SMTP_PASS=votre_mot_de_passe_app
 ```
 
-> ℹ️ Fournir l'URL de callback à CashPlus : `https://kessabcom.ma/api/payments/cashplus/callback`
+> ℹ️ Fournir l'URL de callback à CashPlus : définir `CASHPLUS_CALLBACK_URL` dans `.env` (ex: `https://kessabcom.ma/api/payments/cashplus/callback` en prod, ou l'URL Ngrok en dev)
 
 ---
 

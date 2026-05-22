@@ -57,15 +57,8 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
   const [dynamicCity, setDynamicCity] = useState<string>('');
   const [retryTrigger, setRetryTrigger] = useState(0);
   const [lastCreatedId, setLastCreatedId] = useState<string | null>(null);
-  const [hasListings, setHasListings] = useState<boolean | null>(null);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const miniMapRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (user) {
-      firestoreService.hasUserListings(user.uid).then(setHasListings);
-    }
-  }, [user]);
 
   const openMap = useCallback(() => {
     if (miniMapRef.current) {
@@ -318,7 +311,9 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
         await firestoreService.updateAnnouncement(listingId, finalData);
       } else {
         const res = await firestoreService.createAnnouncement(finalData);
-        if (res?.id) setLastCreatedId(res.id);
+        if (res?.id) {
+          setLastCreatedId(res.id);
+        }
       }
       setShowSuccess(true);
     } catch (error: any) {
@@ -1163,21 +1158,29 @@ export default function AddListing({ onNavigate, listingId: propListingId }: Pro
       {showSuccess && (
         <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-sm rounded-[10px] p-8 text-center animate-in zoom-in-95 duration-200">
-            <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6">
-              <CheckCircle2 className="w-10 h-10" />
-            </div>
-            <h3 className="text-2xl font-black text-[#1a1a1a] mb-2 font-headline">{listingId ? 'تم التعديل!' : 'مبروك!'}</h3>
-            <p className="text-[#4a4a4a] font-bold leading-relaxed mb-8">
-              {listingId ? 'تم تعديل معلومات القطيع بنجاح.' : 'صافي الغنم ديالك دخلات، دابا الناس غيلقاو الغنم ديالك'}
-            </p>
-            <div className="space-y-3">
-              <button 
-                onClick={() => onNavigate('listing-details', lastCreatedId || listingId)}
-                className="w-full py-4 bg-[#2E7D32] text-white rounded-xl font-black shadow-lg shadow-green-900/20 transition-colors border border-transparent hover:bg-transparent hover:text-[#2E7D32] hover:border-[#2E7D32] animate-shake"
-              >
-                شوف الإعلان ديالك دابا
-              </button>
-            </div>
+              <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                <CheckCircle2 className="w-10 h-10" />
+              </div>
+              <h3 className="text-2xl font-black text-[#1a1a1a] mb-2 font-headline">{listingId ? 'تم التعديل!' : 'مبروك!'}</h3>
+              <p className="text-[#4a4a4a] font-bold leading-relaxed mb-8">
+                {listingId ? 'تم تعديل معلومات القطيع بنجاح.' : 'مبروك لقد تم إضافة الغنم ديالك بنجاح.'}
+              </p>
+              <div className="space-y-3">
+                <button 
+                  onClick={() => {
+                    const isUnactivated = !profile?.accountActivated && lastCreatedId;
+                    if (isUnactivated) {
+                      localStorage.setItem('pendingActivationListing', lastCreatedId);
+                      onNavigate('seller');
+                    } else {
+                      onNavigate('listing-details', lastCreatedId || listingId);
+                    }
+                  }}
+                  className="w-full py-4 bg-[#2E7D32] text-white rounded-xl font-black shadow-lg shadow-green-900/20 transition-colors border border-transparent hover:bg-transparent hover:text-[#2E7D32] hover:border-[#2E7D32] animate-shake"
+                >
+                  {!profile?.accountActivated && lastCreatedId ? 'الذهاب لتفعيل الحساب' : 'شوف الإعلان ديالك دابا'}
+                </button>
+              </div>
           </div>
         </div>
       )}

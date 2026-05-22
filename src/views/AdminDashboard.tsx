@@ -12,7 +12,7 @@ import {
   Clock, ChevronLeft, ChevronDown, LogOut, MapPin, Heart, HeartHandshake, Zap, Megaphone, Loader2,
   Lock, Camera, Shield, Globe, Mail, Phone, Calendar, Info, Flag, Trash2,
   ShoppingBag, CreditCard, BarChart3, PieChart, Monitor, Smartphone, Star, RefreshCw, History,
-  Link as LinkIcon
+  MessageCircle, Link as LinkIcon
 } from 'lucide-react';
 import { updatePassword, updateProfile, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { useSettings } from '../hooks/useSettings';
@@ -591,8 +591,9 @@ export default function AdminDashboard({ onNavigate, activeSubView }: Props) {
   const itemsPerPage = 10;
   const [reports, setReports] = useState<any[]>([]);
   const [reportSubTab, setReportSubTab] = useState<'listing' | 'request' | 'offer'>('listing');
-  const [supportSubTab, setSupportSubTab] = useState<'password' | 'contact'>('password');
+  const [supportSubTab, setSupportSubTab] = useState<'password' | 'contact' | 'refund'>('password');
   const [sentPasswords, setSentPasswords] = useState<Record<string, boolean>>({});
+  const [selectedRequestDetails, setSelectedRequestDetails] = useState<any | null>(null);
   const [donations, setDonations] = useState<any[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
@@ -949,6 +950,7 @@ export default function AdminDashboard({ onNavigate, activeSubView }: Props) {
 
     // Total revenue in this period (simulated from plans of new users joining in this period)
     const periodRevenue = filteredUsersInPeriod.reduce((acc, user) => {
+      if (user.plan === 'باقة الانطلاق') return acc;
       if (user.plan === 'احترافي') return acc + (settings.monetization?.proMonthly || 199);
       if (user.plan === 'شركات') return acc + (settings.monetization?.farmMonthly || 499);
       return acc;
@@ -1379,6 +1381,7 @@ export default function AdminDashboard({ onNavigate, activeSubView }: Props) {
               <DonutChart segments={[
                 { value: s.planBreakdown.find((p: any) => p.name === 'شركات')?.count || 0, color: '#3b82f6', label: 'شركات' },
                 { value: s.planBreakdown.find((p: any) => p.name === 'احترافي')?.count || 0, color: '#8b5cf6', label: 'احترافي' },
+                { value: s.planBreakdown.find((p: any) => p.name === 'باقة الانطلاق')?.count || 0, color: '#f59e0b', label: 'باقة الانطلاق' },
                 { value: s.planBreakdown.find((p: any) => p.name === 'مجاني')?.count || 0, color: '#e2e8f0', label: 'مجاني' },
               ]} />
             ) : (
@@ -1947,6 +1950,7 @@ const renderOverview = () => (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {[
               { name: 'الباقة المجانية', users: users.filter(u => !u.plan || u.plan === 'مجاني').length, revenue: '0', color: 'bg-surface-variant' },
+              { name: 'باقة الانطلاق', users: users.filter(u => u.plan === 'باقة الانطلاق').length, revenue: '0', color: 'bg-amber-100' },
               { name: 'الباقة الاحترافية', users: users.filter(u => u.plan === 'احترافي').length, revenue: (users.filter(u => u.plan === 'احترافي').length * (settings.monetization?.proMonthly || 199)).toLocaleString(), color: 'bg-blue-100' },
               { name: 'باقة الضيعة', users: users.filter(u => u.plan === 'شركات').length, revenue: (users.filter(u => u.plan === 'شركات').length * (settings.monetization?.farmMonthly || 499)).toLocaleString(), color: 'bg-purple-100' },
             ].map((plan, i) => (
@@ -2129,13 +2133,16 @@ const renderOverview = () => (
 
     const filteredRequests = supportRequests.filter(req => {
       if (supportSubTab === 'password') {
-        return req.type === 'password_reset' || !req.type; // Fallback for old ones
+        return req.type === 'password_reset' || !req.type;
+      } else if (supportSubTab === 'refund') {
+        return req.type === 'refund_request' || req.type === 'cancel_subscription';
       } else {
         return req.type === 'contact' || req.type === 'home_page' || req.type === 'banner' || req.type === 'other' || req.type === 'certified_badge';
       }
     });
 
     return (
+      <>
       <div className="space-y-6">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
@@ -2154,6 +2161,12 @@ const renderOverview = () => (
               className={`px-5 py-2 rounded-lg text-sm font-black transition-all ${supportSubTab === 'contact' ? 'bg-white text-primary shadow-sm border border-primary/20' : 'text-on-surface-variant hover:text-primary'}`}
             >
               طلبات أخرى
+            </button>
+            <button
+              onClick={() => setSupportSubTab('refund')}
+              className={`px-5 py-2 rounded-lg text-sm font-black transition-all ${supportSubTab === 'refund' ? 'bg-white text-primary shadow-sm border border-primary/20' : 'text-on-surface-variant hover:text-primary'}`}
+            >
+              استرجاع المبلغ
             </button>
           </div>
         </div>
@@ -2179,7 +2192,9 @@ const renderOverview = () => (
                      req.type === 'home_page' ? 'الصفحة الرئيسية' :
                      req.type === 'banner' ? 'طلبات أخرى' : 
                      req.type === 'contact' ? 'اتصال عام' :
-                     req.type === 'other' ? 'موضوع آخر' : req.type}
+                     req.type === 'other' ? 'موضوع آخر' :
+                     req.type === 'refund_request' ? 'طلب استرجاع المبلغ' :
+                     req.type === 'cancel_subscription' ? 'إلغاء الاشتراك' : req.type}
                   </td>
                   <td className="p-5">
                     {(() => {
@@ -2190,6 +2205,11 @@ const renderOverview = () => (
                             {u?.fullName || u?.displayName || req.name || 'غير معروف'}
                           </span>
                           {u && <span className="text-[9px] text-on-surface-variant opacity-60">ID: {u.id.slice(0,8)}...</span>}
+                          {req.type === 'cancel_subscription' && req.reasonLabel && (
+                            <span className="text-[10px] text-red-600 font-bold mt-1">
+                              السبب: {req.reasonLabel}
+                            </span>
+                          )}
                         </div>
                       );
                     })()}
@@ -2296,6 +2316,44 @@ const renderOverview = () => (
                           تمت القراءة
                         </button>
                       )}
+                      {req.status === 'pending' && supportSubTab === 'refund' && (
+                        <>
+                          <button 
+                            onClick={async () => {
+                              const sellerPhone = req.phone || req.sellerPhone || '';
+                              const cleanPhone = sellerPhone.replace(/\+/g, '');
+                              const waPhone = cleanPhone.startsWith('0') ? '212' + cleanPhone.slice(1) : cleanPhone;
+                              const msgBody = req.type === 'cancel_subscription'
+                                ? `السلام عليكم، توصلنا بطلب إلغاء الاشتراك الخاص بحسابكم.\nالسبب: ${req.reasonLabel || ''}\nرسالتك: ${req.customMessage || ''}\nالرجاء التواصل معنا لمعالجة الطلب.`
+                                : `السلام عليكم، توصلنا بطلب إلغاء التفعيل واسترجاع المبلغ الخاص بحسابكم. الرجاء التواصل معنا لمعالجة الطلب.`;
+                              const message = encodeURIComponent(msgBody);
+                              window.open(`https://wa.me/${waPhone}?text=${message}`, '_blank');
+                            }}
+                            className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-all text-[10px] font-black"
+                            title="تواصل مع الكساب عبر واتساب"
+                          >
+                            <MessageCircle size={14} />
+                            واتساب
+                          </button>
+                          <button 
+                            onClick={async () => {
+                              await firestoreService.adminUpdateSupportRequestStatus(req.id, 'completed');
+                              fetchAdminData();
+                            }}
+                            className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all text-[10px] font-black"
+                          >
+                            <CheckCircle2 size={14} />
+                            تمت المعالجة
+                          </button>
+                        </>
+                      )}
+                      <button 
+                        onClick={() => setSelectedRequestDetails(req)}
+                        className="p-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-600 hover:text-white transition-all"
+                        title="عرض التفاصيل"
+                      >
+                        <Eye size={16} />
+                      </button>
                       <button 
                         onClick={() => {
                           setSupportRequestToDelete(req.id);
@@ -2312,7 +2370,7 @@ const renderOverview = () => (
               ))}
               {filteredRequests.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="p-20 text-center text-on-surface-variant font-bold">
+                  <td colSpan={7} className="p-20 text-center text-on-surface-variant font-bold">
                     لا توجد طلبات في هذا القسم
                   </td>
                 </tr>
@@ -2321,6 +2379,99 @@ const renderOverview = () => (
           </table>
         </div>
       </div>
+
+      {/* Request Details Modal */}
+      {selectedRequestDetails && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setSelectedRequestDetails(null)}>
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg p-8 animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-6">
+              <button onClick={() => setSelectedRequestDetails(null)} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+              <h3 className="text-xl font-black text-on-surface">تفاصيل الطلب</h3>
+            </div>
+
+            <div className="space-y-4 text-right">
+              <div className="bg-surface-container-low rounded-2xl p-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-[10px] font-black text-on-surface-variant uppercase tracking-wide">نوع الطلب</p>
+                    <p className="text-sm font-bold text-on-surface mt-1">
+                      {selectedRequestDetails.type === 'password_reset' ? 'إعادة تعيين كلمة المرور' : 
+                       selectedRequestDetails.type === 'home_page' ? 'الصفحة الرئيسية' :
+                       selectedRequestDetails.type === 'banner' ? 'طلبات أخرى' : 
+                       selectedRequestDetails.type === 'contact' ? 'اتصال عام' :
+                       selectedRequestDetails.type === 'other' ? 'موضوع آخر' :
+                       selectedRequestDetails.type === 'refund_request' ? 'طلب استرجاع المبلغ' :
+                       selectedRequestDetails.type === 'cancel_subscription' ? 'إلغاء الاشتراك' : selectedRequestDetails.type}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black text-on-surface-variant uppercase tracking-wide">الحالة</p>
+                    <p className={`text-sm font-bold mt-1 ${selectedRequestDetails.status === 'pending' ? 'text-orange-600' : 'text-green-600'}`}>
+                      {selectedRequestDetails.status === 'pending' ? 'في الانتظار' : 'تمت المعالجة'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black text-on-surface-variant uppercase tracking-wide">الاسم</p>
+                    <p className="text-sm font-bold text-on-surface mt-1">{selectedRequestDetails.name || '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black text-on-surface-variant uppercase tracking-wide">رقم الهاتف</p>
+                    <p className="text-sm font-bold text-on-surface mt-1 font-mono" dir="ltr">{formatSupportPhone(selectedRequestDetails.phone) || '—'}</p>
+                  </div>
+                  {selectedRequestDetails.reasonLabel && (
+                    <div className="col-span-2">
+                      <p className="text-[10px] font-black text-on-surface-variant uppercase tracking-wide">السبب</p>
+                      <p className="text-sm font-bold text-red-600 mt-1">{selectedRequestDetails.reasonLabel}</p>
+                    </div>
+                  )}
+                  {selectedRequestDetails.customMessage && (
+                    <div className="col-span-2">
+                      <p className="text-[10px] font-black text-on-surface-variant uppercase tracking-wide">الرسالة</p>
+                      <p className="text-sm font-bold text-on-surface mt-1 bg-surface-container-high rounded-xl p-3">{selectedRequestDetails.customMessage}</p>
+                    </div>
+                  )}
+                  {selectedRequestDetails.details && (
+                    <div className="col-span-2">
+                      <p className="text-[10px] font-black text-on-surface-variant uppercase tracking-wide">التفاصيل</p>
+                      <p className="text-sm font-bold text-on-surface mt-1 bg-surface-container-high rounded-xl p-3 whitespace-pre-line">{selectedRequestDetails.details}</p>
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-[10px] font-black text-on-surface-variant uppercase tracking-wide">تاريخ الإنشاء</p>
+                    <p className="text-sm font-bold text-on-surface mt-1">
+                      {(() => {
+                        try {
+                          if (!selectedRequestDetails.createdAt) return '—';
+                          const date = selectedRequestDetails.createdAt.toDate ? selectedRequestDetails.createdAt.toDate() : new Date(selectedRequestDetails.createdAt);
+                          if (isNaN(date.getTime())) return '—';
+                          return new Intl.DateTimeFormat('ar-MA', {
+                            day: '2-digit', month: '2-digit', year: 'numeric',
+                            hour: '2-digit', minute: '2-digit'
+                          }).format(date);
+                        } catch (e) { return '—'; }
+                      })()}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black text-on-surface-variant uppercase tracking-wide">المعرف</p>
+                    <p className="text-sm font-bold text-on-surface mt-1 font-mono text-[10px]">{selectedRequestDetails.id || '—'}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setSelectedRequestDetails(null)}
+              className="w-full mt-6 py-3.5 bg-surface-container-high text-on-surface rounded-2xl font-black text-sm hover:bg-surface-container-higher transition-all"
+            >
+              إغلاق
+            </button>
+          </div>
+        </div>
+      )}
+    </>
     );
   };
 
@@ -2543,6 +2694,7 @@ const renderOverview = () => (
                             className="bg-surface-container-low border border-outline-variant/20 rounded-lg px-2 py-1 text-[10px] font-black outline-none focus:ring-1 focus:ring-primary cursor-pointer"
                           >
                             <option value="Free">حساب عادي</option>
+                            <option value="باقة الانطلاق">باقة الانطلاق</option>
                             <option value="احترافي">احترافي</option>
                             <option value="شركات">شركات</option>
                           </select>
@@ -2620,6 +2772,28 @@ const renderOverview = () => (
                         >
                           <Ban className="w-4 h-4" />
                         </button>
+                        {user.role === 'seller' && user.accountActivated === true && (
+                          <button
+                            onClick={async () => {
+                              if (!window.confirm('واش متأكد من تعطيل حساب هذا الكساب؟ ستحتاج إلى دفع 500 درهم لإعادة التفعيل.')) return;
+                              try {
+                                const idToken = await auth.currentUser?.getIdToken();
+                                const res = await fetch(`/api/admin/users/${user.id}/deactivate`, {
+                                  method: 'PUT',
+                                  headers: { 'Authorization': `Bearer ${idToken}` }
+                                });
+                                if (!res.ok) throw new Error('فشل تعطيل الحساب');
+                                fetchAdminData();
+                              } catch (e: any) {
+                                alert(e.message);
+                              }
+                            }}
+                            className="p-2.5 bg-orange-50 text-orange-700 hover:bg-orange-600 hover:text-white rounded-2xl transition-all shadow-sm border border-orange-100 hover:border-transparent"
+                            title="تعطيل الحساب"
+                          >
+                            <Lock className="w-4 h-4" />
+                          </button>
+                        )}
                         <button 
                           onClick={() => {
                             setUserToDeleteConfirm(user.id);
@@ -2898,6 +3072,10 @@ const renderOverview = () => (
                   {listing.status === 'active' && <span className="bg-green-100 text-green-700 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">نشط</span>}
                   {listing.status === 'inactive' && <span className="bg-surface-variant text-on-surface-variant text-[10px] font-black px-2 py-0.5 rounded-full uppercase">متوقف</span>}
                   {listing.status === 'rejected' && <span className="bg-red-100 text-red-700 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">مرفوض</span>}
+                  {listing.status === 'sold' && <span className="bg-blue-100 text-blue-700 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">مباع</span>}
+                  {listing.status === 'paused_for_payment' && <span className="bg-amber-100 text-amber-800 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">في انتظار الدفع</span>}
+                  {listing.activationType === 'manual' && <span className="bg-emerald-100 text-emerald-700 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">يدوي (أوائل)</span>}
+                  {listing.activationType === 'paid' && <span className="bg-amber-100 text-amber-700 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">مدفوع</span>}
                   <span className="bg-surface-variant text-on-surface-variant text-[10px] font-black px-2 py-0.5 rounded-full uppercase">{listing.category}</span>
                 </div>
                 <h3 className="font-bold text-on-surface text-lg">{listing.title}</h3>
@@ -4271,6 +4449,23 @@ const renderOverview = () => (
                         <div className={`w-4 h-4 rounded-full absolute top-0.5 shadow-sm transition-all ${settings.paymentSystemEnabled ? 'bg-on-primary left-0.5' : 'bg-surface right-0.5'}`}></div>
                       </div>
                     </div>
+
+                    {settings.paymentSystemEnabled && (
+                      <div className="p-4 bg-primary/5 border border-primary/10 rounded-xl space-y-2 animate-in slide-in-from-top-1">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h4 className="font-bold text-on-surface text-sm text-primary">آخر أجل لاسترجاع الأموال</h4>
+                            <p className="text-[10px] text-on-surface-variant">آخر أجل يمكن للكسابة فيه طلب استرجاع 500 درهم.</p>
+                          </div>
+                          <input 
+                            type="datetime-local" 
+                            className="bg-white border border-outline-variant/30 rounded-lg px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-primary"
+                            value={settings.refund_deadline_date || ''}
+                            onChange={(e) => updateSettings({ refund_deadline_date: e.target.value })}
+                          />
+                        </div>
+                      </div>
+                    )}
 
                     {!settings.paymentSystemEnabled && (
                       <div className="flex items-center justify-between p-4 bg-primary/5 rounded-xl border border-primary/10 animate-in slide-in-from-top-1">
