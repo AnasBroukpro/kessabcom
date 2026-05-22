@@ -13,7 +13,7 @@ export default function PrivacyPage({ onNavigate }: Props) {
     <div className="min-h-screen bg-[#FDFCF8] antialiased" dir="rtl">
       <SearchHeader onNavigate={onNavigate} />
       
-      <div className="max-w-4xl mx-auto py-12 px-6">
+      <div className="max-w-4xl mx-auto pt-28 pb-16 px-6">
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}

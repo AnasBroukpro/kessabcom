@@ -220,6 +220,7 @@ export default function Auth({ onNavigate, intendedView }: Props) {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [pendingNavigation, setPendingNavigation] = useState<{ view: ViewType } | null>(null);
   const [showTutorial, setShowTutorial] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const allCities = Object.keys(cityCoords).sort();
   
   // 10-digit phone input logic
@@ -416,6 +417,7 @@ export default function Auth({ onNavigate, intendedView }: Props) {
     }
     if (!fullName.trim()) { setFieldErrors({ general: 'يرجى إدخال اسمك الكامل' }); return; }
     if (!city) { setFieldErrors({ general: 'يرجى اختيار مدينتك' }); return; }
+    if (!acceptedTerms) { setFieldErrors({ general: 'يرجى الموافقة على شروط الاستخدام' }); return; }
 
     setLoading(true);
     setError(null);
@@ -689,7 +691,7 @@ export default function Auth({ onNavigate, intendedView }: Props) {
                     أنا مشتري
                   </button>
                 </div>
-                {fieldErrors.general && !selectedRole && (
+                {fieldErrors.general && (
                   <p className="text-center text-xs font-black text-red-500 animate-pulse">
                     {fieldErrors.general}
                   </p>
@@ -711,13 +713,32 @@ export default function Auth({ onNavigate, intendedView }: Props) {
                     className="w-full h-14 bg-[#F9F9F6] border-2 border-outline-variant/20 rounded-2xl px-4 text-base text-center font-black focus:border-primary focus:bg-white transition-all"
                   />
                 )}
-                <CitySearchInput
-                  value={city}
-                  onChange={setCity}
-                  isDetecting={isDetectingLocation}
-                  allCities={allCities}
-                />
-              </div>
+                  <CitySearchInput
+                    value={city}
+                    onChange={setCity}
+                    isDetecting={isDetectingLocation}
+                    allCities={allCities}
+                  />
+
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={acceptedTerms}
+                      onChange={(e) => setAcceptedTerms(e.target.checked)}
+                      className="w-5 h-5 accent-[#2E7D32] rounded"
+                    />
+                    <span className="text-sm font-bold text-[#1A1A1A]">
+                      أوافق على{' '}
+                      <button
+                        type="button"
+                        onClick={() => onNavigate('terms')}
+                        className="text-[#2E7D32] underline hover:text-[#1B5E20] transition-colors"
+                      >
+                        شروط الاستخدام
+                      </button>
+                    </span>
+                  </label>
+                </div>
             )}
 
             <button
