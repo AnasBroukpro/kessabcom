@@ -96,6 +96,18 @@ const CASHPLUS_CALLBACK_URL = process.env.CASHPLUS_CALLBACK_URL || '';
 export const SIMULATION_MODE = process.env.CASHPLUS_SIMULATION_MODE === 'true' ||
   (process.env.CASHPLUS_SIMULATION_MODE !== 'false' && process.env.NODE_ENV !== 'production');
 
+/**
+ * Construit l'URL complète pour un endpoint CashPlus.
+ * Format: base/cpws/cpmarchand/index.cfm/{endpoint}
+ */
+function buildCashplusUrl(endpoint: string): URL {
+  // Enlève le ?endpoint=xxx s'il existe et utilise le path à la place
+  const base = CASHPLUS_BASE_URL.split('?')[0];
+  const normalized = base.endsWith('/') ? base.slice(0, -1) : base;
+  const ep = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  return new URL(`${normalized}${ep}`);
+}
+
 function generateSimulatedToken(params: GenerateTokenParams): GenerateTokenResult {
   const token = `SIM_${params.requestId.slice(-8)}_${Date.now().toString(36).toUpperCase()}`;
   const defaultExpiration = new Date(Date.now() + 24 * 60 * 60 * 1000);
@@ -157,7 +169,7 @@ export async function generateCashplusToken(params: GenerateTokenParams): Promis
     console.log('📡 CashPlus Body envoyé:', JSON.stringify(body));
     const data: any = await new Promise((resolve, reject) => {
       const fullBody = JSON.stringify(body);
-      const url = new URL(`${CASHPLUS_BASE_URL}?endpoint=/generate_token`);
+      const url = buildCashplusUrl('/generate_token');
       const opts: https.RequestOptions = {
         hostname: url.hostname,
         port: url.port || 443,
@@ -222,7 +234,7 @@ export async function checkCashplusTokenStatus(token: string): Promise<CheckStat
     console.log(`📡 CashPlus: Vérification statut token=${token}`);
     const data: any = await new Promise((resolve, reject) => {
       const fullBody = JSON.stringify({ token, marchand_code: MARCHAND_CODE, hmac });
-      const url = new URL(`${CASHPLUS_BASE_URL}?endpoint=/status_token`);
+      const url = buildCashplusUrl('/status_token');
       const opts: https.RequestOptions = {
         hostname: url.hostname,
         port: url.port || 443,
