@@ -245,7 +245,8 @@ async function startServer() {
       if (
         allowedOrigins.includes(origin) || 
         origin.endsWith('.ngrok-free.dev') || 
-        origin.endsWith('.ngrok-free.app')
+        origin.endsWith('.ngrok-free.app') ||
+        origin.endsWith('.hstgr.cloud')
       ) {
         return callback(null, true);
       }

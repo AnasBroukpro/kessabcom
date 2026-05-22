@@ -158,9 +158,7 @@ export async function generateCashplusToken(params: GenerateTokenParams): Promis
     date_expiration: dateExpiration,
   };
 
-  if (params.jsonData) {
-    body.json_data = JSON.stringify(params.jsonData);
-  }
+  body.json_data = JSON.stringify(params.jsonData || []);
 
   try {
     console.log(`📡 CashPlus: Génération token pour request_id=${params.requestId}, montant=${params.amount} MAD`);
