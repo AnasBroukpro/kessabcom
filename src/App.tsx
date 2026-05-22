@@ -31,12 +31,13 @@ const TipsPage = lazy(() => import('./views/TipsPage'));
 const ContactPage = lazy(() => import('./views/ContactPage'));
 const TermsPage = lazy(() => import('./views/TermsPage'));
 const PrivacyPage = lazy(() => import('./views/PrivacyPage'));
+const RefundPolicyPage = lazy(() => import('./views/RefundPolicyPage'));
 
 import { firestoreService } from './services/firestoreService';
 import { useAuth } from './contexts/AuthContext';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation, useParams, Navigate } from 'react-router-dom';
 
-export type ViewType = 'home' | 'auth' | 'forgot-password' | 'admin-auth' | 'buyer' | 'seller' | 'add-listing' | 'admin' | 'listing-details' | 'search-results' | 'solidarity-request' | 'solidarity-donate' | 'price-catalog' | 'tips' | 'contact' | 'terms' | 'privacy' | 'notifications';
+export type ViewType = 'home' | 'auth' | 'forgot-password' | 'admin-auth' | 'buyer' | 'seller' | 'add-listing' | 'admin' | 'listing-details' | 'search-results' | 'solidarity-request' | 'solidarity-donate' | 'price-catalog' | 'tips' | 'contact' | 'terms' | 'privacy' | 'refund-policy' | 'notifications';
 
 function AppContent() {
   const navigate = useNavigate();
@@ -69,6 +70,7 @@ function AppContent() {
     if (pathname === '/contact') return 'contact';
     if (pathname === '/terms') return 'terms';
     if (pathname === '/privacy') return 'privacy';
+    if (pathname === '/refund-policy') return 'refund-policy';
     if (pathname === '/notifications') return 'notifications';
     if (pathname === '/forgot-password') return 'forgot-password';
     return 'home';
@@ -114,6 +116,7 @@ function AppContent() {
       case 'contact': navigate('/contact'); break;
       case 'terms': navigate('/terms'); break;
       case 'privacy': navigate('/privacy'); break;
+      case 'refund-policy': navigate('/refund-policy'); break;
       case 'notifications': navigate('/notifications'); break;
       case 'forgot-password': navigate('/forgot-password'); break;
       default: navigate('/');
@@ -280,6 +283,7 @@ function AppContent() {
           <Route path="/contact" element={<ContactPage onNavigate={handleNavigate} />} />
           <Route path="/terms" element={<TermsPage onNavigate={handleNavigate} />} />
           <Route path="/privacy" element={<PrivacyPage onNavigate={handleNavigate} />} />
+          <Route path="/refund-policy" element={<RefundPolicyPage onNavigate={handleNavigate} />} />
           <Route path="/notifications" element={<Notifications onNavigate={handleNavigate} />} />
           
           <Route path="*" element={<Navigate to="/" />} />

@@ -17,6 +17,7 @@ import {
   HelpCircle,
   Shield,
   FileText,
+  Scale,
   User as UserIcon,
   LogIn
 } from 'lucide-react';
@@ -48,6 +49,7 @@ export default function MobileSidebar({ isOpen, onClose, onNavigate }: Props) {
     { icon: <MessageSquare size={20} />, label: 'اتصل بنا', view: 'contact' as ViewType },
     { icon: <Shield size={20} />, label: 'شروط الاستخدام', view: 'terms' as ViewType },
     { icon: <FileText size={20} />, label: 'سياسة الخصوصية', view: 'privacy' as ViewType },
+    { icon: <Scale size={20} />, label: 'سياسة استرداد الأموال', view: 'refund-policy' as ViewType },
   ];
 
   const currentRoleMenu = menuItems;
