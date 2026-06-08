@@ -1,4 +1,4 @@
-import logoV2 from '../assets/marketing/branding/logo v2.png';
+import logoV2 from '../assets/marketing/branding/logo-v2.png';
 
 interface FooterProps {
   onNavigate: (view: any, listingId?: string, city?: string, radius?: string, subView?: string) => void;
@@ -23,7 +23,6 @@ export default function Footer({ onNavigate }: FooterProps) {
           <button onClick={() => onNavigate('contact')} className="text-[#A0A0A0] hover:text-white px-3 py-1.5 rounded-lg border border-transparent hover:border-[#A0A0A0] transition-colors">اتصل بنا</button>
           <button onClick={() => onNavigate('terms')} className="text-[#A0A0A0] hover:text-white px-3 py-1.5 rounded-lg border border-transparent hover:border-[#A0A0A0] transition-colors">شروط الاستخدام</button>
           <button onClick={() => onNavigate('privacy')} className="text-[#A0A0A0] hover:text-white px-3 py-1.5 rounded-lg border border-transparent hover:border-[#A0A0A0] transition-colors">سياسة الخصوصية</button>
-          <button onClick={() => onNavigate('refund-policy')} className="text-[#A0A0A0] hover:text-white px-3 py-1.5 rounded-lg border border-transparent hover:border-[#A0A0A0] transition-colors">سياسة استرداد الأموال</button>
         </div>
         <p className="text-xs text-[#757575]">© 2026 منصة kessabcom.ma. جميع الحقوق محفوظة لكسابة المغرب.</p>
       </div>

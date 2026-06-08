@@ -4,7 +4,7 @@ import {
   Settings, HeartHandshake, LogOut 
 } from 'lucide-react';
 import { SellerTab } from '../../views/SellerDashboard';
-import logoV2 from '../../assets/marketing/branding/logo v2.png';
+import logoV2 from '../../assets/marketing/branding/logo-v2.png';
 
 interface SellerSidebarProps {
   activeTab: SellerTab;

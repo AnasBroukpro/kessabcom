@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import logoV2 from '../assets/marketing/branding/logo v2.png';
+import logoV2 from '../assets/marketing/branding/logo-v2.png';
 import { ViewType } from '../App';
 import { MapPin, Phone, MessageCircle, Navigation, Star, ArrowLeft, BadgeCheck, Play, Heart, AlertTriangle, X, CheckCircle2, AlertCircle, ChevronRight, ChevronLeft, User, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';

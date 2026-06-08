@@ -6,6 +6,7 @@ import admin from "firebase-admin";
 import fs from "fs";
 import fetch from "node-fetch";
 import cors from "cors";
+import compression from "compression";
 import rateLimit from "express-rate-limit";
 import nodemailer from "nodemailer";
 import { generateCashplusToken, checkCashplusTokenStatus, verifyCallbackHmac, SIMULATION_MODE } from "./cashplusService.js";
@@ -72,10 +73,14 @@ if (!admin.apps.length) {
     console.log('✅ Firebase Admin: initialized from individual env vars');
   } else {
     // Bug #1 FIX: error block was previously INSIDE the else-if, causing exit even on success
-    console.error("❌ ERREUR FATALE: Credentials Firebase introuvables !");
-    console.error("   En local: Assurez-vous que 'firebase-service-account.json' est présent à la racine.");
-    console.error("   En prod: Vérifiez les variables d'environnement (FIREBASE_SERVICE_ACCOUNT_JSON ou variables individuelles).");
-    process.exit(1);
+    console.warn("⚠️ Firebase explicit credentials not found — trying Application Default Credentials (ADC)");
+    console.warn("   Sur Cloud Run, ADC utilise le service account de l'instance.");
+    // Ne pas faire process.exit(1) — on essaie les credentials par défaut de l'environnement GCP
+    admin.initializeApp({
+      credential: admin.credential.applicationDefault(),
+      projectId: firebaseConfig.projectId,
+    });
+    console.log('✅ Firebase Admin: initialized via Application Default Credentials');
   }
 }
 
@@ -217,7 +222,7 @@ async function startServer() {
   const app = express();
   const PORT = parseInt(process.env.PORT || '3001', 10);
 
-  app.use(express.json({ limit: '50mb' }));
+  app.use(express.json({ limit: '10mb' }));
 
   // CORS Middleware (Strict)
   const allowedOrigins = [
@@ -233,6 +238,8 @@ async function startServer() {
     "http://127.0.0.1:3001",
     "http://localhost:3002",
     "http://127.0.0.1:3002",
+    "https://kessabcom-api-854879643489.europe-west9.run.app",
+    "https://kessabcom-api-854879643489.europe-west1.run.app",
   ];
 
   app.use(cors({
@@ -259,6 +266,8 @@ async function startServer() {
 
   app.set("trust proxy", 1);
 
+  app.use(compression());
+
   // Rate Limiters
   const checkPhoneLimiter = rateLimit({
     windowMs: 60 * 1000,
@@ -283,7 +292,7 @@ async function startServer() {
         { key: 'listingId', value: 'debug_test_' + Date.now() },
         { key: 'sellerId', value: 'debug_user' },
         { key: 'listingTitle', value: 'Test' },
-        { key: 'callbackUrl', value: 'https://baggie-unguided-annex.ngrok-free.dev/api/payments/cashplus/callback' },
+        { key: 'callbackUrl', value: process.env.CASHPLUS_CALLBACK_URL || '' },
       ],
     });
     res.json(result);
@@ -546,12 +555,12 @@ async function startServer() {
       if (category) queryRef = queryRef.where('category', '==', category);
       if (sellerId) {
         queryRef = queryRef.where('sellerId', '==', sellerId);
-      } else {
-        queryRef = queryRef.where('sellerAccountActivated', '==', true);
       }
 
       const snap = await queryRef.get();
-      let data = snap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
+      let data = snap.docs
+        .map((doc: any) => ({ id: doc.id, ...doc.data() }))
+        .filter((d: any) => d.sellerAccountActivated !== false);
 
       data.sort((a, b) => {
         const dateA = a.createdAt?.toDate?.() || new Date(0);
@@ -599,14 +608,17 @@ async function startServer() {
     }
   });
 
-  app.get("/api/listings/:id", async (req: any, res) => {
+  app.get("/api/listings/:id", optionalVerifyToken, async (req: any, res) => {
     try {
       const doc = await db.collection('announcements').doc(req.params.id).get();
       if (!doc.exists) return res.status(404).json({ error: "Not found" });
       const data: any = { id: doc.id, ...doc.data() };
-      
-      if (!data.sellerAccountActivated || data.status !== 'active') {
-        return res.status(404).json({ error: "Not found" });
+
+      const isOwner = req.user && data.sellerId === req.user.uid;
+      if (!isOwner) {
+        if (data.sellerAccountActivated === false || data.status !== 'active') {
+          return res.status(404).json({ error: "Not found" });
+        }
       }
 
       // Fetch approved reviews for this listing
@@ -965,12 +977,6 @@ async function startServer() {
   });
 
 
-
-  app.get("/api/offer-requests/:id", async (req, res) => {
-    const doc = await db.collection('offerRequests').doc(req.params.id).get();
-    if (!doc.exists) return res.status(404).json({ error: "Not found" });
-    res.json({ id: doc.id, ...doc.data() });
-  });
 
   app.put("/api/offer-requests/:id/archive", verifyToken, async (req: any, res) => {
     await db.collection('offerRequests').doc(req.params.id).update({ status: 'archived' });
@@ -2319,10 +2325,12 @@ async function startServer() {
    * Pas d'auth nécessaire (c'est CashPlus qui appelle).
    * Répond "OK" ou "NOK" selon la spec CashPlus.
    */
-  app.post("/api/payments/cashplus/callback", async (req, res) => {
-    const { request_id, hmac } = req.body;
+  app.use("/api/payments/cashplus/callback", async (req, res) => {
+    // CashPlus peut envoyer le callback en POST (body) ou GET (query params)
+    const request_id = req.body?.request_id || (req.query?.request_id as string);
+    const hmac = req.body?.hmac || (req.query?.hmac as string);
 
-    console.log(`📡 CashPlus Callback reçu: request_id=${request_id}`);
+    console.log(`📡 CashPlus Callback reçu (${req.method}): request_id=${request_id}`);
 
     if (!request_id || !hmac) {
       console.error('❌ CashPlus Callback: request_id ou hmac manquant.');
@@ -2838,13 +2846,30 @@ async function startServer() {
     res.status(500).json({ error: err.message || "Internal Server Error" });
   });
 
-  app.listen(PORT, "0.0.0.0", () => {
+  const server = app.listen(PORT, "0.0.0.0", () => {
     console.log(`✅ API Server running on http://localhost:${PORT}`);
     if (process.env.NODE_ENV !== "production") {
       console.log(`🎨 Frontend dev server: http://localhost:5173`);
       console.log(`   Run 'npm run dev:client' in another terminal if not already running.`);
     }
   });
+
+  const gracefulShutdown = (signal: string) => {
+    console.log(`🛑 Received ${signal}, starting graceful shutdown...`);
+    server.close(() => {
+      admin.app().delete().then(() => {
+        console.log('Firebase Admin SDK disconnected.');
+        process.exit(0);
+      }).catch(() => process.exit(1));
+    });
+    setTimeout(() => {
+      console.error('Forced shutdown after timeout.');
+      process.exit(1);
+    }, 10000);
+  };
+
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 }
 
 startServer();

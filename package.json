@@ -9,13 +9,14 @@
     "dev": "concurrently \"npm run dev:api\" \"npm run dev:client\"",
     "build": "npx vite build",
     "preview": "npx vite preview",
-    "start": "cross-env NODE_ENV=production PORT=3000 npx tsx server.ts",
+    "start": "npx tsx server.ts",
     "clean": "rm -rf dist",
     "lint": "npx tsc --noEmit"
   },
   "dependencies": {
     "@google-cloud/firestore": "^7.10.0",
     "@react-google-maps/api": "^2.20.8",
+    "compression": "^1.8.1",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.18.2",
@@ -25,12 +26,13 @@
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
     "node-fetch": "^3.3.2",
+    "nodemailer": "^6.9.15",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-firebase-hooks": "^5.1.1",
     "react-router-dom": "^7.14.1",
     "recharts": "^3.8.1",
-    "nodemailer": "^6.9.15"
+    "tsx": "^4.21.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.14",
@@ -43,7 +45,6 @@
     "concurrently": "^9.2.1",
     "cross-env": "^7.0.3",
     "tailwindcss": "^4.1.14",
-    "tsx": "^4.21.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"
   }

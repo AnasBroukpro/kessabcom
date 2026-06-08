@@ -7,7 +7,7 @@ import { useSettings } from '../hooks/useSettings';
 import { compressImage, checkPayloadSize } from '../lib/imageUtils';
 import DashboardHeader from '../components/DashboardHeader';
 import NewsTicker from '../components/NewsTicker';
-import logoV2 from '../assets/marketing/branding/logo v2.png';
+import logoV2 from '../assets/marketing/branding/logo-v2.png';
 
 import GoogleMapComponent from '../components/GoogleMap';
 import { cityMapping, getDisplayCity, cityCoords, calculateDistance } from '../constants/cityMapping';

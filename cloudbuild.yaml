@@ -1,0 +1,47 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'europe-west9-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/kessabcom:$COMMIT_SHA'
+      - '-t'
+      - 'europe-west9-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/kessabcom:latest'
+      - '--build-arg=VITE_FIREBASE_API_KEY=$_VITE_FIREBASE_API_KEY'
+      - '--build-arg=VITE_FIREBASE_AUTH_DOMAIN=$_VITE_FIREBASE_AUTH_DOMAIN'
+      - '--build-arg=VITE_FIREBASE_PROJECT_ID=$_VITE_FIREBASE_PROJECT_ID'
+      - '--build-arg=VITE_FIREBASE_STORAGE_BUCKET=$_VITE_FIREBASE_STORAGE_BUCKET'
+      - '--build-arg=VITE_FIREBASE_MESSAGING_SENDER_ID=$_VITE_FIREBASE_MESSAGING_SENDER_ID'
+      - '--build-arg=VITE_FIREBASE_APP_ID=$_VITE_FIREBASE_APP_ID'
+      - '--build-arg=VITE_FIRESTORE_DATABASE_ID=$_VITE_FIRESTORE_DATABASE_ID'
+      - '--build-arg=VITE_RECAPTCHA_SITE_KEY=$_VITE_RECAPTCHA_SITE_KEY'
+      - '--build-arg=VITE_GOOGLE_MAPS_API_KEY=$_VITE_GOOGLE_MAPS_API_KEY'
+      - '.'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'europe-west9-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/kessabcom'
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'kessabcom'
+      - '--image=europe-west9-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/kessabcom:$COMMIT_SHA'
+      - '--region=europe-west9'
+      - '--platform=managed'
+      - '--allow-unauthenticated'
+      - '--memory=512Mi'
+      - '--cpu=1'
+      - '--concurrency=40'
+      - '--timeout=300'
+      - '--set-env-vars=^|^NODE_ENV=production|SMTP_HOST=smtp.gmail.com|SMTP_PORT=587|SMTP_SECURE=false|SMTP_USER=kessabcom.maroc@gmail.com|CASHPLUS_BASE_URL=https://cpay.ma/cpws/cpmarchand/index.cfm|CASHPLUS_CALLBACK_URL=https://kessabcom.ma/api/payments/cashplus/callback|CASHPLUS_SIMULATION_MODE=false|FIREBASE_PROJECT_ID=kessabcom-0004|FIRESTORE_DATABASE_ID=(default)'
+      - '--set-secrets=FIREBASE_SERVICE_ACCOUNT_JSON=firebase-service-account:latest'
+      - '--set-secrets=CASHPLUS_MARCHAND_CODE=cashplus-marchand-code:latest'
+      - '--set-secrets=CASHPLUS_SECRET_KEY=cashplus-secret-key:latest'
+      - '--set-secrets=SMTP_PASS=smtp-pass:latest'
+      - '--set-secrets=GOOGLE_CLOUD_API_KEY=google-cloud-api-key:latest'
+
+images:
+  - 'europe-west9-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/kessabcom'

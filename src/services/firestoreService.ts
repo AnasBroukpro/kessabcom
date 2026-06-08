@@ -131,8 +131,7 @@ export const firestoreService = {
     if (startAfter) url += `&startAfter=${encodeURIComponent(startAfter)}`;
     
     try {
-      const response = await fetch(url);
-      const data = await response.json();
+      const data = await apiFetch(url);
       return (data && data.data) ? data : { data: Array.isArray(data) ? data : [], nextCursor: null };
     } catch (error) {
       console.error("Error fetching announcements:", error);
@@ -157,7 +156,8 @@ export const firestoreService = {
   },
 
   async getAnnouncement(id: string) {
-    return apiFetch(`${API_BASE}/listings/${id}`);
+    const headers = await getAuthHeaders();
+    return apiFetch(`${API_BASE}/listings/${id}`, { headers });
   },
 
   async createAnnouncement(data: any) {

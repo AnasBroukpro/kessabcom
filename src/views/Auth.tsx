@@ -20,7 +20,7 @@ import img3 from '../assets/marketing/branding/img3.webp';
 import img4 from '../assets/marketing/branding/img4.webp';
 import img5 from '../assets/marketing/branding/img5.webp';
 import img6 from '../assets/marketing/branding/img6.webp';
-import logoV2 from '../assets/marketing/branding/logo v2.png';
+import logoV2 from '../assets/marketing/branding/logo-v2.png';
 
 const marketingImages = [img1, img2, img3, img4, img5, img6];
 
@@ -132,7 +132,7 @@ function OnboardingModal({ role, name, onDone }: { role: 'seller' | 'buyer'; nam
     { icon: MapPin, label: 'حدد موقع الضيعة ديالك بدقة على الخريطة' },
     { icon: Image, label: 'دخل تصاور القطيع ديالك' },
     { icon: FileText, label: 'دخل المعلومات ديال القطيع' },
-    { icon: PhoneCall, label: '  أكتيفي  إعلان القطيع ديالك.  ' },
+    { icon: PhoneCall, label: 'صافي! راك واجد باش تستقبل طلبات المشترين' },
   ] : [
     { icon: Search, label: 'قلب على الحولي لي قراب منك بالمدينة والصنف' },
     { icon: Navigation, label: 'شوف موقع الضيعة على الخريطة قبل ما تتنقل' },
@@ -220,7 +220,6 @@ export default function Auth({ onNavigate, intendedView }: Props) {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [pendingNavigation, setPendingNavigation] = useState<{ view: ViewType } | null>(null);
   const [showTutorial, setShowTutorial] = useState(false);
-  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const allCities = Object.keys(cityCoords).sort();
   
   // 10-digit phone input logic
@@ -417,7 +416,6 @@ export default function Auth({ onNavigate, intendedView }: Props) {
     }
     if (!fullName.trim()) { setFieldErrors({ general: 'يرجى إدخال اسمك الكامل' }); return; }
     if (!city) { setFieldErrors({ general: 'يرجى اختيار مدينتك' }); return; }
-    if (!acceptedTerms) { setFieldErrors({ general: 'يرجى الموافقة على شروط الاستخدام' }); return; }
 
     setLoading(true);
     setError(null);
@@ -691,7 +689,7 @@ export default function Auth({ onNavigate, intendedView }: Props) {
                     أنا مشتري
                   </button>
                 </div>
-                {fieldErrors.general && (
+                {fieldErrors.general && !selectedRole && (
                   <p className="text-center text-xs font-black text-red-500 animate-pulse">
                     {fieldErrors.general}
                   </p>
@@ -713,32 +711,13 @@ export default function Auth({ onNavigate, intendedView }: Props) {
                     className="w-full h-14 bg-[#F9F9F6] border-2 border-outline-variant/20 rounded-2xl px-4 text-base text-center font-black focus:border-primary focus:bg-white transition-all"
                   />
                 )}
-                  <CitySearchInput
-                    value={city}
-                    onChange={setCity}
-                    isDetecting={isDetectingLocation}
-                    allCities={allCities}
-                  />
-
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={acceptedTerms}
-                      onChange={(e) => setAcceptedTerms(e.target.checked)}
-                      className="w-5 h-5 accent-[#2E7D32] rounded"
-                    />
-                    <span className="text-sm font-bold text-[#1A1A1A]">
-                      أوافق على{' '}
-                      <button
-                        type="button"
-                        onClick={() => onNavigate('terms')}
-                        className="text-[#2E7D32] underline hover:text-[#1B5E20] transition-colors"
-                      >
-                        شروط الاستخدام
-                      </button>
-                    </span>
-                  </label>
-                </div>
+                <CitySearchInput
+                  value={city}
+                  onChange={setCity}
+                  isDetecting={isDetectingLocation}
+                  allCities={allCities}
+                />
+              </div>
             )}
 
             <button

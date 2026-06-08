@@ -18,9 +18,8 @@ import AccountView from '../components/dashboard/AccountView';
 import SellerSidebar from '../components/dashboard/SellerSidebar';
 import SellerMobileNav from '../components/dashboard/SellerMobileNav';
 import DeleteConfirmationModal from '../components/dashboard/DeleteConfirmationModal';
-import { Star, Plus, LayoutDashboard, Tag, BarChart3, CreditCard, Settings, HeartHandshake, LogOut, Lock } from 'lucide-react';
+import { Star, Plus, LayoutDashboard, Tag, BarChart3, CreditCard, Settings, HeartHandshake, LogOut } from 'lucide-react';
 import Notifications from './Notifications';
-import PaymentModal from '../components/dashboard/PaymentModal';
 
 const SheepIcon = ({ className }: { className?: string }) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -32,51 +31,6 @@ const SheepIcon = ({ className }: { className?: string }) => (
     <circle cx="13" cy="10.5" r=".5" />
   </svg>
 );
-
-function DashboardLockScreen({ sellerName, onActivated }: { sellerName: string; onActivated: () => void }) {
-  const [showPayment, setShowPayment] = useState(false);
-
-  return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] p-6 text-center animate-in fade-in slide-in-from-bottom-4 duration-500 bg-transparent" dir="rtl">
-      <div className="max-w-md w-full bg-white rounded-3xl p-8 border border-outline-variant/10 shadow-2xl relative overflow-hidden group">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full -mr-16 -mt-16 blur-2xl"></div>
-        <div className="absolute bottom-0 left-0 w-32 h-32 bg-[#115E2C]/5 rounded-full -ml-16 -mb-16 blur-2xl"></div>
-        
-        <div className="relative z-10 flex flex-col items-center">
-          <div className="w-16 h-16 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-600 mb-6 shadow-xl shadow-amber-100 group-hover:scale-110 transition-transform duration-300">
-            <Lock className="w-8 h-8" />
-          </div>
-          
-          <h2 className="text-xl font-black text-[#1A1A1A] mb-4 font-headline leading-tight">حسابك غير مفعّل</h2>
-          
-          <p className="text-sm text-[#757575] font-bold leading-relaxed mb-8">
-            حسابك مازال غير مفعّل. خلص 500 درهم مرة وحدة باش الحساب ينشط وتقدر تنشر إعلاناتك وتشوف الإحصائيات ديالك.
-          </p>
-
-          <button
-            onClick={() => setShowPayment(true)}
-            className="w-full py-4 bg-[#115E2C] text-white rounded-2xl font-black text-sm flex items-center justify-center gap-2 hover:bg-[#1B5E20] hover:shadow-xl hover:shadow-[#115E2C]/20 active:scale-95 transition-all duration-300 shadow-lg"
-          >
-            <CreditCard className="w-4 h-4" />
-            <span>تفعيل الحساب — 500 درهم</span>
-          </button>
-        </div>
-      </div>
-
-      {showPayment && (
-        <PaymentModal
-          isOpen={true}
-          onClose={() => setShowPayment(false)}
-          sellerName={sellerName}
-          onActivated={() => {
-            setShowPayment(false);
-            onActivated();
-          }}
-        />
-      )}
-    </div>
-  );
-}
 
 export type SellerTab = 'dashboard' | 'flock' | 'stats' | 'subscription' | 'account' | 'settings' | 'buyer-requests' | 'donations' | 'notifications';
 
@@ -216,89 +170,58 @@ export default function SellerDashboard({ onNavigate, activeSubView }: Props) {
         />
 
         <div className="p-4 md:p-8 max-w-7xl mx-auto w-full space-y-6 md:space-y-8 text-right pt-32 lg:pt-24">
-          {(() => {
-            const accountActivated = profile?.accountActivated === true || profile?.accountActivationType === 'grandfathered';
-
-            if (!accountActivated && settings?.paymentSystemEnabled && ['dashboard', 'flock', 'stats', 'buyer-requests', 'donations', 'subscription'].includes(activeTab)) {
-              const sellerName = profile?.pseudo || profile?.fullName || profile?.displayName || 'سي محمد';
-              return (
-                <DashboardLockScreen 
-                  sellerName={sellerName}
-                  onActivated={() => {
-                    const pendingId = localStorage.getItem('pendingActivationListing');
-                    if (pendingId) {
-                      localStorage.removeItem('pendingActivationListing');
-                      onNavigate('listing-details', pendingId);
-                    } else {
-                      window.location.reload();
-                    }
-                  }} 
-                />
-              );
-            }
-
-            return (
-              <>
-                {activeTab === 'dashboard' && (
-                    <SellerHomeView 
-                      profile={profile}
-                      activeFilter={activeFilter}
-                      setActiveFilter={setActiveFilter}
-                      stats={statsModel}
-                      announcements={announcements}
-                      onNavigate={onNavigate}
-                      setActiveTab={setActiveTab}
-                      setListingToDelete={setListingToDelete}
-                      setShowDeleteConfirm={setShowDeleteConfirm}
-                      renderStars={renderStars}
-                    />
-                )}
-                {activeTab === 'flock' && (
-                  <FlockView 
-                    announcements={announcements}
-                    onNavigate={onNavigate}
-                    settings={settings}
-                    setListingToDelete={setListingToDelete}
-                    setShowDeleteConfirm={setShowDeleteConfirm}
-                    renderStars={renderStars}
-                  />
-                )}
-                {activeTab === 'stats' && <SellerStats stats={statsModel} />}
-                {activeTab === 'subscription' && (
-                  <SubscriptionView 
-                    settings={settings} 
-                    profile={profile} 
-                    announcements={announcements} 
-                  />
-                )}
-                {(activeTab === 'account' || activeTab === 'settings') && (
-                  <AccountView 
-                    user={user} 
-                    profile={profile} 
-                    settings={settings} 
-                    cities={Object.keys(cityCoords).sort()} 
-                  />
-                )}
-                {activeTab === 'buyer-requests' && (
-                  <BuyerRequestsView 
-                    requests={requests} 
-                    announcements={announcements}
-                    onLoadMore={handleLoadMoreRequests}
-                    hasMore={!!nextCursorRequests}
-                    isLoadingMore={isLoadingMoreRequests}
-                    dailyLeadsCount={dailyLeadsCount}
-                    dailyLeadsLimit={dailyLeadsLimit}
-                    dailyOffersCount={dailyOffersCount}
-                    dailyOffersLimit={dailyOffersLimit}
-                  />
-                )}
-                {activeTab === 'donations' && settings.solidarityDonationEnabled && (
-                  <DonationsView onBack={() => setActiveTab('dashboard')} />
-                )}
-                {activeTab === 'notifications' && <Notifications onNavigate={onNavigate} hideHeader={true} />}
-              </>
-            );
-          })()}
+          {activeTab === 'dashboard' && (
+            <SellerHomeView 
+              profile={profile}
+              activeFilter={activeFilter}
+              setActiveFilter={setActiveFilter}
+              stats={statsModel}
+              announcements={announcements}
+              onNavigate={onNavigate}
+              setActiveTab={setActiveTab}
+              settings={settings}
+              setListingToDelete={setListingToDelete}
+              setShowDeleteConfirm={setShowDeleteConfirm}
+              renderStars={renderStars}
+            />
+          )}
+          {activeTab === 'flock' && (
+            <FlockView 
+              announcements={announcements}
+              onNavigate={onNavigate}
+              settings={settings}
+              setListingToDelete={setListingToDelete}
+              setShowDeleteConfirm={setShowDeleteConfirm}
+              renderStars={renderStars}
+            />
+          )}
+          {activeTab === 'stats' && <SellerStats stats={statsModel} />}
+          {activeTab === 'subscription' && <SubscriptionView settings={settings} />}
+          {(activeTab === 'account' || activeTab === 'settings') && (
+            <AccountView 
+              user={user} 
+              profile={profile} 
+              settings={settings} 
+              cities={Object.keys(cityCoords).sort()} 
+            />
+          )}
+          {activeTab === 'buyer-requests' && (
+            <BuyerRequestsView 
+              requests={requests} 
+              announcements={announcements}
+              onLoadMore={handleLoadMoreRequests}
+              hasMore={!!nextCursorRequests}
+              isLoadingMore={isLoadingMoreRequests}
+              dailyLeadsCount={dailyLeadsCount}
+              dailyLeadsLimit={dailyLeadsLimit}
+              dailyOffersCount={dailyOffersCount}
+              dailyOffersLimit={dailyOffersLimit}
+            />
+          )}
+          {activeTab === 'donations' && settings.solidarityDonationEnabled && (
+            <DonationsView onBack={() => setActiveTab('dashboard')} />
+          )}
+          {activeTab === 'notifications' && <Notifications onNavigate={onNavigate} hideHeader={true} />}
         </div>
       </main>
 

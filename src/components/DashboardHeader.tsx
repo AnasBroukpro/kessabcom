@@ -6,7 +6,7 @@ import { firestoreService } from '../services/firestoreService';
 import { cityMapping, cityCoords, getClosestCity, normalizeArabic } from '../constants/cityMapping';
 import MobileSidebar from './MobileSidebar';
 import NotificationSidebar from './NotificationSidebar';
-import logoV2 from '../assets/marketing/branding/logo v2.png';
+import logoV2 from '../assets/marketing/branding/logo-v2.png';
 
 interface Props {
   title?: string;

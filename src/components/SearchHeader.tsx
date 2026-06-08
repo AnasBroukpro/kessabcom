@@ -8,7 +8,7 @@ import NotificationSidebar from './NotificationSidebar';
 import { useSettings } from '../hooks/useSettings';
 import { firestoreService } from '../services/firestoreService';
 import { cityCoords, getClosestCity, normalizeArabic, cityMapping } from '../constants/cityMapping';
-import logoV2 from '../assets/marketing/branding/logo v2.png';
+import logoV2 from '../assets/marketing/branding/logo-v2.png';
 import ValidationModal from './ValidationModal';
 
 interface Props {

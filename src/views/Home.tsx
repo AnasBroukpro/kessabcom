@@ -14,7 +14,7 @@ import { useSettings } from '../hooks/useSettings';
 import ContactSellerModal from '../components/ContactSellerModal';
 import LoginRequiredModal from '../components/LoginRequiredModal';
 import NewsTicker from '../components/NewsTicker';
-import logoV2 from '../assets/marketing/branding/logo v2.png';
+import logoV2 from '../assets/marketing/branding/logo-v2.png';
 import MobileSidebar from '../components/MobileSidebar';
 import NotificationSidebar from '../components/NotificationSidebar';
 import GoogleMapComponent from '../components/GoogleMap';
@@ -26,7 +26,63 @@ interface Props {
 
 const moroccanCities = Object.keys(cityCoords);
 
+const EidCountdown = () => {
+  const calculateTimeLeft = () => {
+    // Approximation for Eid 2026
+    const eidDate = new Date('2026-05-26T00:00:00');
+    const difference = +eidDate - +new Date();
+    let timeLeft = { days: 0, hours: 0, minutes: 0, seconds: 0 };
 
+    if (difference > 0) {
+      timeLeft = {
+        days: Math.floor(difference / (1000 * 60 * 60 * 24)),
+        hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
+        minutes: Math.floor((difference / 1000 / 60) % 60),
+        seconds: Math.floor((difference / 1000) % 60)
+      };
+    }
+    return timeLeft;
+  };
+
+  const [timeLeft, setTimeLeft] = useState(calculateTimeLeft());
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setTimeLeft(calculateTimeLeft());
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [timeLeft]);
+
+  if (timeLeft.days === 0 && timeLeft.hours === 0 && timeLeft.minutes === 0) return null;
+
+  return (
+    <div className="bg-black/10 backdrop-blur-3xl border border-white/10 rounded-[2rem] p-4 md:p-6 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] inline-block">
+      <div className="flex items-center justify-center gap-2 mb-4">
+        <Clock className="w-4 h-4 text-[#A5D6A7]" />
+        <h2 className="text-sm md:text-base font-black text-white tracking-tight font-headline">باقي لعيد الأضحى المبارك</h2>
+      </div>
+      <div className="flex justify-center gap-2 md:gap-3" dir="ltr">
+        {[
+          { label: 'أيام', value: timeLeft.days },
+          { label: 'ساعات', value: timeLeft.hours },
+          { label: 'دقائق', value: timeLeft.minutes },
+          { label: 'ثواني', value: timeLeft.seconds }
+        ].map((unit, idx) => (
+          <div key={idx} className="flex flex-col items-center">
+            <div className="bg-white/10 backdrop-blur-xl border border-white/30 rounded-xl p-2 md:p-3 min-w-[55px] md:min-w-[65px] shadow-xl relative overflow-hidden group">
+              <div className="text-lg md:text-xl font-black text-white leading-none mb-1 drop-shadow-md">
+                {unit.value}
+              </div>
+              <div className="text-[10px] md:text-xs font-black text-white uppercase tracking-wider drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)] mt-1">
+                {unit.label}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 export default function Home({ onNavigate }: Props) {
   const { settings } = useSettings();
@@ -465,7 +521,7 @@ export default function Home({ onNavigate }: Props) {
           {/* TOP CONTENT: Countdown & Title */}
           <div className="relative z-10 max-w-5xl w-full text-center mt-16 md:mt-0">
             <div className="flex flex-col items-center mb-8 animate-in fade-in slide-in-from-top-4 duration-1000 relative">
-              <Countdown />
+              <EidCountdown />
             </div>
 
             <div className="md:bg-transparent md:backdrop-blur-none md:p-0 md:rounded-none">

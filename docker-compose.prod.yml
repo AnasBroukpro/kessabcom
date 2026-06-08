@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   kessabcom:
     image: ghcr.io/anasbrouk/kessabcom-v31:latest

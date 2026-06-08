@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import logoV2 from '../assets/marketing/branding/logo v2.png';
+import logoV2 from '../assets/marketing/branding/logo-v2.png';
 
 const LoadingScreen: React.FC = () => {
   return (

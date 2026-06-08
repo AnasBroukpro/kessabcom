@@ -1,11 +1,14 @@
 node_modules
-# dist
-# .env
+dist
+.env
+.env.bak
+.env.local
 firebase-service-account.json
 firebase-applet-config.json
 .git
 .github
 *.zip
+*.tar.gz
 *.md
 .gitignore
 .firebaserc
@@ -15,3 +18,7 @@ firebase.json
 metadata.json
 request.json
 scratch
+.kilo
+build_error.txt
+source.zip
+Dockerfile.patch

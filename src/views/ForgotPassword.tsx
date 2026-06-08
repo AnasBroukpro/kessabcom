@@ -5,7 +5,7 @@ import { Phone, ArrowRight, CheckCircle2, Loader2, KeyRound } from 'lucide-react
 import { firestoreService } from '../services/firestoreService';
 import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import logoV2 from '../assets/marketing/branding/logo v2.png';
+import logoV2 from '../assets/marketing/branding/logo-v2.png';
 
 interface Props {
   onNavigate: (view: ViewType) => void;

@@ -2,14 +2,14 @@ import React from 'react';
 import { Phone, AlertTriangle, X } from 'lucide-react';
 import { useSettings } from '../hooks/useSettings';
 import { useAuth } from '../contexts/AuthContext';
-import { monetizationService } from '../services/monetizationService';
+import { firestoreService } from '../services/firestoreService';
 import { ViewType } from '../App';
 import LoginRequiredModal from './LoginRequiredModal';
 
 // Assets
 import whatsappIcon from '../assets/marketing/features/whatsapp-svgrepo-com.svg';
 import mapPointIcon from '../assets/marketing/features/map-point-svgrepo-com.svg';
-import logoV2 from '../assets/marketing/branding/logo v2.png';
+import logoV2 from '../assets/marketing/branding/logo-v2.png';
 
 interface ContactSellerModalProps {
   isOpen: boolean;
@@ -39,17 +39,15 @@ export default function ContactSellerModal({
 
   if (!isOpen) return null;
 
-  const handlePhoneClick = async () => {
+  const handlePhoneClick = () => {
     if (listingId) {
-      try { await monetizationService.recordContact(listingId, 'phone'); }
-      catch (e) { console.warn('Contact point deduction failed (non-blocking):', e); }
+      firestoreService.incrementContactClick(listingId, 'phone');
     }
   };
 
-  const handleWhatsappClick = async () => {
+  const handleWhatsappClick = () => {
     if (listingId) {
-      try { await monetizationService.recordContact(listingId, 'whatsapp'); }
-      catch (e) { console.warn('Contact point deduction failed (non-blocking):', e); }
+      firestoreService.incrementContactClick(listingId, 'whatsapp');
     }
   };
 

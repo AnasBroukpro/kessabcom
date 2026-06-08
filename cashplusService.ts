@@ -92,7 +92,6 @@ export function verifyCallbackHmac(
 const CASHPLUS_BASE_URL = process.env.CASHPLUS_BASE_URL || 'https://cpay.ma/cpws/cpmarchand/index.cfm';
 const MARCHAND_CODE = process.env.CASHPLUS_MARCHAND_CODE || '';
 const SECRET_KEY = process.env.CASHPLUS_SECRET_KEY || '';
-const CASHPLUS_CALLBACK_URL = process.env.CASHPLUS_CALLBACK_URL || '';
 export const SIMULATION_MODE = process.env.CASHPLUS_SIMULATION_MODE === 'true' ||
   (process.env.CASHPLUS_SIMULATION_MODE !== 'false' && process.env.NODE_ENV !== 'production');
 
