@@ -16,8 +16,6 @@ ARG VITE_GOOGLE_MAPS_API_KEY
 COPY package*.json ./
 RUN npm ci && npm cache clean --force
 COPY . .
-# Rendre les VITE_* vars disponibles pour le build frontend
-COPY .env.cloudbuild .env
 RUN npm run build
 
 # ── Stage 2 : Runner ──
