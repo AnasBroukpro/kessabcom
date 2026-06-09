@@ -6,9 +6,9 @@ steps:
     args:
       - 'build'
       - '-t'
-      - 'europe-west9-docker.pkg.dev/kessabcom-0004/cloud-run-source-deploy/kessabcom:$COMMIT_SHA'
+      - 'europe-west1-docker.pkg.dev/kessabcom-0004/cloud-run-source-deploy/kessabcom:$COMMIT_SHA'
       - '-t'
-      - 'europe-west9-docker.pkg.dev/kessabcom-0004/cloud-run-source-deploy/kessabcom:latest'
+      - 'europe-west1-docker.pkg.dev/kessabcom-0004/cloud-run-source-deploy/kessabcom:latest'
       - '--build-arg=VITE_FIREBASE_API_KEY=$_VITE_FIREBASE_API_KEY'
       - '--build-arg=VITE_FIREBASE_AUTH_DOMAIN=$_VITE_FIREBASE_AUTH_DOMAIN'
       - '--build-arg=VITE_FIREBASE_PROJECT_ID=$_VITE_FIREBASE_PROJECT_ID'
@@ -23,7 +23,7 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'push'
-      - 'europe-west9-docker.pkg.dev/kessabcom-0004/cloud-run-source-deploy/kessabcom'
+      - 'europe-west1-docker.pkg.dev/kessabcom-0004/cloud-run-source-deploy/kessabcom'
 
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
@@ -31,8 +31,8 @@ steps:
       - 'run'
       - 'deploy'
       - 'kessabcom'
-      - '--image=europe-west9-docker.pkg.dev/kessabcom-0004/cloud-run-source-deploy/kessabcom:$COMMIT_SHA'
-      - '--region=europe-west9'
+      - '--image=europe-west1-docker.pkg.dev/kessabcom-0004/cloud-run-source-deploy/kessabcom:$COMMIT_SHA'
+      - '--region=europe-west1'
       - '--platform=managed'
       - '--allow-unauthenticated'
       - '--memory=512Mi'
@@ -47,4 +47,4 @@ steps:
       - '--set-secrets=GOOGLE_CLOUD_API_KEY=google-cloud-api-key:latest'
 
 images:
-  - 'europe-west9-docker.pkg.dev/kessabcom-0004/cloud-run-source-deploy/kessabcom'
+  - 'europe-west1-docker.pkg.dev/kessabcom-0004/cloud-run-source-deploy/kessabcom'
