@@ -34,7 +34,7 @@ steps:
       - '--image=europe-west1-docker.pkg.dev/kessabcom-0004/cloud-run-source-deploy/kessabcom:$COMMIT_SHA'
       - '--region=europe-west1'
       - '--platform=managed'
-      - '--allow-unauthenticated'
+      - '--no-allow-unauthenticated'
       - '--memory=512Mi'
       - '--cpu=1'
       - '--concurrency=40'
