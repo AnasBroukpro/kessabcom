@@ -6,7 +6,6 @@ import admin from "firebase-admin";
 import fs from "fs";
 import fetch from "node-fetch";
 import cors from "cors";
-import compression from "compression";
 import rateLimit from "express-rate-limit";
 import nodemailer from "nodemailer";
 import { generateCashplusToken, checkCashplusTokenStatus, verifyCallbackHmac, SIMULATION_MODE } from "./cashplusService.js";
@@ -265,8 +264,6 @@ async function startServer() {
   }));
 
   app.set("trust proxy", 1);
-
-  app.use(compression());
 
   // Rate Limiters
   const checkPhoneLimiter = rateLimit({
@@ -2836,7 +2833,13 @@ async function startServer() {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
     app.use((req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
+      const indexPath = path.join(distPath, 'index.html');
+      if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+      } else {
+        console.error("🔥 dist/index.html NOT FOUND at", indexPath);
+        res.status(500).json({ error: "Frontend build not found" });
+      }
     });
   }
 
