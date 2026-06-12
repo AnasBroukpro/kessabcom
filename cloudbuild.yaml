@@ -6,8 +6,6 @@ steps:
     args:
       - 'build'
       - '-t'
-      - 'europe-west1-docker.pkg.dev/kessabcom-0004/cloud-run-source-deploy/kessabcom:$COMMIT_SHA'
-      - '-t'
       - 'europe-west1-docker.pkg.dev/kessabcom-0004/cloud-run-source-deploy/kessabcom:latest'
       - '--build-arg=VITE_FIREBASE_API_KEY=$_VITE_FIREBASE_API_KEY'
       - '--build-arg=VITE_FIREBASE_AUTH_DOMAIN=$_VITE_FIREBASE_AUTH_DOMAIN'
@@ -31,7 +29,7 @@ steps:
       - 'run'
       - 'deploy'
       - 'kessabcom'
-      - '--image=europe-west1-docker.pkg.dev/kessabcom-0004/cloud-run-source-deploy/kessabcom:$COMMIT_SHA'
+      - '--image=europe-west1-docker.pkg.dev/kessabcom-0004/cloud-run-source-deploy/kessabcom:latest'
       - '--region=europe-west1'
       - '--platform=managed'
       - '--no-allow-unauthenticated'
