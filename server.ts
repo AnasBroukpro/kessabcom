@@ -227,6 +227,7 @@ async function startServer() {
   const allowedOrigins = [
     "https://kessabcom.ma",
     "https://www.kessabcom.ma",
+    "https://kessabcom-854879643489.europe-west1.run.app",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "http://localhost:5174",
@@ -237,7 +238,6 @@ async function startServer() {
     "http://127.0.0.1:3001",
     "http://localhost:3002",
     "http://127.0.0.1:3002",
-    "https://kessabcom-api-854879643489.europe-west9.run.app",
     "https://kessabcom-api-854879643489.europe-west1.run.app",
   ];
 
